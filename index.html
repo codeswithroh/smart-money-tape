@@ -47,8 +47,10 @@
   .call.trench{background:#fce9df;}
   .call .cap{display:flex;align-items:center;gap:9px;padding:10px 16px;border-bottom:2px dashed var(--ink);font-family:"Caveat",cursive;font-weight:700;font-size:18px;letter-spacing:.04em;text-transform:uppercase;color:var(--accent);}
   .call .cap .live-tag{margin-left:auto;font-family:"Patrick Hand",cursive;text-transform:none;font-size:13px;color:var(--ink-faint);}
-  .call .body{padding:16px;display:grid;grid-template-columns:1.1fr 1fr;gap:18px;}
-  .call.none .body{grid-template-columns:1fr;}
+  .call .body{padding:16px;display:flex;flex-direction:column;gap:14px;}
+  .callchart{width:100%;}
+  .callchart .chart-embed{height:460px;}
+  .callchart canvas.candles{height:360px;}
   .call .headline{display:flex;flex-direction:column;gap:9px;}
   .call .tk{font-family:"Caveat",cursive;font-weight:700;font-size:42px;line-height:.9;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;}
   .call .tk .cash{color:var(--ink-faint);font-size:28px;}
@@ -56,7 +58,8 @@
   .call .verdict{font-family:"Caveat",cursive;font-weight:700;font-size:24px;}
   .call .verdict.buy{color:var(--pos);} .call .verdict.watch{color:var(--accent);}
   .call .reason{font-size:15px;color:var(--ink-soft);line-height:1.5;} .call .reason b{color:var(--ink);}
-  .call .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-self:start;}
+  .call .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
+  @media(max-width:720px){ .call .grid{grid-template-columns:repeat(2,1fr);} }
   .call .cell{padding:9px 12px;border-radius:9px 13px 8px 12px / 13px 8px 12px 9px;background:var(--card);}
   .call .cell .k{font-size:12px;letter-spacing:.03em;text-transform:uppercase;color:var(--ink-faint);}
   .call .cell .v{font-size:19px;margin-top:3px;} .call .cell .v small{font-size:12.5px;color:var(--ink-soft);}
