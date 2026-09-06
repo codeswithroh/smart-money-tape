@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <style>html,body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
 <title>Smart Money Tape</title>
-<meta name="description" content="fomo.family top traders fused into calls, with Trenches mode, live price charts, a traders scatter, a 3D copy-network and push alerts." />
+<meta name="description" content="fomo.family's top traders fused into one call, with full candle charts and the smart-money entry prices marked so you know if you're early or late." />
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Patrick+Hand&display=swap" />
 <style>
   :root{
@@ -26,28 +26,22 @@
     background-attachment: fixed, scroll;
     font-family:"Patrick Hand","Comic Sans MS",ui-rounded,cursive; font-size:16.5px; line-height:1.5;
   }
-  .wrap{max-width:1040px;margin:0 auto;padding:24px 20px 140px;position:relative;}
-  .wrap::before{content:"";position:fixed;top:0;bottom:0;left:max(12px,calc(50% - 486px));width:2px;background:rgba(207,58,38,.26);pointer-events:none;}
-  @media(max-width:860px){ .wrap::before{display:none;} }
+  .wrap{max-width:1000px;margin:0 auto;padding:24px 20px 140px;position:relative;}
+  .wrap::before{content:"";position:fixed;top:0;bottom:0;left:max(12px,calc(50% - 466px));width:2px;background:rgba(207,58,38,.26);pointer-events:none;}
+  @media(max-width:820px){ .wrap::before{display:none;} }
   a{color:var(--accent);text-decoration:underline;text-decoration-style:wavy;text-underline-offset:2px;}
   :focus-visible{outline:2px dashed var(--accent);outline-offset:3px;}
   h1,h2{font-family:"Caveat","Patrick Hand",cursive;font-weight:700;}
   header.top{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px 20px;border-bottom:2px dashed var(--ink);padding-bottom:12px;}
   .brand{margin-right:auto;display:flex;flex-direction:column;gap:2px;}
   .brand h1{font-size:clamp(34px,6vw,52px);line-height:.95;margin:0;transform:rotate(-1deg);}
-  .brand .sub{color:var(--ink-soft);font-size:15px;max-width:66ch;}
+  .brand .sub{color:var(--ink-soft);font-size:15px;max-width:64ch;}
   .status{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--ink-soft);}
   .dot{width:13px;height:13px;border:2px solid var(--ink);background:transparent;border-radius:60% 40% 55% 45% / 50% 60% 45% 55%;flex:none;filter:url(#rough);}
   .dot.live{background:var(--pos);} .dot.stale{background:var(--accent);} .dot.err{background:var(--neg);}
   @media(prefers-reduced-motion:no-preference){ .dot.live{animation:wob 2.6s ease-in-out infinite;} @keyframes wob{0%,100%{transform:rotate(-5deg)}50%{transform:rotate(5deg)}} }
 
-  .tabs{display:flex;gap:8px;margin:16px 0 4px;flex-wrap:wrap;}
-  .tab{font-family:"Caveat",cursive;font-weight:700;font-size:20px;text-transform:uppercase;letter-spacing:.04em;padding:4px 14px;border:2px solid var(--ink);border-radius:12px 6px 13px 7px / 7px 13px 6px 12px;background:var(--card);color:var(--ink-soft);cursor:pointer;transform:rotate(-.6deg);}
-  .tab:nth-child(2){transform:rotate(.5deg);} .tab:nth-child(3){transform:rotate(-.3deg);}
-  .tab[aria-selected="true"]{background:var(--accent);color:var(--paper);}
-
-  .call,.row,.btn,.seg,.chip-toggle,.track .m,.call .cell,.detail,.tape,.cchip,.trust-b,.tape .t .rk,.panel{ border:2px solid var(--ink); background:var(--card); appearance:none; -webkit-appearance:none; }
-  .panel{border-radius:16px 8px 18px 8px / 8px 16px 9px 16px;padding:14px;margin:14px 0;box-shadow:3px 4px 0 rgba(44,53,80,.14);}
+  .call,.row,.btn,.seg,.chip-toggle,.track .m,.call .cell,.detail,.tape,.cchip,.trust-b,.tape .t .rk{ border:2px solid var(--ink); background:var(--card); appearance:none; -webkit-appearance:none; }
   .call{position:relative;border-radius:20px 9px 22px 8px / 9px 20px 11px 20px;background:var(--note);box-shadow:3px 4px 0 rgba(44,53,80,.18);transform:rotate(-.5deg);margin:20px 0 10px;overflow:hidden;}
   .call::after{content:"";position:absolute;inset:-6px -5px -4px -6px;border:1.5px solid var(--ink);border-radius:12px 20px 10px 22px / 20px 10px 22px 12px;opacity:.3;pointer-events:none;filter:url(#rough);}
   .call.trench{background:#fce9df;}
@@ -67,8 +61,7 @@
   .call .cell .k{font-size:12px;letter-spacing:.03em;text-transform:uppercase;color:var(--ink-faint);}
   .call .cell .v{font-size:19px;margin-top:3px;} .call .cell .v small{font-size:12.5px;color:var(--ink-soft);}
   .call .actions{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding-top:2px;}
-  .call .chartwrap{grid-column:1/-1;}
-  .call canvas.spark{width:100%;height:130px;display:block;border:1.5px dashed var(--pencil);border-radius:8px;background:var(--card);}
+  .call .cfull{grid-column:1/-1;}
   .call .mono{font-family:"Patrick Hand",cursive;}
   .btn{font-family:"Patrick Hand",cursive;font-size:15px;padding:6px 14px;border-radius:12px 6px 14px 7px / 7px 13px 6px 12px;background:var(--card);color:var(--ink);cursor:pointer;box-shadow:2px 2px 0 rgba(44,53,80,.18);}
   .btn:hover{transform:translate(1px,1px);box-shadow:1px 1px 0 rgba(44,53,80,.18);}
@@ -125,17 +118,23 @@
   .why p{margin:0;font-size:13px;color:var(--ink-soft);} .why p b{color:var(--ink);}
   .chev{color:var(--ink-faint);justify-self:end;font-size:20px;transition:transform .15s;}
   .row[aria-expanded="true"] .chev{transform:rotate(90deg);}
-  .detail{margin:2px 0 0;padding:6px 13px 14px;border-radius:5px 11px 6px 10px / 10px 5px 11px 6px;background:var(--card);}
-  .detail canvas.spark{width:100%;height:120px;display:block;margin:6px 0 4px;border:1.5px dashed var(--pencil);border-radius:6px;}
-  .detail table{width:100%;border-collapse:collapse;font-size:13px;}
-  .detail th{text-align:right;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.03em;font-size:11px;padding:8px 7px 5px;border-bottom:2px dashed var(--ink);}
-  .detail th:first-child{text-align:left;}
-  .detail td{text-align:right;padding:6px 7px;border-bottom:1px dashed var(--pencil);}
-  .detail td:first-child{text-align:left;color:var(--ink);}
-  .detail tr:last-child td{border-bottom:0;}
-  .trust-b{display:inline-block;min-width:30px;text-align:center;padding:0 6px;border-radius:6px 10px 5px 9px / 9px 5px 10px 6px;font-size:12px;}
-  .trust-hi{background:var(--pos-wash);color:var(--pos);} .trust-mid{background:var(--accent-wash);color:var(--accent);}
-  .trust-lo{background:var(--neg-wash);color:var(--neg);} .trust-prov{background:var(--card);color:var(--ink-faint);}
+  .detail{margin:2px 0 0;padding:10px 13px 14px;border-radius:5px 11px 6px 10px / 10px 5px 11px 6px;background:var(--card);}
+  .ctoggle{display:inline-flex;border:2px solid var(--ink);border-radius:9px 5px 10px 5px;overflow:hidden;margin-bottom:6px;}
+  .ctoggle button{font-family:"Patrick Hand",cursive;font-size:13px;padding:3px 11px;border:0;border-right:2px dashed var(--ink);background:var(--card);color:var(--ink-soft);cursor:pointer;}
+  .ctoggle button:last-child{border-right:0;}
+  .ctoggle button[aria-pressed="true"]{background:var(--accent);color:var(--paper);}
+  .chart-embed{width:100%;height:430px;border:2px solid var(--ink);border-radius:10px 6px 12px 6px;overflow:hidden;background:#0e0f13;}
+  .chart-embed iframe{width:100%;height:100%;border:0;display:block;}
+  canvas.candles{width:100%;height:300px;display:block;border:2px solid var(--ink);border-radius:10px 6px 12px 6px;background:#12131c;}
+  .entries{width:100%;border-collapse:collapse;font-size:13px;margin-top:10px;}
+  .entries th{text-align:right;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.03em;font-size:10.5px;padding:6px 6px 4px;border-bottom:2px dashed var(--ink);}
+  .entries th:first-child{text-align:left;}
+  .entries td{text-align:right;padding:5px 6px;border-bottom:1px dashed var(--pencil);font-family:"Patrick Hand",cursive;}
+  .entries td:first-child{text-align:left;color:var(--ink);}
+  .entries tr:last-child td{border-bottom:0;}
+  .entries .up{color:var(--pos);} .entries .down{color:var(--neg);}
+  .entry-summary{margin:8px 0 0;font-size:13.5px;color:var(--ink-soft);line-height:1.5;} .entry-summary b{color:var(--ink);}
+  .entry-summary .late{color:var(--neg);} .entry-summary .early{color:var(--pos);}
   .detail .expl{margin:11px 0 0;font-size:13px;color:var(--ink-soft);line-height:1.5;} .detail .expl b{color:var(--ink);}
   .detail .links{display:flex;flex-wrap:wrap;gap:14px;margin-top:9px;font-size:13px;}
   .detail .mono{font-family:"Patrick Hand",cursive;}
@@ -144,92 +143,50 @@
   .tape .t:last-child{border-bottom:0;}
   .tape .t .side{font-family:"Caveat",cursive;font-weight:700;font-size:15px;text-transform:uppercase;}
   .tape .t.buy .side{color:var(--pos);} .tape .t.sell .side{color:var(--neg);}
-  .tape .t .who{color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;text-decoration:underline dotted;}
+  .tape .t .who{color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .tape .t .rk{font-size:10px;color:var(--accent);border-radius:5px 8px 4px 7px;padding:0 4px;margin-left:5px;}
   .tape .t .tk,.tape .t .sz{color:var(--ink-soft);} .tape .t .ago{color:var(--ink-faint);font-size:12px;}
   .empty{padding:28px 12px;text-align:center;color:var(--ink-soft);font-size:14px;}
   .blocked-head{cursor:pointer;font-family:"Patrick Hand",cursive;font-size:13px;color:var(--ink-faint);margin:14px 2px 4px;}
-
-  canvas.bubble{width:100%;height:360px;display:block;border:2px solid var(--ink);border-radius:14px 8px 16px 8px / 8px 15px 9px 14px;background:var(--card);touch-action:none;}
-  .ttable{overflow-x:auto;margin-top:12px;}
-  .ttable table{width:100%;border-collapse:collapse;font-size:13px;border:2px solid var(--ink);border-radius:10px 6px 12px 6px;overflow:hidden;background:var(--card);}
-  .ttable th{cursor:pointer;text-align:right;font-family:"Patrick Hand",cursive;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.03em;font-size:11px;padding:8px 8px 6px;border-bottom:2px dashed var(--ink);white-space:nowrap;}
-  .ttable th:first-child{text-align:left;}
-  .ttable td{text-align:right;padding:7px 8px;border-bottom:1px dashed var(--pencil);}
-  .ttable td:first-child{text-align:left;}
-  .ttable tr{cursor:pointer;} .ttable tbody tr:hover td{background:var(--note);}
-  .ttable .h{color:var(--ink);text-decoration:underline dotted;}
-  .tdrill canvas{width:100%;height:150px;display:block;border:1.5px dashed var(--pencil);border-radius:8px;margin:8px 0;background:var(--card);}
-  .tdrill .bars{display:flex;flex-direction:column;gap:6px;font-size:13px;margin:8px 0;}
-  .tdrill .bars .b{display:grid;grid-template-columns:150px 1fr 46px;gap:8px;align-items:center;}
-  .tdrill .bars .track2{height:12px;border:1.5px solid var(--ink);border-radius:6px;overflow:hidden;}
-  .tdrill .bars .track2 i{display:block;height:100%;background:repeating-linear-gradient(45deg,var(--accent) 0 2px,transparent 2px 5px);}
-  #net3d{height:520px;border:2px solid var(--ink);border-radius:16px 8px 18px 8px;background:#12131c;overflow:hidden;position:relative;}
-  #net3d .hint2{position:absolute;left:10px;bottom:8px;color:#cdd2df;font-size:12px;font-family:"Patrick Hand",cursive;z-index:2;pointer-events:none;}
-  canvas.net2d{width:100%;height:516px;display:block;border:2px solid var(--ink);border-radius:16px 8px 18px 8px;background:#12131c;touch-action:none;}
-
   .disclaimer{position:fixed;left:0;right:0;bottom:0;z-index:5;background:var(--paper-2);border-top:2px dashed var(--ink);font-size:12.5px;color:var(--ink-soft);line-height:1.4;}
-  .disclaimer div{max-width:1040px;margin:0 auto;padding:8px 20px;} .disclaimer b{color:var(--ink);}
-  @media(max-width:720px){ .call .body{grid-template-columns:1fr;} .row{grid-template-columns:48px 1fr 16px;} .row .why{grid-column:1/-1;} .tape .t{grid-template-columns:42px 48px 1fr auto;} .tape .t .ago{display:none;} .tdrill .bars .b{grid-template-columns:110px 1fr 42px;} }
+  .disclaimer div{max-width:1000px;margin:0 auto;padding:8px 20px;} .disclaimer b{color:var(--ink);}
+  @media(max-width:720px){ .call .body{grid-template-columns:1fr;} .row{grid-template-columns:48px 1fr 16px;} .row .why{grid-column:1/-1;} .tape .t{grid-template-columns:42px 48px 1fr auto;} .tape .t .ago{display:none;} }
 </style>
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><filter id="rough"><feTurbulence type="fractalNoise" baseFrequency="0.045" numOctaves="2" seed="7" result="t" /><feDisplacementMap in="SourceGraphic" in2="t" scale="3" /></filter></svg>
 <div class="wrap">
   <header class="top">
-    <div class="brand"><h1>Smart Money Tape</h1><span class="sub">fomo.family top-100 traders, fused into calls. <b>Trenches</b> mode for fresh micro-caps (rug-screened via RugCheck / Honeypot). Live GeckoTerminal price charts, a traders scatter, a 3D copy-network, and push alerts to Discord / Telegram.</span></div>
+    <div class="brand"><h1>Smart Money Tape</h1><span class="sub">fomo.family's top-100 traders fused into one call. Full candle charts and the <b>smart-money entry prices</b> marked, so you always know if you're early or late.</span></div>
     <div class="status"><span class="dot" id="dot"></span><span id="statusText">connecting&hellip;</span></div>
   </header>
 
-  <div class="tabs" role="tablist">
-    <button class="tab" data-tab="signals" role="tab" aria-selected="true">Signals</button>
-    <button class="tab" data-tab="traders" role="tab" aria-selected="false">Traders</button>
-    <button class="tab" data-tab="network" role="tab" aria-selected="false">Network</button>
+  <div class="controls" style="margin-top:12px"><div class="seg mode-seg" role="group" aria-label="Mode"><button data-mode="liquid" aria-pressed="true">Liquid</button><button data-mode="trenches" aria-pressed="false">Trenches</button></div></div>
+  <section class="call none" id="call" aria-live="polite"><div class="cap">The call <span class="live-tag" id="callAge"></span></div><div class="body" id="callBody"><div class="empty" style="border:0;background:transparent">Reading the tape&hellip;</div></div></section>
+  <div class="track" id="track" hidden></div><p class="track-note" id="trackNote" hidden></p>
+  <div class="controls">
+    <div class="seg" role="group" aria-label="Leaderboard window"><button data-win="24h" aria-pressed="true">24H</button><button data-win="7d" aria-pressed="false">7D</button><button data-win="30d" aria-pressed="false">30D</button></div>
+    <label class="chip-filter" id="minLiqWrap">min liq <select id="minLiq"><option value="0">any</option><option value="10000">$10k</option><option value="25000" selected>$25k</option><option value="50000">$50k</option><option value="100000">$100k</option></select></label>
+    <label class="chip-filter">bankroll $ <input id="bankroll" type="number" min="0" step="100" value="1000" style="width:88px" /></label>
+    <button class="chip-toggle" id="watchOnly" aria-pressed="false">&#9733; only</button>
+    <span class="chip-filter">chains</span>
+    <button class="chip-toggle" data-chain="solana" aria-pressed="true">solana</button>
+    <button class="chip-toggle" data-chain="bsc" aria-pressed="true">bsc</button>
+    <button class="chip-toggle" data-chain="base" aria-pressed="true">base</button>
+    <button class="chip-toggle" data-chain="robinhood" aria-pressed="false">robinhood</button>
+    <label class="chip-filter">fomoapi key <input id="apiKey" type="password" placeholder="optional" autocomplete="off" /></label>
+    <label class="chip-filter">alert to <input id="hook" type="text" placeholder="discord webhook or tg:BOT:CHATID" autocomplete="off" /></label>
   </div>
-
-  <section id="view-signals">
-    <div class="controls" style="margin-top:8px"><div class="seg mode-seg" role="group" aria-label="Mode"><button data-mode="liquid" aria-pressed="true">Liquid</button><button data-mode="trenches" aria-pressed="false">Trenches</button></div></div>
-    <section class="call none" id="call" aria-live="polite"><div class="cap">The call <span class="live-tag" id="callAge"></span></div><div class="body" id="callBody"><div class="empty" style="border:0;background:transparent">Reading the tape&hellip;</div></div></section>
-    <div class="track" id="track" hidden></div><p class="track-note" id="trackNote" hidden></p>
-    <div class="controls">
-      <div class="seg" role="group" aria-label="Leaderboard window"><button data-win="24h" aria-pressed="true">24H</button><button data-win="7d" aria-pressed="false">7D</button><button data-win="30d" aria-pressed="false">30D</button></div>
-      <label class="chip-filter" id="minLiqWrap">min liq <select id="minLiq"><option value="0">any</option><option value="10000">$10k</option><option value="25000" selected>$25k</option><option value="50000">$50k</option><option value="100000">$100k</option></select></label>
-      <label class="chip-filter">bankroll $ <input id="bankroll" type="number" min="0" step="100" value="1000" style="width:88px" /></label>
-      <button class="chip-toggle" id="watchOnly" aria-pressed="false">&#9733; only</button>
-      <span class="chip-filter">chains</span>
-      <button class="chip-toggle" data-chain="solana" aria-pressed="true">solana</button>
-      <button class="chip-toggle" data-chain="bsc" aria-pressed="true">bsc</button>
-      <button class="chip-toggle" data-chain="base" aria-pressed="true">base</button>
-      <button class="chip-toggle" data-chain="robinhood" aria-pressed="false">robinhood</button>
-      <label class="chip-filter">fomoapi key <input id="apiKey" type="password" placeholder="optional" autocomplete="off" /></label>
-      <label class="chip-filter">alert to <input id="hook" type="text" placeholder="discord webhook or tg:BOT:CHATID" autocomplete="off" /></label>
-    </div>
-    <div class="tallies" id="tallies"></div>
-    <div class="shead"><h2 id="listTitle">Signals now</h2><span class="hint" id="listHint">90-minute window &middot; tap a row for chart + breakdown</span></div>
-    <div class="rows" id="signals"><div class="empty">Loading the tape&hellip;</div></div>
-    <div id="blockedZone"></div>
-    <div class="shead" id="discHead" hidden><h2>Fresh launches</h2><span class="hint">GeckoTerminal new + trending, safe-screened, no fomo buyer yet</span></div>
-    <div class="rows" id="discovery" hidden></div>
-    <div class="shead"><h2>Raw tape</h2><span class="hint"><span class="rk">#</span> = rank &middot; click a name</span></div>
-    <div class="tape" id="tape"></div>
-  </section>
-
-  <section id="view-traders" hidden>
-    <div class="shead"><h2>Traders scatter</h2><span class="hint">x = trades &middot; y = board PnL &middot; size = followers &middot; colour = trust &middot; click a bubble</span></div>
-    <canvas class="bubble" id="tbubble"></canvas>
-    <div class="ttable" id="ttable"></div>
-    <div class="tdrill panel" id="tdrill" hidden></div>
-  </section>
-
-  <section id="view-network" hidden>
-    <div class="shead"><h2>Copy network</h2><span class="hint">ranked traders &harr; tokens bought in the window &middot; tight clusters = coordinated wallets</span></div>
-    <div class="controls"><div class="seg" role="group" aria-label="Network dim"><button data-net="3d" aria-pressed="true">3D</button><button data-net="2d" aria-pressed="false">2D</button></div></div>
-    <div id="net3d"><span class="hint2" id="net3dHint">loading&hellip;</span></div>
-    <canvas class="net2d" id="net2d" hidden></canvas>
-  </section>
+  <div class="tallies" id="tallies"></div>
+  <div class="shead"><h2 id="listTitle">Signals now</h2><span class="hint" id="listHint">90-minute window &middot; tap a row for chart + entries</span></div>
+  <div class="rows" id="signals"><div class="empty">Loading the tape&hellip;</div></div>
+  <div id="blockedZone"></div>
+  <div class="shead" id="discHead" hidden><h2>Fresh launches</h2><span class="hint">GeckoTerminal new + trending, safe-screened, no fomo buyer yet</span></div>
+  <div class="rows" id="discovery" hidden></div>
+  <div class="shead"><h2>Raw tape</h2><span class="hint"><span class="rk">#</span> = leaderboard rank</span></div>
+  <div class="tape" id="tape"></div>
 </div>
-<div class="disclaimer"><div id="discl"><b>Not financial advice.</b> Public data: an unofficial fomo.family feed, DexScreener, GeckoTerminal, RugCheck, Honeypot. Memecoins are extreme risk and most go to zero; you are ~15s behind. Model sizes are mechanical formulas. Track record is paper only. No tool makes this safe &mdash; it only organises the information.</div></div>
-<script src="https://cdn.jsdelivr.net/npm/3d-force-graph@1.73.4/dist/3d-force-graph.min.js" defer></script>
+<div class="disclaimer"><div id="discl"><b>Not financial advice.</b> Public data: an unofficial fomo.family feed, DexScreener, GeckoTerminal, RugCheck, Honeypot. Memecoins are extreme risk and most go to zero; you are ~15s behind. Model sizes are mechanical formulas. Track record is paper only.</div></div>
 <script src="/app.js" defer></script>
 </body>
 </html>
