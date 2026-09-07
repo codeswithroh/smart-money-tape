@@ -100,7 +100,12 @@
   .rcard .cap img{width:38px;height:38px;border-radius:50%;border:2px solid var(--ink);object-fit:cover;background:var(--paper-2);}
   .rcard .cap .nm{font-family:"Caveat",cursive;font-weight:700;font-size:30px;line-height:.9;}
   .rcard .cap .chain{font-size:12px;text-transform:uppercase;border:2px solid var(--ink);border-radius:7px 4px 8px 4px;padding:1px 6px;color:var(--ink-soft);}
-  .rcard .cap .lnks{margin-left:auto;display:flex;gap:10px;font-size:13px;}
+  .rcard .cap .xh{font-size:13px;color:var(--accent);}
+  .rcard .cap .lnks{margin-left:auto;display:flex;gap:10px;font-size:13px;flex-wrap:wrap;}
+  .panel.proj .proj-desc{margin:0 0 8px;font-size:13.5px;line-height:1.5;color:var(--ink-soft);white-space:pre-wrap;word-break:break-word;}
+  .panel.proj .proj-desc.clamp{display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;overflow:hidden;}
+  .proj-links{display:flex;flex-wrap:wrap;gap:7px;}
+  .proj-links .btn.sm{text-decoration:none;}
   .rcard .body{padding:16px;display:flex;flex-direction:column;gap:16px;}
   .verdict{font-family:"Caveat",cursive;font-weight:700;font-size:25px;}
   .verdict.go{color:var(--pos);} .verdict.watch{color:var(--hot);} .verdict.pass{color:var(--ink-soft);} .verdict.fomo{color:var(--neg);}

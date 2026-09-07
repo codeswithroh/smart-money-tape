@@ -26,7 +26,7 @@ var state={
  chains:{solana:true,base:true,bsc:true,ethereum:false},
  searchCache:new Map(), // q -> {ts,pairs}
  tokenCache:new Map(),   // addr -> {ts,pair}
- boosts:[],trending:[],
+ boosts:[],trending:[],profiles:{},tinfo:new Map(),
  safety:new Map(),ohlcv:new Map(),
  research:{},journal:[],holders:{},watch:new Set(),
  chartMode:'entries',rcAddr:null,rcPair:null,
@@ -95,6 +95,24 @@ function dexTokens(addrs){
    b.forEach(function(a){if(m[a])state.tokenCache.set(a,{ts:Date.now(),pair:m[a]});else state.tokenCache.set(a,{ts:Date.now(),pair:null});});
   }).catch(function(){});
  }));
+}
+function fetchProfiles(){
+ return fetch(DEX+'/token-profiles/latest/v1').then(function(r){return r.ok?r.json():[];}).then(function(j){
+  var a=Array.isArray(j)?j:[];
+  a.forEach(function(x){
+   var addr=String(x.tokenAddress||'').toLowerCase();if(!addr)return;
+   state.profiles[addr]={desc:x.description||'',links:(x.links||[]).map(function(l){return {type:String(l.type||l.label||'link').toLowerCase(),url:l.url};}),cto:!!x.cto,header:x.header||null};
+  });
+ }).catch(function(){});
+}
+function fetchTokenInfo(addr,chain){
+ var c=state.tinfo.get(addr);if(c&&Date.now()-c.ts<600000)return Promise.resolve(c.v);
+ var net=gtNet(chain||'solana');
+ return fetch(GT+'/networks/'+net+'/tokens/'+addr+'/info').then(function(r){return r.ok?r.json():null;}).then(function(j){
+  var at=j&&j.data&&j.data.attributes;var v=null;
+  if(at)v={desc:at.description||'',x:at.twitter_handle||'',tg:at.telegram_handle||'',discord:at.discord_url||'',sites:at.websites||[],cats:at.categories||[],cg:at.coingecko_coin_id||'',gtScore:at.gt_score,img:at.image_url||null};
+  state.tinfo.set(addr,{ts:Date.now(),v:v});return v;
+ }).catch(function(){state.tinfo.set(addr,{ts:Date.now(),v:null});return null;});
 }
 function fetchBoosts(){
  return fetch(DEX+'/token-boosts/top/v1').then(function(r){return r.ok?r.json():[];}).then(function(j){
@@ -221,7 +239,7 @@ function trajTag(a){return '<span class="traj '+a.traj+'">'+a.traj.toUpperCase()
 
 /* ---------- SCAN render ---------- */
 function scan(){
- return Promise.all([fetchBoosts(),fetchTrending()]).then(function(){
+ return Promise.all([fetchBoosts(),fetchTrending(),fetchProfiles()]).then(function(){
   var addrs=state.boosts.map(function(b){return b.addr;}).concat(state.trending.map(function(t){return t.addr;})).filter(Boolean);
   return dexTokens(addrs).then(function(){renderScan();});
  });
@@ -284,8 +302,9 @@ function openResearch(addr,chain){
    fetchSafety(addr,pp.chain),
    fetchOhlcv(addr,pp.pairAddr,pp.chain),
    fomoWatchers(addr),
-   primeThemePeers(pp)
-  ]).then(function(r){renderResearch(pp,r[0],r[2]);});
+   primeThemePeers(pp),
+   fetchTokenInfo(addr,pp.chain)
+  ]).then(function(r){state.rcInfo=r[4];renderResearch(pp,r[0],r[2],r[4]);});
  });
 }
 function primeThemePeers(pp){
@@ -302,6 +321,29 @@ function themeCeiling(pp){
  var med=mcs[Math.floor(mcs.length/2)],mx=mcs[mcs.length-1];
  return {theme:t.name,median:med,max:mx,n:mcs.length};
 }
+function xHandle(url){var m=String(url||'').match(/(?:x|twitter)\.com\/([A-Za-z0-9_]{1,20})(?:\/|$|\?)/i);if(!m)return null;var h=m[1].toLowerCase();if(['i','intent','share','home','search','hashtag','status'].indexOf(h)>=0)return null;return m[1];}
+function buildProject(pp,tinfo){
+ var prof=state.profiles[pp.addr]||{};
+ var desc=(tinfo&&tinfo.desc)||prof.desc||pp.desc||'';
+ var sites=[];(pp.sites||[]).forEach(function(u){sites.push(u);});
+ if(tinfo&&tinfo.sites)tinfo.sites.forEach(function(u){if(sites.indexOf(u)<0)sites.push(u);});
+ (prof.links||[]).forEach(function(l){if(l.type==='website'&&l.url&&sites.indexOf(l.url)<0)sites.push(l.url);});
+ var x=null,xUrl=null,tg=null,discord=null;
+ if(tinfo&&tinfo.x){x=tinfo.x;xUrl='https://x.com/'+tinfo.x;}
+ if(tinfo&&tinfo.tg)tg='https://t.me/'+tinfo.tg;
+ if(tinfo&&tinfo.discord)discord=tinfo.discord;
+ pp.socials.concat((prof.links||[])).forEach(function(s){
+  var u=s.url,ty=s.type;
+  if((ty==='twitter'||ty==='x'||/(?:x|twitter)\.com/i.test(u))&&!x){var h=xHandle(u);if(h){x=h;xUrl='https://x.com/'+h;}else if(!xUrl){xUrl=u;}}
+  if((ty==='telegram'||/t\.me/i.test(u))&&!tg)tg=u;
+  if((ty==='discord'||/discord\.(gg|com)/i.test(u))&&!discord)discord=u;
+ });
+ // website URLs may actually be x links
+ var realSites=[];sites.forEach(function(u){if(/(?:x|twitter)\.com/i.test(u)){if(!x){var h=xHandle(u);if(h){x=h;xUrl='https://x.com/'+h;}}}else if(/t\.me/i.test(u)){if(!tg)tg=u;}else realSites.push(u);});
+ var cats=(tinfo&&tinfo.cats)||[];
+ var surface=[!!desc,realSites.length>0,!!xUrl,!!tg].filter(Boolean).length;
+ return {desc:desc,sites:realSites,x:x,xUrl:xUrl,tg:tg,discord:discord,cats:cats,cto:!!prof.cto,cg:(tinfo&&tinfo.cg)||'',gtScore:tinfo&&tinfo.gtScore,surface:surface};
+}
 function researchOf(addr){return state.research[addr]||{type:'',meme:0,hook:'',catalysts:[],target:0,tf:'',entry:'',conviction:0};}
 function catScore(cats){
  if(!cats||!cats.length)return {v:0.25,label:'no catalyst identified'};
@@ -311,14 +353,15 @@ function catScore(cats){
  if(future)return {v:0.6,label:'catalyst dated, >7 days out'};
  return {v:0.45,label:cats.length+' catalyst note'+(cats.length>1?'s':'')+', undated'};
 }
-function verdict(pp,a,sf){
+function verdict(pp,a,sf,surface){
  var r=researchOf(pp.addr);
  var att=a.traj==='ramping'?1:a.traj==='steady'?0.55:0.2;
  var meme=(r.meme||0)/5;
  var cs=catScore(r.catalysts);
  var safe=sf&&sf.ok===true?1:(!sf||sf.ok==null?0.55:0);
  var conv=(r.conviction||0)/5;
- var pct=Math.round(100*(0.30*att+0.28*meme+0.18*cs.v+0.12*safe+0.12*conv));
+ var prj=surface==null?0.5:surface/4;
+ var pct=Math.round(100*(0.28*att+0.26*meme+0.17*cs.v+0.11*safe+0.11*conv+0.07*prj));
  var openHere=state.journal.some(function(j){return j.addr===pp.addr&&j.status==='open';});
  var fomo=((+pp.pc.h1||0)>=40||(+pp.pc.m5||0)>=18)&&!openHere;
  var label,cls;
@@ -336,13 +379,19 @@ function planFrom(pp,r){
  else{m1=0.4;m2=1.1;m3=2.5;}
  return {px:px,lo:px*0.94,hi:px*1.05,stop:px*0.7,stopPct:30,t1:px*(1+m1),t2:px*(1+m2),t3:px*(1+m3),tMult:tMult};
 }
-function renderResearch(pp,sf,watchers){
- var a=attn(pp),v=verdict(pp,a,sf),r=researchOf(pp.addr),ceil=themeCeiling(pp),hr=holderRate(pp.addr);
+function renderResearch(pp,sf,watchers,tinfo){
+ if(tinfo===undefined)tinfo=state.rcInfo;
+ var r=researchOf(pp.addr),ceil=themeCeiling(pp),hr=holderRate(pp.addr);
  var tags=tagThemes(pp),tguess=typeGuess(pp);
- var lnk=[];pp.socials.forEach(function(s){if(s.url)lnk.push('<a href="'+esc(s.url)+'" target="_blank" rel="noopener">'+esc(s.type||'link')+'</a>');});
- (pp.sites||[]).slice(0,1).forEach(function(u){lnk.push('<a href="'+esc(u)+'" target="_blank" rel="noopener">site</a>');});
+ var proj=buildProject(pp,tinfo);
+ var a=attn(pp),v=verdict(pp,a,sf,proj.surface);
+ var lnk=[];
+ if(proj.xUrl)lnk.push('<a href="'+esc(proj.xUrl)+'" target="_blank" rel="noopener">'+(proj.x?'@'+esc(proj.x):'X')+'</a>');
+ if(proj.tg)lnk.push('<a href="'+esc(proj.tg)+'" target="_blank" rel="noopener">Telegram</a>');
+ if(proj.sites[0])lnk.push('<a href="'+esc(proj.sites[0])+'" target="_blank" rel="noopener">site</a>');
  lnk.push('<a href="'+esc(pp.url||('https://dexscreener.com/search?q='+pp.addr))+'" target="_blank" rel="noopener">DexScreener</a>');
  var plan=planFrom(pp,r);
+ var projPanel=projectPanel(pp,proj);
 
  var autoKv='<div class="kv">'
   +kv('narrative tags',tags.length?tags.map(function(k){var t=THEMES.filter(function(x){return x.k===k;})[0];return t?t.name:k;}).join(', '):'none detected')
@@ -357,6 +406,8 @@ function renderResearch(pp,sf,watchers){
   +kv('holders',hr?fNum(hr.now)+'  ('+ (hr.perHr>=0?'+':'') +Math.round(hr.perHr)+'/hr)':(sf&&sf.holders?fNum(sf.holders)+' (tracking...)':'tracking...'),hr&&hr.perHr>0?'pos':'')
   +kv('boosted',pp.boosts?'yes ('+pp.boosts+')':'no')
   +kv('trajectory',a.traj.toUpperCase()+' &middot; attn '+a.score,a.traj==='ramping'?'pos':a.traj==='fading'?'neg':'')
+  +kv('project surface',proj.surface+'/4 '+(proj.surface>=3?'(desc + site + socials)':proj.surface===0?'(bare &mdash; no story surface)':'(partial)'),proj.surface>=3?'pos':proj.surface===0?'neg':'')
+  +(proj.cg?kv('coingecko','listed'+(proj.gtScore?' &middot; GT score '+Math.round(proj.gtScore):''),'pos'):'')
   +(ceil?kv(ceil.theme+' peers','median peak '+fUsd(ceil.median)+', top '+fUsd(ceil.max)+' (n='+ceil.n+')'):'')
   +'</div>';
  var safeLine='<div style="margin-top:9px;font-size:12.5px;color:var(--ink-soft)"><b>Rug screen ('+esc((sf&&sf.src)||'?')+'):</b> '
@@ -388,15 +439,38 @@ function renderResearch(pp,sf,watchers){
  q1('rcardHost').innerHTML='<div class="rcard"><div class="cap">'
   +(pp.img?'<img src="'+esc(pp.img)+'" alt="" onerror="this.style.visibility=\'hidden\'">':'')
   +'<span class="nm">$'+esc(pp.sym)+'</span><span class="chain">'+esc(pp.chain)+'</span>'
+  +(proj.x?'<a class="xh" href="'+esc(proj.xUrl)+'" target="_blank" rel="noopener">@'+esc(proj.x)+'</a>':'')
   +'<span class="lnks">'+lnk.join('')+'</span></div>'
   +'<div class="body">'
   +'<div><div class="verdict '+v.cls+'">'+v.label+'</div>'
-   +'<div style="font-size:12.5px;color:var(--ink-soft);margin-top:4px">research score <b>'+v.pct+'/100</b> = attention '+Math.round(v.att*100)+' &middot; meme '+Math.round(v.meme*100)+' &middot; '+esc(v.cs.label)+' &middot; safety '+Math.round(v.safe*100)+' &middot; conviction '+Math.round(v.conv*100)+'</div></div>'
+   +'<div style="font-size:12.5px;color:var(--ink-soft);margin-top:4px">research score <b>'+v.pct+'/100</b> = attention '+Math.round(v.att*100)+' &middot; your meme rating '+Math.round(v.meme*100)+' &middot; '+esc(v.cs.label)+' &middot; safety '+Math.round(v.safe*100)+' &middot; conviction '+Math.round(v.conv*100)+' &middot; project surface '+proj.surface+'/4</div></div>'
+  +projPanel
   +'<div class="panel"><h3>What the radar sees</h3>'+autoKv+safeLine+watchLine+'</div>'
   +chart
   +form
   +'</div></div>';
  hydrateChart();
+}
+function projectPanel(pp,proj){
+ var lines=[];
+ var links=[];
+ if(proj.xUrl)links.push('<a class="btn sm" href="'+esc(proj.xUrl)+'" target="_blank" rel="noopener">'+(proj.x?'@'+esc(proj.x):'X / Twitter')+'</a>');
+ links.push('<a class="btn sm" href="https://x.com/search?q='+encodeURIComponent('$'+pp.sym)+'&f=live" target="_blank" rel="noopener">search $'+esc(pp.sym)+' on X</a>');
+ if(proj.tg)links.push('<a class="btn sm" href="'+esc(proj.tg)+'" target="_blank" rel="noopener">Telegram</a>');
+ if(proj.discord)links.push('<a class="btn sm" href="'+esc(proj.discord)+'" target="_blank" rel="noopener">Discord</a>');
+ proj.sites.slice(0,2).forEach(function(u){links.push('<a class="btn sm" href="'+esc(u)+'" target="_blank" rel="noopener">'+esc(u.replace(/^https?:\/\//,'').replace(/\/$/,'').slice(0,28))+'</a>');});
+ var badges=[];
+ if(proj.cto)badges.push('<span class="tag">community takeover</span>');
+ (proj.cats||[]).slice(0,5).forEach(function(c){badges.push('<span class="tag n">'+esc(c)+'</span>');});
+ var d=proj.desc||'';
+ var descHtml=d?'<p class="proj-desc'+(d.length>420?' clamp':'')+'">'+esc(d)+'</p>'+(d.length>420?'<button class="btn sm" data-act="moredesc">read more</button>':'')
+   :'<p class="proj-desc" style="color:var(--ink-faint)">No project description published anywhere public yet. For a fresh coin that is normal &mdash; but it also means the story lives only on X. Read the replies before you trust it.</p>';
+ return '<div class="panel proj"><h3>The project</h3>'
+  +descHtml
+  +(badges.length?'<div class="tags" style="margin:8px 0">'+badges.join('')+'</div>':'')
+  +'<div class="proj-links">'+links.join('')+'</div>'
+  +'<div style="font-size:11.5px;color:var(--ink-faint);margin-top:7px">Sources: GeckoTerminal token info, DexScreener profile'+(proj.cto?', flagged community-takeover':'')+'. Always read what people are actually saying on X, not just the bio.</div>'
+  +'</div>';
 }
 function kv(k,v,cls){return '<div><div class="k">'+esc(k)+'</div><div class="v'+(cls?' '+cls:'')+'">'+v+'</div></div>';}
 function seg(opts,cur){return opts.map(function(o){return '<button data-v="'+o+'" aria-pressed="'+(cur===o)+'">'+o+'</button>';}).join('');}
@@ -464,6 +538,7 @@ function rcardClick(ev){
  var a=act.getAttribute('data-act');
  if(a==='addcat'){var r=researchOf(addr);r.catalysts=(r.catalysts||[]).concat([{when:'',what:''}]);setRes(addr,{catalysts:r.catalysts});rerenderRcard();}
  else if(a==='delcat'){var r2=researchOf(addr);r2.catalysts.splice(+act.getAttribute('data-i'),1);setRes(addr,{catalysts:r2.catalysts});rerenderRcard();}
+ else if(a==='moredesc'){var d=act.previousElementSibling;if(d)d.classList.remove('clamp');act.remove();return;}
  else if(a==='savefav'){if(state.watch.has(addr))state.watch.delete(addr);else state.watch.add(addr);saveWatch();rerenderRcard();}
  else if(a==='addjrnl'){addToJournal(pp);}
 }
