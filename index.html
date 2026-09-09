@@ -35,15 +35,15 @@
    setStat('waiting for payment… auto-unlocks within ~1 min');
    poll(o.orderId);
   }
-  async function poll(oid){
+  async function checkOnce(oid,tx){
+   var r=await fetch('/api/verify?orderId='+encodeURIComponent(oid)+(tx?'&tx='+encodeURIComponent(tx):''),{cache:'no-store'});
+   var j=await r.json();
+   if(j&&j.paid){clearInterval(pollT);setStat('payment confirmed ✔ unlocking…',true);i.value=j.code||'';setTimeout(unlock,400);return true;}
+   return false;
+  }
+  function poll(oid){
    clearInterval(pollT);
-   async function tick(){
-    try{
-     var r=await fetch('/api/verify?orderId='+encodeURIComponent(oid),{cache:'no-store'});
-     var j=await r.json();
-     if(j&&j.paid){clearInterval(pollT);setStat('payment confirmed ✔ unlocking…',true);i.value=j.code||'';setTimeout(unlock,400);}
-    }catch(_){}
-   }
+   async function tick(){try{await checkOnce(oid);}catch(_){}}
    tick();pollT=setInterval(tick,8000);
   }
   if(buyBtn)buyBtn.addEventListener('click',async function(){
@@ -54,6 +54,16 @@
     try{localStorage.setItem(ORD,JSON.stringify(o));}catch(_){}
     showOrder(o);
    }catch(_){buyBtn.disabled=false;buyBtn.textContent='Buy access · 10 USDC (Base)';setStat('could not reach payment server, try again',false);}
+  });
+  var txBtn=document.getElementById('gateTxBtn'),txIn=document.getElementById('gateTx');
+  if(txBtn)txBtn.addEventListener('click',async function(){
+   var saved;try{saved=JSON.parse(localStorage.getItem(ORD)||'null');}catch(_){}
+   if(!saved||!saved.orderId){setStat('click Buy access first',false);return;}
+   var tx=txIn.value.trim();if(!/^0x[0-9a-fA-F]{64}$/.test(tx)){setStat('paste a valid 0x… tx hash',false);return;}
+   txBtn.disabled=true;txBtn.textContent='checking…';setStat('checking that transaction…');
+   try{var ok=await checkOnce(saved.orderId,tx);if(!ok)setStat('no matching payment in that tx yet — wait for it to confirm and retry',false);}
+   catch(_){setStat('check failed, try again',false);}
+   txBtn.disabled=false;txBtn.textContent='check';
   });
   document.querySelectorAll('#gateBuyPanel [data-copy]').forEach(function(b){
    b.addEventListener('click',function(){
@@ -240,6 +250,9 @@
   #gate .addr code{font-family:"Share Tech Mono",monospace;font-size:12px;color:var(--ink);word-break:break-all;background:var(--paper);border:1.5px solid var(--pencil);border-radius:5px;padding:4px 6px;flex:1;min-width:0;}
   #gate [data-copy]{font-family:"Patrick Hand",cursive;font-size:12px;padding:4px 9px;border:1.5px solid var(--ink);border-radius:7px 4px 8px 4px;background:var(--card);color:var(--ink);cursor:pointer;box-shadow:none;}
   #gate .stat{font-size:13px;color:var(--ink-soft);margin-top:8px;min-height:16px;}
+  #gate .txrow{display:flex;gap:6px;margin-top:8px;}
+  #gate .txrow input{flex:1;font-family:"Share Tech Mono",monospace;font-size:11px;padding:6px 8px;border:1.5px solid var(--pencil);border-radius:6px;background:var(--paper);color:var(--ink);min-width:0;}
+  #gate .txrow button{font-family:"Patrick Hand",cursive;font-size:12px;padding:6px 10px;border:1.5px solid var(--ink);border-radius:7px 4px 8px 4px;background:var(--card);color:var(--ink);cursor:pointer;box-shadow:none;}
   #gate .foot{font-size:12px;color:var(--ink-faint);margin-top:16px;line-height:1.5;}
   #gate .foot a{color:var(--accent);}
 
@@ -395,6 +408,7 @@
         <p class="pi">to this address:</p>
         <div class="addr"><code id="gateAddr">&mdash;</code> <button type="button" data-copy="addr">copy address</button></div>
         <div id="gateStat" class="stat">&hellip;</div>
+        <div class="txrow"><input id="gateTx" type="text" placeholder="paste tx hash (optional, instant)" autocomplete="off" /><button id="gateTxBtn" type="button">check</button></div>
       </div>
     </div>
     <div class="foot">Questions? DM <a href="https://x.com/codeswithroh" target="_blank" rel="noopener">@codeswithroh</a> on X.</div>
