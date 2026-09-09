@@ -217,6 +217,19 @@
   .radar-tile .rl-s b{color:#cdd2df;}
   @media(max-width:640px){ .radar-tile{flex-direction:column;align-items:center;} .radar-tile .rl{width:100%;} }
 
+  /* mint an idea */
+  #ideaBox .hotbar{display:flex;flex-wrap:wrap;gap:6px;font-size:12px;color:var(--ink-soft);margin-bottom:10px;align-items:center;}
+  #ideaBox .hotbar b{color:var(--ink);} #ideaBox .hotbar .hn{border:1.5px solid var(--pencil);border-radius:6px 4px 7px 4px;padding:1px 7px;background:var(--card);}
+  #ideaBox .hotbar .hn.hot{border-color:var(--hot);color:var(--ink);}
+  .ideas{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px;}
+  .idea{border:2px solid var(--ink);border-radius:14px 8px 13px 8px / 8px 13px 8px 13px;background:var(--card);padding:13px 15px;box-shadow:2px 3px 0 rgba(44,53,80,.13);}
+  .idea:nth-child(odd){transform:rotate(-.3deg);} .idea:nth-child(even){transform:rotate(.3deg);}
+  .idea .in{font-family:"Caveat",cursive;font-weight:700;font-size:26px;line-height:1;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;}
+  .idea .it{font-family:"Share Tech Mono",monospace;font-size:14px;color:var(--accent);background:var(--accent-wash);border-radius:5px;padding:1px 6px;}
+  .idea .ith{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-faint);margin:6px 0 5px;}
+  .idea .io{font-size:13.5px;color:var(--ink-soft);line-height:1.5;}
+  .idea .icopy{margin-top:9px;font-size:12px;color:var(--accent);cursor:pointer;background:none;border:0;padding:0;text-decoration:underline;text-decoration-style:wavy;}
+
   .verdict.go{color:var(--pos);} .verdict.watch{color:var(--hot);} .verdict.pass{color:var(--ink-soft);} .verdict.fomo{color:var(--neg);}
   .collapsed-form>summary{cursor:pointer;font-size:13px;color:var(--ink-soft);padding:4px 0;list-style:none;}
   .collapsed-form>summary::-webkit-details-marker{display:none;}
@@ -311,6 +324,10 @@
     <div class="shead"><h2><span class="sweep"></span>Hot right now</h2><span class="hint"><button class="btn sm" id="flexBoard">&#128248; flex the board</button></span></div>
     <p class="lead">Top coins by attention momentum, this minute. Not advice &mdash; just where the eyeballs are.</p>
     <div class="board" id="board"><div class="empty">reading the tape&hellip;</div></div>
+
+    <div class="shead"><h2>Mint an idea</h2><span class="hint"><button class="btn sm" id="ideaRoll">&#127922; reroll</button></span></div>
+    <p class="lead">Narratives that are hot on-chain right now, turned into fresh coin concepts &mdash; name, ticker, one-liner. A toy. Do your own homework before you deploy anything.</p>
+    <div id="ideaBox"><div class="empty">reading the narratives&hellip;</div></div>
 
     <div class="shead"><h2>Spotted a meme?</h2><span class="hint">TikTok / Reels / X &rarr; is there a coin?</span></div>
     <div class="controls">

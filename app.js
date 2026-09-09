@@ -306,7 +306,7 @@ function renderScan(){
   return pp._tags.indexOf(cur)>=0;
  });
  q1('attnList').innerHTML=shown.length?shown.slice(0,40).map(function(pp){return tokenRow(pp);}).join(''):'<div class="empty">nothing here right now &mdash; try another filter or widen chains</div>';
- renderTicker();renderBoard();
+ renderTicker();renderBoard();renderIdeas();
 }
 function tokenRow(pp){
  var a=pp._a||attn(pp),tags=pp._tags||tagThemes(pp);
@@ -806,6 +806,97 @@ function renderBoard(){
    +'</button>';
  }).join('');
 }
+/* ---------- MINT AN IDEA ---------- */
+var IDEA_BANK={
+ ai:{adj:['neural','turbo','quantum','sentient'],words:['grok','gpt','agent','llm','prompt','vector','gradient','tensor','synapse','oracle','daemon'],
+  hooks:['the AI that trades its own bag','on-chain intelligence, off-chain vibes','your model has a wallet now','agentic liquidity, zero prompts','skynet but the terminal is green']},
+ gta:{adj:['wanted','vice','5-star'],words:['lucia','heist','rockstar','trailer','sixth','payphone','getaway','armored'],
+  hooks:['the trailer dropped, so did we','5 stars and climbing','vice city runs on this','leaked, minted, mooned']},
+ trump:{adj:['tremendous','patriot','47th'],words:['maga','eagle','tariff','potus','freedom','liberty','landslide'],
+  hooks:['tremendous gains, everybody says so','the deal of the century','red candle? never heard of her','we are going to win so much']},
+ elon:{adj:['interplanetary','recursive','420'],words:['grok','xai','doge','mars','optimus','starship','neural','tunnel'],
+  hooks:['tweeted into existence','to mars, then to the moon','xai but you actually own it','concerning. bullish.']},
+ stream:{adj:['clipped','viral','no-cap'],words:['kai','speed','rizz','stream','chat','clip','pog','dub'],
+  hooks:['chat is this real','clipped and shipped','the stream told me to','one W away from valhalla']},
+ hood:{adj:['listed','retail','commission-free'],words:['hood','vlad','ticker','retail','app','bell'],
+  hooks:['the first meme on retail rails','your grandma can buy this','commission-free, conviction-heavy']},
+ dog:{adj:['very','good','loyal'],words:['inu','shiba','bonk','woof','paw','fetch','floki','samo'],
+  hooks:['good boy, great chart','fetch the liquidity','every dog has its pump','wags on green days only']},
+ frog:{adj:['rare','feels','swamp'],words:['pepe','wojak','chad','kek','ribbit','lily','bog','apu'],
+  hooks:['feels good man','back from the swamp, richer','rare and getting rarer','2016 energy, 2026 chart']},
+ china:{adj:['lucky','jade','88'],words:['panda','dragon','mao','red','fortune','lantern','koi'],
+  hooks:['8 is lucky, 88 is luckier','minted in the group chat','the great wall of green candles']},
+ anime:{adj:['based','sakura','9000'],words:['waifu','senpai','chad','sword','otaku','ki','arc','filler'],
+  hooks:['notice me senpai','power level over 9000','the filler arc is over','plot armor for your portfolio']}
+};
+var IDEA_PRE=['turbo','mega','based','giga','hyper','micro','ultra','super','wojak'];
+var IDEA_SUF=['inu','pepe','fi','ai','69','420','coin','dao','god','max','world'];
+function titleCase(s){return s.replace(/\b\w/g,function(c){return c.toUpperCase();});}
+function poolWords(){
+ var w={};(state._pool||[]).forEach(function(pp){
+  ((pp.sym||'')+' '+(pp.name||'')).toLowerCase().replace(/[^a-z ]/g,' ').split(/\s+/).forEach(function(t){
+   if(t.length>=3&&t.length<=10&&!/^(the|and|for|inu|usd|sol|eth|bsc|base|coin|token|pump|meme|moon|pool)$/.test(t))w[t]=(w[t]||0)+1;
+  });
+ });
+ return Object.keys(w).sort(function(a,b){return w[b]-w[a];}).slice(0,20);
+}
+function hotThemes(){
+ var c={};(state._pool||[]).forEach(function(pp){(pp._tags||[]).forEach(function(k){c[k]=(c[k]||0)+1;});});
+ var ks=Object.keys(IDEA_BANK).sort(function(a,b){return (c[b]||0)-(c[a]||0);});
+ return ks.map(function(k){return {k:k,n:c[k]||0,name:(THEMES.filter(function(t){return t.k===k;})[0]||{}).name||k};});
+}
+function pick(a){return a[Math.floor(Math.random()*a.length)];}
+function mkTicker(name){
+ var parts=name.replace(/[^A-Za-z0-9 ]/g,'').split(/(?=[A-Z])|\s+/).filter(Boolean);
+ var t;
+ if(parts.length>=2)t=parts.map(function(p){return p[0];}).join('')+parts[0].slice(1,3);
+ else t=name.replace(/[^A-Za-z0-9]/g,'').slice(0,5);
+ t=t.toUpperCase().replace(/[^A-Z0-9]/g,'');
+ if(t.length<3)t=(t+name.toUpperCase().replace(/[^A-Z0-9]/g,'')).slice(0,4);
+ return t.slice(0,6)||'MEME';
+}
+function genIdea(themes,pw){
+ var hot=themes.filter(function(t){return t.n>0;});
+ var th=pick(hot.length?hot.slice(0,4):themes.slice(0,4));
+ var bank=IDEA_BANK[th.k];
+ var core=(Math.random()<0.45&&pw.length)?pick(pw):pick(bank.words);
+ core=core.replace(/[^a-z0-9]/gi,'');
+ var name,r=Math.random();
+ if(r<0.28)name=titleCase(pick(IDEA_PRE)+core);
+ else if(r<0.55)name=titleCase(core)+titleCase(pick(IDEA_SUF));
+ else if(r<0.8)name=titleCase(pick(bank.adj).replace(/[^a-z0-9]/gi,''))+titleCase(core);
+ else name=titleCase(core)+' '+titleCase(pick(bank.words));
+ name=name.replace(/\s+/g,Math.random()<0.5?'':' ').slice(0,22);
+ var tk=mkTicker(name);
+ var oneliner;
+ function cap(s){return s.charAt(0).toUpperCase()+s.slice(1);}
+ if(Math.random()<0.6)oneliner=cap(pick(bank.hooks))+'.';
+ else{
+  var tmpls=[
+   'The first '+th.name.toLowerCase()+' coin that actually '+pick(['ships','delivers','travels','pumps on catalyst','survives the dip'])+'.',
+   name+': '+pick(bank.adj)+' energy, '+pick(['parabolic','irresponsible','diamond','textbook'])+' chart.',
+   'If the '+th.name.toLowerCase()+' narrative had a ticker, it would be $'+tk+'.',
+   'What happens when '+pick(bank.words)+' meets '+pick(pw.length?pw:bank.words)+'. Nobody asked. Everybody aped.'
+  ];
+  oneliner=pick(tmpls);
+ }
+ return {name:name,ticker:tk,one:oneliner,theme:th.name};
+}
+function renderIdeas(){
+ var el=q1('ideaBox');if(!el)return;
+ if(!(state._pool&&state._pool.length)){el.innerHTML='<div class="empty">reading the narratives&hellip;</div>';return;}
+ var themes=hotThemes(),pw=poolWords();
+ var top=themes.filter(function(t){return t.n>0;}).slice(0,5);
+ var hb='<div class="hotbar"><b>hot narratives:</b> '+(top.length?top.map(function(t,i){return '<span class="hn'+(i===0?' hot':'')+'">'+esc(t.name)+' &middot; '+t.n+'</span>';}).join(''):'<span class="hn">quiet right now</span>')+'</div>';
+ var ideas=[],tries=0,seen={};
+ while(ideas.length<3&&tries++<40){var g=genIdea(themes,pw);if(seen[g.name.toLowerCase()])continue;seen[g.name.toLowerCase()]=1;ideas.push(g);}
+ el.innerHTML=hb+'<div class="ideas">'+ideas.map(function(g){
+  return '<div class="idea"><div class="in">'+esc(g.name)+' <span class="it">$'+esc(g.ticker)+'</span></div>'
+   +'<div class="ith">rides: '+esc(g.theme)+'</div>'
+   +'<div class="io">'+esc(g.one)+'</div>'
+   +'<button class="icopy" data-idea="'+esc(g.name+' ($'+g.ticker+') — '+g.one)+'">copy concept</button></div>';
+ }).join('')+'</div>';
+}
 /* ---------- FLEX CARD (shareable) ---------- */
 function drawFlex(cv,draw){
  var W=1080,H=1350,dpr=1;cv.width=W;cv.height=H;var x=cv.getContext('2d');
@@ -955,7 +1046,9 @@ q1('rcardHost').addEventListener('input',rcardInput);
 q1('rcardHost').addEventListener('change',rcardInput);
 q1('rcardHost').addEventListener('click',function(ev){var s=ev.target.closest('#fhSound');if(!s)return;state.fhSound=!state.fhSound;saveCfg();fhCtx();s.setAttribute('aria-pressed',state.fhSound?'true':'false');s.innerHTML=state.fhSound?'&#128266;':'&#128263;';});
 q1('board').addEventListener('click',function(ev){var b=ev.target.closest('[data-addr]');if(!b)return;openResearch(b.getAttribute('data-addr'),b.getAttribute('data-chain'));});
-q1('flexBoard').addEventListener('click',flexBoard);
+q1("flexBoard").addEventListener("click",flexBoard);
+q1("ideaRoll").addEventListener("click",renderIdeas);
+q1("ideaBox").addEventListener("click",function(ev){var b=ev.target.closest("[data-idea]");if(!b)return;try{navigator.clipboard.writeText(b.getAttribute("data-idea"));toast("concept copied");}catch(_){}});
 q1('qgo').addEventListener('click',function(){doQuery(q1('q').value,'rcardHost',true);});
 q1('q').addEventListener('keydown',function(e){if(e.key==='Enter')doQuery(q1('q').value,'rcardHost',true);});
 q1('scanGo').addEventListener('click',function(){doQuery(q1('scanQ').value,'scanQResult',false);});
@@ -983,6 +1076,7 @@ renderTicker();
 scan().then(setStatus);
 // keep the ticker refreshed from the latest pool even between scans, and re-scan on any tab
 setInterval(function(){if(state._pool){renderTicker();renderBoard();}},30000);
+setInterval(function(){if(state._pool&&state.tab==='scan')renderIdeas();},120000);
 setInterval(function(){scan().then(setStatus);},90000);
 setInterval(setStatus,15000);
 })();
