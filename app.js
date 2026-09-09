@@ -520,9 +520,11 @@ function catsHtml(cats){cats=cats||[];if(!cats.length)return '<div style="font-s
 /* ---------- chart (ported) ---------- */
 function fitCanvas(cv){var dpr=window.devicePixelRatio||1,w=cv.clientWidth||cv.parentNode.clientWidth||600,h=cv.clientHeight||160;var pw=Math.max(1,Math.round(w*dpr)),ph=Math.max(1,Math.round(h*dpr));if(cv.width!==pw||cv.height!==ph){cv.width=pw;cv.height=ph;}var x=cv.getContext('2d');x.setTransform(dpr,0,0,dpr,0,0);return {x:x,w:w,h:h};}
 function chartBlock(pp,plan){
- var slug=chainSlug(pp.chain),canEmbed=!!(pp.pairAddr&&slug),mode=state.chartMode;if(!canEmbed)mode='entries';
- var toggle='<div class="ctoggle">'+(canEmbed?'<button data-cm="chart" aria-pressed="'+(mode==='chart')+'">DexScreener</button>':'')+'<button data-cm="entries" aria-pressed="'+(mode==='entries')+'">Candles + levels</button></div>';
- var embed=canEmbed?'<div class="chart-embed"'+(mode==='entries'?' hidden':'')+'><iframe loading="lazy" title="chart" src="https://dexscreener.com/'+slug+'/'+esc(pp.pairAddr)+'?embed=1&theme=dark&trades=0&info=0"></iframe></div>':'';
+ var net=gtNet(pp.chain),canEmbed=!!(pp.pairAddr&&net),mode=state.chartMode;if(!canEmbed)mode='entries';
+ var toggle='<div class="ctoggle"><button data-cm="entries" aria-pressed="'+(mode==='entries')+'">Candles + levels</button>'+(canEmbed?'<button data-cm="chart" aria-pressed="'+(mode==='chart')+'">Full chart</button>':'')+'</div>';
+ // GeckoTerminal pool embed = a TradingView-style chart that works for any on-chain pair (real TradingView has no symbol for microcaps). Only loaded when selected.
+ var embSrc=canEmbed?'https://www.geckoterminal.com/'+net+'/pools/'+esc(pp.pairAddr)+'?embed=1&info=0&swaps=0&grayscale=0&light_chart=0&resolution=15m':'';
+ var embed=canEmbed?'<div class="chart-embed"'+(mode==='entries'?' hidden':'')+'><iframe loading="lazy" title="chart" src="'+(mode==='chart'?embSrc:'')+'" data-embsrc="'+embSrc+'"></iframe></div>':'';
  var cand='<canvas class="candles" data-caddr="'+esc(pp.addr)+'"'+(mode==='chart'?' hidden':'')+'></canvas>';
  var note='<div style="font-size:11.5px;color:var(--ink-faint);margin-top:5px">Levels are mechanical: entry '+fPrice(plan.lo)+'&ndash;'+fPrice(plan.hi)+' &middot; stop '+fPrice(plan.stop)+' (-'+plan.stopPct+'%) &middot; targets '+fPrice(plan.t1)+' / '+fPrice(plan.t2)+' / '+fPrice(plan.t3)+(plan.tMult?' (to your '+plan.tMult.toFixed(1)+'x mcap goal)':'')+'. Not advice.</div>';
  return '<div>'+toggle+embed+cand+note+'</div>';
@@ -772,7 +774,13 @@ function rcardClick(ev){
  var st=ev.target.closest('.stars [data-v]');
  if(st){var f2=st.parentNode.getAttribute('data-f');var patch2={};patch2[f2]=+st.getAttribute('data-v');setRes(addr,patch2);rerenderRcard();return;}
  var cm=ev.target.closest('[data-cm]');
- if(cm){state.chartMode=cm.getAttribute('data-cm')==='chart'?'chart':'entries';saveCfg();rerenderRcard();return;}
+ if(cm){var m=cm.getAttribute('data-cm')==='chart'?'chart':'entries';state.chartMode=m;saveCfg();
+  var box=cm.closest('.ctoggle').parentNode;
+  box.querySelectorAll('[data-cm]').forEach(function(b){b.setAttribute('aria-pressed',b.getAttribute('data-cm')===m?'true':'false');});
+  var emb=box.querySelector('.chart-embed'),cvv=box.querySelector('canvas.candles'),ifr=box.querySelector('.chart-embed iframe');
+  if(m==='chart'){if(ifr&&!ifr.getAttribute('src'))ifr.setAttribute('src',ifr.getAttribute('data-embsrc')||'');if(emb)emb.hidden=false;if(cvv)cvv.hidden=true;}
+  else{if(emb)emb.hidden=true;if(cvv)cvv.hidden=false;}
+  return;}
  var act=ev.target.closest('[data-act]');if(!act)return;
  var a=act.getAttribute('data-act');
  if(a==='addcat'){var r=researchOf(addr);r.catalysts=(r.catalysts||[]).concat([{when:'',what:''}]);setRes(addr,{catalysts:r.catalysts});rerenderRcard();}
