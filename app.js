@@ -521,12 +521,12 @@ function catsHtml(cats){cats=cats||[];if(!cats.length)return '<div style="font-s
 function fitCanvas(cv){var dpr=window.devicePixelRatio||1,w=cv.clientWidth||cv.parentNode.clientWidth||600,h=cv.clientHeight||160;var pw=Math.max(1,Math.round(w*dpr)),ph=Math.max(1,Math.round(h*dpr));if(cv.width!==pw||cv.height!==ph){cv.width=pw;cv.height=ph;}var x=cv.getContext('2d');x.setTransform(dpr,0,0,dpr,0,0);return {x:x,w:w,h:h};}
 function chartBlock(pp,plan){
  var net=gtNet(pp.chain),canEmbed=!!(pp.pairAddr&&net),mode=state.chartMode;if(!canEmbed)mode='entries';
- var toggle='<div class="ctoggle"><button data-cm="entries" aria-pressed="'+(mode==='entries')+'">Candles + levels</button>'+(canEmbed?'<button data-cm="chart" aria-pressed="'+(mode==='chart')+'">Full chart</button>':'')+'</div>';
- // GeckoTerminal pool embed = a TradingView-style chart that works for any on-chain pair (real TradingView has no symbol for microcaps). Only loaded when selected.
+ var toggle='<div class="ctoggle"><button data-cm="entries" aria-pressed="'+(mode==='entries')+'">TradingView + levels</button>'+(canEmbed?'<button data-cm="chart" aria-pressed="'+(mode==='chart')+'">Full toolbar</button>':'')+'</div>';
+ // "Full toolbar" = GeckoTerminal pool embed (indicators/drawing). Only loaded when selected.
  var embSrc=canEmbed?'https://www.geckoterminal.com/'+net+'/pools/'+esc(pp.pairAddr)+'?embed=1&info=0&swaps=0&grayscale=0&light_chart=0&resolution=15m':'';
  var embed=canEmbed?'<div class="chart-embed"'+(mode==='entries'?' hidden':'')+'><iframe loading="lazy" title="chart" src="'+(mode==='chart'?embSrc:'')+'" data-embsrc="'+embSrc+'"></iframe></div>':'';
- var cand='<canvas class="candles" data-caddr="'+esc(pp.addr)+'"'+(mode==='chart'?' hidden':'')+'></canvas>';
- var note='<div style="font-size:11.5px;color:var(--ink-faint);margin-top:5px">Levels are mechanical: entry '+fPrice(plan.lo)+'&ndash;'+fPrice(plan.hi)+' &middot; stop '+fPrice(plan.stop)+' (-'+plan.stopPct+'%) &middot; targets '+fPrice(plan.t1)+' / '+fPrice(plan.t2)+' / '+fPrice(plan.t3)+(plan.tMult?' (to your '+plan.tMult.toFixed(1)+'x mcap goal)':'')+'. Not advice.</div>';
+ var cand='<div class="lwchart" data-caddr="'+esc(pp.addr)+'"'+(mode==='chart'?' hidden':'')+'></div>';
+ var note='<div class="lwchart-note">TradingView Lightweight Charts &middot; GeckoTerminal 5m data &middot; entry '+fPrice(plan.lo)+'&ndash;'+fPrice(plan.hi)+', stop '+fPrice(plan.stop)+' (-'+plan.stopPct+'%), targets '+fPrice(plan.t1)+' / '+fPrice(plan.t2)+' / '+fPrice(plan.t3)+(plan.tMult?' (to your '+plan.tMult.toFixed(1)+'x goal)':'')+'. Not advice.</div>';
  return '<div>'+toggle+embed+cand+note+'</div>';
 }
 /* ---------- ATTENTION RADAR hex ---------- */
@@ -676,7 +676,7 @@ function renderTrades(fresh){
 var _pumpN=0;
 function pumpTrades(){
  var pp=state.rcPair;if(!pp)return;
- if((_pumpN++%2)===1)fetchOhlcv(pp.addr,pp.pairAddr,pp.chain); // nudge candles ~every 3rd tick
+ if((_pumpN++%2)===1)fetchOhlcv(pp.addr,pp.pairAddr,pp.chain).then(lwApply); // refresh chart bars
  fetchTrades(pp.addr,pp.pairAddr,pp.chain).then(function(list){
   if(list==null){state._trFail=(state._trFail||0)+1;if(state._trFail>=2&&!state.trades.length){var f=q1('tradesFeed');if(f)f.innerHTML='<div style="padding:14px;color:#6b7180;font-size:12px">live feed catching its breath (GeckoTerminal rate limit) &mdash; retrying&hellip;</div>';}return;}
   state._trFail=0;
@@ -699,70 +699,56 @@ function startTrades(){
  state._tradesPoll=setInterval(pumpTrades,8000);
 }
 function stopTrades(){clearInterval(state._tradesPoll);state._tradesPoll=0;}
-var _chartRAF=0;
-function stopChart(){if(_chartRAF)cancelAnimationFrame(_chartRAF);_chartRAF=0;}
+/* ---------- TradingView Lightweight Charts ---------- */
+var _lw=null,_lwCandle=null,_lwVol=null,_lwAddr=null,_lwLines=[],_lwRO=null;
+function stopChart(){
+ if(_lwRO){try{_lwRO.disconnect();}catch(_){}_lwRO=null;}
+ if(_lw){try{_lw.remove();}catch(_){}}
+ _lw=_lwCandle=_lwVol=null;_lwAddr=null;_lwLines=[];
+}
 function mountChart(){
  stopChart();
  var pp=state.rcPair;if(!pp)return;
- fetchOhlcv(pp.addr,pp.pairAddr,pp.chain);
- var t0=performance.now();
- function frame(now){
-  var cv=document.querySelector('canvas.candles[data-caddr]');
-  var p=state.rcPair;
-  if(cv&&p&&!cv.hidden){
-   var oc=state.ohlcv.get(p.addr);var rows=(oc&&oc.rows)||[];
-   drawCandles(cv,rows,planFrom(p,researchOf(p.addr)),(now-t0)/1000);
-  }
-  if(reduceMotion){_chartRAF=0;return;}
-  _chartRAF=requestAnimationFrame(frame);
- }
- _chartRAF=requestAnimationFrame(frame);
-}
-function drawCandles(cv,oh,plan,tt){
- tt=tt||0;var flow=reduceMotion?0:1;
- var c=fitCanvas(cv),x=c.x,w=c.w,h=c.h;x.fillStyle='#12131c';x.fillRect(0,0,w,h);
- if(!oh||oh.length<3){x.fillStyle='#cdd2df';x.font='13px "Patrick Hand",cursive';x.textAlign='left';x.fillText('candles not indexed yet (GeckoTerminal)',12,h/2);return;}
- var caddr=cv.getAttribute('data-caddr');
- // eased display state (morphs toward live data, survives re-render)
- state._ease=state._ease||{};
- var disp=state._ease[caddr];
- if(!disp||disp.length!==oh.length){disp=oh.map(function(r){return [+r[1],+r[2],+r[3],+r[4]];});state._ease[caddr]=disp;}
- else {var k=reduceMotion?1:0.18;for(var di=0;di<oh.length;di++){for(var dj=0;dj<4;dj++){disp[di][dj]+=((+oh[di][dj+1])-disp[di][dj])*k;}}}
- var pad={l:8,r:104,t:12,b:18};var cur=(plan&&plan.px)||disp[disp.length-1][3];
- var cLo=Infinity,cHi=-Infinity;disp.forEach(function(r){cHi=Math.max(cHi,r[1]);cLo=Math.min(cLo,r[2]);});
- var brk=null;for(var bi=0;bi<disp.length-2;bi++){if(brk==null||disp[bi][1]>brk)brk=disp[bi][1];}
- var lv=[];
- if(plan&&plan.px){var g=function(v){return Math.round((v/plan.px-1)*100);};
-  lv.push({v:plan.stop,c:'#f2594f',t:'STOP '+g(plan.stop)+'%',d:[4,3],hard:1});
-  lv.push({v:plan.lo,c:'#46bd62',t:'entry lo',d:[2,3],hard:1});
-  lv.push({v:plan.hi,c:'#46bd62',t:'entry hi',d:[2,3],hard:1});
-  lv.push({v:plan.t1,c:'#5bd07a',t:'T1 +'+g(plan.t1)+'%',d:[7,4],hard:1});
-  lv.push({v:plan.t2,c:'#5bd07a',t:'T2 +'+g(plan.t2)+'%',d:[7,4]});
-  lv.push({v:plan.t3,c:'#5bd07a',t:'T3 +'+g(plan.t3)+'%',d:[7,4]});}
- if(brk)lv.push({v:brk,c:'#f2a63d',t:'breakout',d:[3,3],hard:1});
- var rLo=cLo,rHi=cHi;lv.forEach(function(L){if(L.hard){rLo=Math.min(rLo,L.v);rHi=Math.max(rHi,L.v);}});if(cur){rLo=Math.min(rLo,cur);rHi=Math.max(rHi,cur);}
- var pdv=(rHi-rLo)*0.07||rHi*0.03||1;rHi+=pdv;rLo=Math.max(0,rLo-pdv);
- var Y=function(v){return pad.t+(1-(v-rLo)/(rHi-rLo||1))*(h-pad.t-pad.b);};
- var n=disp.length,cw=(w-pad.l-pad.r)/n;
- // water ripple: gentle per-column vertical undulation
- var wave=function(i){return flow?Math.sin(tt*1.1+i*0.45)*(h*0.010)+Math.sin(tt*0.5+i*0.13)*(h*0.006):0;};
- x.textAlign='left';x.font='9px "Patrick Hand",cursive';
- for(var gi=0;gi<=4;gi++){var gv=rLo+(rHi-rLo)*gi/4,gy=Y(gv);x.strokeStyle='rgba(205,210,223,.09)';x.setLineDash([]);x.beginPath();x.moveTo(pad.l,gy);x.lineTo(w-pad.r,gy);x.stroke();x.fillStyle='rgba(205,210,223,.4)';x.fillText(fPrice(gv),w-pad.r+5,gy-2);}
- if(plan&&plan.lo&&plan.hi){var eb1=Y(plan.hi),eb2=Y(plan.lo);var pulse=flow?0.09+0.05*(0.5+0.5*Math.sin(tt*1.6)):0.12;x.fillStyle='rgba(70,185,98,'+pulse.toFixed(3)+')';x.fillRect(pad.l,Math.min(eb1,eb2),w-pad.r-pad.l,Math.abs(eb2-eb1)||1);}
- disp.forEach(function(r,i){var o=r[0],hh=r[1],ll=r[2],cl=r[3];var up=cl>=o,col=up?'#46bd62':'#f2594f';var cx=pad.l+i*cw+cw/2;var dy=wave(i);
-  x.strokeStyle=col;x.lineWidth=1;x.setLineDash([]);x.beginPath();x.moveTo(cx,Y(hh)+dy);x.lineTo(cx,Y(ll)+dy);x.stroke();
-  x.fillStyle=col;var bt=Y(Math.max(o,cl))+dy,bb=Y(Math.min(o,cl))+dy;x.fillRect(cx-Math.max(1,cw*0.32),bt,Math.max(1.4,cw*0.64),Math.max(1,bb-bt));
-  if(i===n-1&&flow){x.globalAlpha=0.35+0.25*Math.sin(tt*4);x.fillStyle='#eef1f7';x.fillRect(cx-Math.max(1,cw*0.32),Y(hh)+dy,Math.max(1.4,cw*0.64),Y(ll)-Y(hh));x.globalAlpha=1;}
+ var el=document.querySelector('.lwchart[data-caddr]');if(!el)return;
+ if(typeof LightweightCharts==='undefined'){el.innerHTML='<div style="padding:20px;color:#8a8a76;font-family:\'Share Tech Mono\',monospace;font-size:12px">chart library failed to load &mdash; check connection</div>';return;}
+ _lwAddr=pp.addr;
+ _lw=LightweightCharts.createChart(el,{
+  width:el.clientWidth||600,height:el.clientHeight||360,
+  layout:{background:{type:'solid',color:'#12131c'},textColor:'#9aa0ad',fontFamily:'"Share Tech Mono", monospace',fontSize:10},
+  grid:{vertLines:{color:'rgba(205,210,223,.05)'},horzLines:{color:'rgba(205,210,223,.05)'}},
+  rightPriceScale:{borderColor:'rgba(205,210,223,.14)',scaleMargins:{top:0.08,bottom:0.22}},
+  timeScale:{borderColor:'rgba(205,210,223,.14)',timeVisible:true,secondsVisible:false},
+  crosshair:{mode:LightweightCharts.CrosshairMode.Normal,vertLine:{color:'rgba(242,166,61,.5)',labelBackgroundColor:'#cf3a26'},horzLine:{color:'rgba(242,166,61,.5)',labelBackgroundColor:'#cf3a26'}},
+  handleScroll:true,handleScale:true,
+  localization:{priceFormatter:function(p){return fPrice(p).replace('$','');}}
  });
- x.font='10px "Patrick Hand",cursive';
- x.lineDashOffset=flow?-tt*9:0;
- lv.forEach(function(L){if(L.v>rHi||L.v<rLo){var ey=L.v>rHi?pad.t+9:h-pad.b-3;x.fillStyle=L.c;x.textAlign='right';x.fillText(L.t+(L.v>rHi?' ↑':' ↓'),w-pad.r-3,ey);x.textAlign='left';return;}var yy=Y(L.v);x.strokeStyle=L.c;x.lineWidth=1;x.setLineDash(L.d||[]);x.beginPath();x.moveTo(pad.l,yy);x.lineTo(w-pad.r,yy);x.stroke();x.fillStyle=L.c;x.fillText(L.t,w-pad.r+5,yy+3.5);});
- x.lineDashOffset=0;x.setLineDash([]);
- if(cur){var yc=Y(cur);var a=flow?0.55+0.45*(0.5+0.5*Math.sin(tt*3)):1;x.strokeStyle='rgba(238,241,247,'+a.toFixed(3)+')';x.lineWidth=1.6;x.beginPath();x.moveTo(pad.l,yc);x.lineTo(w-pad.r,yc);x.stroke();
-  x.fillStyle='#eef1f7';x.fillText('now '+fPrice(cur),w-pad.r+5,yc-3);
-  // travelling glint along the now-line
-  if(flow){var gx=pad.l+((tt*90)%(w-pad.r-pad.l));x.fillStyle='rgba(242,166,61,.9)';x.beginPath();x.arc(gx,yc,2.2,0,7);x.fill();}
- }
+ _lwCandle=_lw.addCandlestickSeries({upColor:'#46bd62',downColor:'#f2594f',borderUpColor:'#46bd62',borderDownColor:'#f2594f',wickUpColor:'#46bd62',wickDownColor:'#f2594f',priceFormat:{type:'custom',minMove:1e-12,formatter:function(p){return fPrice(p).replace('$','');}}});
+ _lwVol=_lw.addHistogramSeries({priceScaleId:'vol',priceFormat:{type:'volume'},color:'rgba(120,130,150,.35)'});
+ _lw.priceScale('vol').applyOptions({scaleMargins:{top:0.82,bottom:0},visible:false});
+ if(window.ResizeObserver){_lwRO=new ResizeObserver(function(){if(_lw&&el.clientWidth)_lw.applyOptions({width:el.clientWidth,height:el.clientHeight});});_lwRO.observe(el);}
+ lwApply();
+ fetchOhlcv(pp.addr,pp.pairAddr,pp.chain).then(lwApply);
+}
+function lwApply(){
+ if(!_lwCandle||!_lwAddr)return;
+ var pp=state.rcPair;if(!pp||pp.addr!==_lwAddr)return;
+ var oc=state.ohlcv.get(pp.addr),rows=(oc&&oc.rows)||[];
+ if(!rows.length)return;
+ var bars=[],vol=[],seen={};
+ rows.forEach(function(r){var t=Math.floor(+r[0]);if(!t||seen[t])return;seen[t]=1;
+  var o=+r[1],hi=+r[2],lo=+r[3],cl=+r[4];
+  bars.push({time:t,open:o,high:hi,low:lo,close:cl});
+  vol.push({time:t,value:+r[5]||0,color:cl>=o?'rgba(70,185,98,.4)':'rgba(242,89,79,.4)'});
+ });
+ bars.sort(function(a,b){return a.time-b.time;});vol.sort(function(a,b){return a.time-b.time;});
+ try{_lwCandle.setData(bars);_lwVol.setData(vol);}catch(_){return;}
+ var plan=planFrom(pp,researchOf(pp.addr));
+ _lwLines.forEach(function(l){try{_lwCandle.removePriceLine(l);}catch(_){}});_lwLines=[];
+ function line(price,color,title,solid){if(!price||!isFinite(price))return;_lwLines.push(_lwCandle.createPriceLine({price:price,color:color,lineWidth:1,lineStyle:solid?LightweightCharts.LineStyle.Solid:LightweightCharts.LineStyle.Dashed,axisLabelVisible:true,title:title}));}
+ line(plan.stop,'#f2594f','STOP');
+ line(plan.lo,'#46bd62','ENTRY');line(plan.hi,'#46bd62','');
+ line(plan.t1,'#5bd07a','T1');line(plan.t2,'#5bd07a','T2');line(plan.t3,'#5bd07a','T3');
+ _lw.timeScale().fitContent();
 }
 
 /* ---------- research form events ---------- */
@@ -777,9 +763,9 @@ function rcardClick(ev){
  if(cm){var m=cm.getAttribute('data-cm')==='chart'?'chart':'entries';state.chartMode=m;saveCfg();
   var box=cm.closest('.ctoggle').parentNode;
   box.querySelectorAll('[data-cm]').forEach(function(b){b.setAttribute('aria-pressed',b.getAttribute('data-cm')===m?'true':'false');});
-  var emb=box.querySelector('.chart-embed'),cvv=box.querySelector('canvas.candles'),ifr=box.querySelector('.chart-embed iframe');
+  var emb=box.querySelector('.chart-embed'),cvv=box.querySelector('.lwchart'),ifr=box.querySelector('.chart-embed iframe');
   if(m==='chart'){if(ifr&&!ifr.getAttribute('src'))ifr.setAttribute('src',ifr.getAttribute('data-embsrc')||'');if(emb)emb.hidden=false;if(cvv)cvv.hidden=true;}
-  else{if(emb)emb.hidden=true;if(cvv)cvv.hidden=false;}
+  else{if(emb)emb.hidden=true;if(cvv){cvv.hidden=false;if(!_lw)mountChart();else if(_lw&&cvv.clientWidth)_lw.applyOptions({width:cvv.clientWidth,height:cvv.clientHeight});}}
   return;}
  var act=ev.target.closest('[data-act]');if(!act)return;
  var a=act.getAttribute('data-act');

@@ -129,7 +129,8 @@
   .cat input{width:100%;}
   .chart-embed{width:100%;height:480px;border:2px solid var(--ink);border-radius:10px 6px 12px 6px;overflow:hidden;background:#0e0f13;}
   .chart-embed iframe{width:100%;height:100%;border:0;display:block;}
-  canvas.candles{width:100%;height:320px;display:block;border:2px solid var(--ink);border-radius:10px 6px 12px 6px;background:#12131c;}
+  .lwchart{width:100%;height:360px;display:block;border:2px solid var(--ink);border-radius:10px 6px 12px 6px;background:#12131c;overflow:hidden;}
+  .lwchart-note{font-size:10.5px;color:var(--ink-faint);font-family:"Share Tech Mono",monospace;margin-top:4px;}
   .ctoggle{display:inline-flex;border:2px solid var(--ink);border-radius:9px 5px 10px 5px;overflow:hidden;margin-bottom:6px;}
   .ctoggle button{font-size:13px;padding:3px 11px;border:0;border-right:2px dashed var(--ink);background:var(--card);color:var(--ink-soft);cursor:pointer;}
   .ctoggle button:last-child{border-right:0;}
@@ -334,6 +335,7 @@
   </section>
 </div>
 <div class="disclaimer"><div><b>Not financial advice.</b> Public data only: DexScreener, GeckoTerminal, RugCheck, Honeypot. Memecoins are extreme risk and most go to zero. This tool shows you data &mdash; it does not tell you what to buy.</div></div>
+<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
 <script src="/app.js" defer></script>
 </body>
 </html>
