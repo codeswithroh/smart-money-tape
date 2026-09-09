@@ -176,15 +176,15 @@ function fetchOhlcv(addr,pairAddr,chain){
  }).catch(function(){state.ohlcv.set(addr,{ts:Date.now(),rows:[]});return [];});
 }
 function fetchTrades(addr,pairAddr,chain){
- if(!pairAddr)return Promise.resolve([]);
+ if(!pairAddr)return Promise.resolve(null);
  var net=gtNet(chain||'solana');
  return fetch(GT+'/networks/'+net+'/pools/'+pairAddr+'/trades?trade_volume_in_usd_greater_than=0').then(function(r){return r.ok?r.json():null;}).then(function(j){
-  var d=(j&&j.data)||[];
-  return d.map(function(t){var at=t.attributes||{};
+  if(!j||!j.data)return null;
+  return j.data.map(function(t){var at=t.attributes||{};
    var isBuy=at.kind==='buy';
    return {id:t.id,buy:isBuy,usd:+at.volume_in_usd||0,px:+(isBuy?at.price_to_in_usd:at.price_from_in_usd)||+at.price_from_in_usd||0,ts:Date.parse(at.block_timestamp)||Date.now(),wal:String(at.tx_from_address||'').toLowerCase()};
   });
- }).catch(function(){return [];});
+ }).catch(function(){return null;});
 }
 function fomoWatchers(addr){
  if(!state.apiKey)return Promise.resolve(null);
@@ -526,11 +526,13 @@ function renderTrades(fresh){
  if(tp){var seg=tr.slice(0,14).map(function(t){return '<span class="'+(t.buy?'b':'s')+'">'+(t.buy?'▲':'▼')+fUsd(t.usd)+'</span>';}).join('');tp.innerHTML=seg+seg;}
  if(rt){var recent=tr.filter(function(t){return Date.now()-t.ts<300000;});var b=recent.filter(function(t){return t.buy;}).length;rt.textContent=recent.length+' in 5m &middot; '+Math.round(recent.length?b/recent.length*100:50)+'% buys';}
 }
+var _pumpN=0;
 function pumpTrades(){
  var pp=state.rcPair;if(!pp)return;
- fetchOhlcv(pp.addr,pp.pairAddr,pp.chain);
+ if((_pumpN++%2)===1)fetchOhlcv(pp.addr,pp.pairAddr,pp.chain); // nudge candles every other tick
  fetchTrades(pp.addr,pp.pairAddr,pp.chain).then(function(list){
-  if(!list.length){renderTrades();return;}
+  if(list==null)return; // rate-limited / failed: keep what we have
+  if(!list.length){if(!state.trades.length)renderTrades();return;}
   var known={};state.trades.forEach(function(t){known[t.id]=1;});
   var freshIds=list.filter(function(t){return !known[t.id];}).map(function(t){return t.id;});
   var merged=list.concat(state.trades.filter(function(t){return list.every(function(n){return n.id!==t.id;});}));
@@ -540,9 +542,9 @@ function pumpTrades(){
  });
 }
 function startTrades(){
- clearInterval(state._tradesPoll);state.trades=[];
+ clearInterval(state._tradesPoll);state.trades=[];_pumpN=0;
  pumpTrades();
- state._tradesPoll=setInterval(pumpTrades,7000);
+ state._tradesPoll=setInterval(pumpTrades,9000);
 }
 function stopTrades(){clearInterval(state._tradesPoll);state._tradesPoll=0;}
 var _chartRAF=0;
