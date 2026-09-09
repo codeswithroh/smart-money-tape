@@ -26,6 +26,7 @@ function drainGt(){
  },wait);
 }
 function gtNet(c){return ({solana:'solana',bsc:'bsc',base:'base',ethereum:'eth'})[c]||c;}
+function gtOk(c){return ['solana','bsc','base','ethereum'].indexOf(normChain(c))>=0;} // has a GeckoTerminal network (chart/trades)
 function chainSlug(c){return ({solana:'solana',base:'base',bsc:'bsc',ethereum:'ethereum'})[c]||'';}
 function normChain(c){c=String(c||'').toLowerCase();if(c==='eth')return'ethereum';if(c==='bnb')return'bsc';return c;}
 
@@ -44,7 +45,7 @@ var THEMES=[
 
 var state={
  tab:'scan',apiKey:'',
- chains:{solana:true,base:true,bsc:true,ethereum:false},
+ chains:{solana:true,base:true,bsc:true,robinhood:true,ethereum:false},
  searchCache:new Map(), // q -> {ts,pairs}
  tokenCache:new Map(),   // addr -> {ts,pair}
  boosts:[],trending:[],profiles:{},tinfo:new Map(),
@@ -56,7 +57,7 @@ var state={
 
 /* ---------- storage ---------- */
 function loadAll(){
- try{var c=JSON.parse(localStorage.getItem(LS_CFG)||'{}');if(c.apiKey)state.apiKey=c.apiKey;if(c.chains)state.chains=c.chains;if(c.tab&&c.tab!=='journal')state.tab=c.tab;if(c.chartMode)state.chartMode=c.chartMode;if(c.fhSound)state.fhSound=true;}catch(_){}
+ try{var c=JSON.parse(localStorage.getItem(LS_CFG)||'{}');if(c.apiKey)state.apiKey=c.apiKey;if(c.chains){state.chains=c.chains;if(state.chains.robinhood===undefined)state.chains.robinhood=true;}if(c.tab&&c.tab!=='journal')state.tab=c.tab;if(c.chartMode)state.chartMode=c.chartMode;if(c.fhSound)state.fhSound=true;}catch(_){}
  try{state.research=JSON.parse(localStorage.getItem(LS_RES)||'{}')||{};}catch(_){state.research={};}
  try{state.holders=JSON.parse(localStorage.getItem(LS_HOLD)||'{}')||{};}catch(_){state.holders={};}
  try{var w=JSON.parse(localStorage.getItem(LS_WATCH)||'[]');state.watch=new Set(w);}catch(_){}
@@ -520,9 +521,12 @@ function catsHtml(cats){cats=cats||[];if(!cats.length)return '<div style="font-s
 /* ---------- chart (ported) ---------- */
 function fitCanvas(cv){var dpr=window.devicePixelRatio||1,w=cv.clientWidth||cv.parentNode.clientWidth||600,h=cv.clientHeight||160;var pw=Math.max(1,Math.round(w*dpr)),ph=Math.max(1,Math.round(h*dpr));if(cv.width!==pw||cv.height!==ph){cv.width=pw;cv.height=ph;}var x=cv.getContext('2d');x.setTransform(dpr,0,0,dpr,0,0);return {x:x,w:w,h:h};}
 function chartBlock(pp,plan){
- var net=gtNet(pp.chain),canEmbed=!!(pp.pairAddr&&net),mode=state.chartMode;if(!canEmbed)mode='entries';
+ var net=gtNet(pp.chain),hasGT=gtOk(pp.chain),canEmbed=!!(pp.pairAddr&&hasGT),mode=state.chartMode;if(!canEmbed)mode='entries';
+ if(!hasGT){
+  return '<div><div class="lwchart" style="display:flex;align-items:center;justify-content:center;text-align:center;color:#8a8a76;font-family:\'Share Tech Mono\',monospace;font-size:12px;padding:20px">No candle feed for '+esc(pp.chain)+' &mdash; GeckoTerminal doesn\'t index it.<br>Use the DexScreener link above for the chart.</div>'
+   +'<div class="lwchart-note">Mechanical levels: entry '+fPrice(plan.lo)+'&ndash;'+fPrice(plan.hi)+', stop '+fPrice(plan.stop)+' (-'+plan.stopPct+'%), targets '+fPrice(plan.t1)+' / '+fPrice(plan.t2)+' / '+fPrice(plan.t3)+'. Not advice.</div></div>';
+ }
  var toggle='<div class="ctoggle"><button data-cm="entries" aria-pressed="'+(mode==='entries')+'">TradingView + levels</button>'+(canEmbed?'<button data-cm="chart" aria-pressed="'+(mode==='chart')+'">Full toolbar</button>':'')+'</div>';
- // "Full toolbar" = GeckoTerminal pool embed (indicators/drawing). Only loaded when selected.
  var embSrc=canEmbed?'https://www.geckoterminal.com/'+net+'/pools/'+esc(pp.pairAddr)+'?embed=1&info=0&swaps=0&grayscale=0&light_chart=0&resolution=15m':'';
  var embed=canEmbed?'<div class="chart-embed"'+(mode==='entries'?' hidden':'')+'><iframe loading="lazy" title="chart" src="'+(mode==='chart'?embSrc:'')+'" data-embsrc="'+embSrc+'"></iframe></div>':'';
  var cand='<div class="lwchart" data-caddr="'+esc(pp.addr)+'"'+(mode==='chart'?' hidden':'')+'></div>';
@@ -695,6 +699,12 @@ function pumpTrades(){
 }
 function startTrades(){
  clearInterval(state._tradesPoll);state.trades=[];_pumpN=0;
+ var pp=state.rcPair;
+ if(pp&&!gtOk(pp.chain)){
+  var f=q1('tradesFeed');if(f)f.innerHTML='<div style="padding:14px;color:#6b7180;font-size:12px">Live trades + candles come from GeckoTerminal, which doesn\'t index '+esc(pp.chain)+' yet. The attention data, holders, socials and project info above are still live.</div>';
+  var r=q1('tradeRate');if(r)r.textContent='n/a for '+esc(pp.chain);
+  return;
+ }
  pumpTrades();
  state._tradesPoll=setInterval(pumpTrades,8000);
 }
