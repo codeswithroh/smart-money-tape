@@ -1,9 +1,32 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="locked">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<style>html,body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<style>html,body{margin:0}img{max-width:100%}[hidden]{display:none!important}
+  html.locked .wrap,html.locked .ticker,html.locked .disclaimer{display:none!important}
+  #gate{display:none}
+  html.locked #gate{display:flex}</style>
+<script>
+(function(){
+ var KEY='ar-gate-v1', HASH='375082520142eb43c477caf1f04e8a7e296d97d07e74fa43eab935321dae87c0';
+ function norm(s){return String(s||'').toLowerCase().replace(/[^a-z0-9]/g,'');}
+ async function sha(s){var b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));return Array.from(new Uint8Array(b)).map(function(x){return x.toString(16).padStart(2,'0');}).join('');}
+ function unlock(){document.documentElement.classList.remove('locked');try{localStorage.setItem(KEY,HASH);}catch(_){}}
+ try{if(localStorage.getItem(KEY)===HASH){unlock();return;}}catch(_){}
+ document.addEventListener('DOMContentLoaded',function(){
+  var f=document.getElementById('gateForm'),i=document.getElementById('gateInput'),m=document.getElementById('gateMsg');
+  if(!f)return;
+  f.addEventListener('submit',async function(e){
+   e.preventDefault();m.textContent='';
+   var h; try{ h=await sha(norm(i.value)); }catch(_){ h=''; }
+   if(h===HASH){m.style.color='var(--pos)';m.textContent='in. welcome.';setTimeout(unlock,350);}
+   else{m.style.color='var(--neg)';m.textContent='wrong passcode.';i.value='';i.focus();}
+  });
+  i.focus();
+ });
+})();
+</script>
 <title>Attention Radar</title>
 <meta name="description" content="Live memecoin attention radar: a streaming trade firehose, a hot-right-now board, and every public data point behind any coin. A radar, not a shortcut." />
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Patrick+Hand&family=Share+Tech+Mono&display=swap" />
@@ -158,6 +181,19 @@
   .disclaimer div{max-width:1040px;margin:0 auto;padding:8px 20px;} .disclaimer b{color:var(--ink);}
   @media(max-width:720px){ .cat{grid-template-columns:110px 1fr 26px;} .rcard .body{padding:12px;} }
 
+  /* passcode gate */
+  #gate{position:fixed;inset:0;z-index:9999;background:var(--paper);background-image:repeating-linear-gradient(var(--paper) 0 26px,var(--rule) 26px 27px);align-items:center;justify-content:center;padding:24px;}
+  #gate .card{max-width:420px;width:100%;border:2px solid var(--ink);background:var(--card);border-radius:20px 9px 22px 8px / 9px 20px 11px 20px;box-shadow:4px 5px 0 rgba(44,53,80,.18);padding:26px 26px 22px;transform:rotate(-.6deg);}
+  #gate h1{font-family:"Caveat",cursive;font-weight:700;font-size:40px;margin:0 0 4px;transform:rotate(-1deg);color:var(--ink);}
+  #gate p{font-size:14px;color:var(--ink-soft);margin:0 0 16px;line-height:1.5;}
+  #gate form{display:flex;gap:8px;}
+  #gate input{flex:1;font-family:"Patrick Hand",cursive;font-size:16px;padding:9px 12px;border:2px solid var(--ink);border-radius:9px 5px 10px 5px;background:var(--paper);color:var(--ink);}
+  #gate button{font-family:"Patrick Hand",cursive;font-size:15px;padding:9px 16px;border:2px solid var(--ink);border-radius:12px 6px 14px 7px / 7px 13px 6px 12px;background:var(--accent);color:var(--paper);cursor:pointer;box-shadow:2px 2px 0 rgba(44,53,80,.2);}
+  #gate button:hover{transform:translate(1px,1px);box-shadow:1px 1px 0 rgba(44,53,80,.2);}
+  #gate .msg{font-size:13px;margin-top:10px;min-height:16px;}
+  #gate .foot{font-size:12px;color:var(--ink-faint);margin-top:16px;line-height:1.5;}
+  #gate .foot a{color:var(--accent);}
+
   /* ---- hot board ---- */
   .shead h2 .sweep{display:inline-block;width:15px;height:15px;margin-right:7px;vertical-align:-2px;border-radius:50%;border:2px solid var(--accent);position:relative;overflow:hidden;}
   .shead h2 .sweep::after{content:"";position:absolute;inset:-2px;background:conic-gradient(from 0deg,var(--accent),transparent 55%);}
@@ -293,6 +329,18 @@
 </style>
 </head>
 <body>
+<div id="gate">
+  <div class="card">
+    <h1>Attention Radar</h1>
+    <p>Private access. Enter your passcode to open the dashboard.</p>
+    <form id="gateForm" autocomplete="off">
+      <input id="gateInput" type="password" placeholder="passcode" autocomplete="off" aria-label="passcode" />
+      <button type="submit">Enter</button>
+    </form>
+    <div class="msg" id="gateMsg"></div>
+    <div class="foot">No passcode? It's <b>10 USDC</b>. DM me and be ready to send.</div>
+  </div>
+</div>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><filter id="rough"><feTurbulence type="fractalNoise" baseFrequency="0.045" numOctaves="2" seed="7" result="t"><animate attributeName="baseFrequency" dur="10s" values="0.042;0.052;0.045;0.042" repeatCount="indefinite"/></feTurbulence><feDisplacementMap in="SourceGraphic" in2="t" scale="3" /></filter></svg>
 <div class="wrap">
   <header class="top">
