@@ -157,6 +157,45 @@
   .disclaimer div{max-width:1040px;margin:0 auto;padding:8px 20px;} .disclaimer b{color:var(--ink);}
   @media(max-width:720px){ .cat{grid-template-columns:110px 1fr 26px;} .rcard .body{padding:12px;} }
 
+  /* ---- hot board ---- */
+  .shead h2 .sweep{display:inline-block;width:15px;height:15px;margin-right:7px;vertical-align:-2px;border-radius:50%;border:2px solid var(--accent);position:relative;overflow:hidden;}
+  .shead h2 .sweep::after{content:"";position:absolute;inset:-2px;background:conic-gradient(from 0deg,var(--accent),transparent 55%);}
+  .board{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px;margin:6px 0 8px;}
+  .bc{border:2px solid var(--ink);border-radius:13px 7px 12px 8px / 7px 13px 8px 12px;background:var(--card);padding:11px 13px;cursor:pointer;box-shadow:2px 3px 0 rgba(44,53,80,.13);position:relative;overflow:hidden;}
+  .bc:nth-child(odd){transform:rotate(-.3deg);} .bc:nth-child(even){transform:rotate(.3deg);}
+  .bc.r1{border-color:var(--hot);background:linear-gradient(180deg,var(--note),var(--card));}
+  .bc .rank{position:absolute;top:6px;right:9px;font-size:19px;}
+  .bc .bsym{font-family:"Caveat",cursive;font-weight:700;font-size:22px;display:flex;align-items:center;gap:6px;}
+  .bc .bsym .cchip{font-size:10px;}
+  .bc .bmeta{font-size:12px;color:var(--ink-soft);margin-top:2px;}
+  .bc .bmeta .up{color:var(--pos);} .bc .bmeta .dn{color:var(--neg);}
+  .bc .battn{margin-top:7px;display:flex;align-items:center;gap:7px;font-size:12px;}
+  .bc .battn .bar{flex:1;height:8px;border:1.5px solid var(--ink);border-radius:5px 3px 5px 3px;overflow:hidden;}
+  .bc .battn .bar>i{display:block;height:100%;background:repeating-linear-gradient(45deg,var(--hot) 0 3px,transparent 3px 6px);}
+  .bc .traj-mini{font-family:"Caveat",cursive;font-weight:700;}
+  .bc .traj-mini.ramping{color:var(--pos);} .bc .traj-mini.fading{color:var(--neg);} .bc .traj-mini.steady{color:var(--ink-soft);}
+
+  /* ---- firehose ---- */
+  .firehose{border:2px solid var(--ink);border-radius:14px 8px 13px 8px;background:#0f1016;overflow:hidden;position:relative;}
+  .fh-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:rgba(205,210,223,.14);border-bottom:1px solid rgba(205,210,223,.14);}
+  .fh-stats .s{background:#12131c;padding:9px 10px;text-align:center;}
+  .fh-stats .s .k{font-size:9.5px;text-transform:uppercase;letter-spacing:.06em;color:#6b7180;}
+  .fh-stats .s .v{font-family:"Caveat",cursive;font-weight:700;font-size:21px;line-height:1;margin-top:3px;color:#eef1f7;}
+  .fh-stats .s .v.g{color:#46bd62;} .fh-stats .s .v.r{color:#f2594f;} .fh-stats .s .v.h{color:#f2a63d;}
+  .fh-wrap{position:relative;height:230px;}
+  canvas.fh-canvas{width:100%;height:100%;display:block;}
+  .fh-bar{position:absolute;left:0;right:0;bottom:0;height:6px;background:#f2594f33;}
+  .fh-bar>i{display:block;height:100%;background:#46bd62;transition:width .4s;}
+  .fh-top{position:absolute;top:8px;left:10px;right:10px;display:flex;justify-content:space-between;align-items:center;font-size:11px;color:#8a8a76;pointer-events:none;}
+  .fh-sound{position:absolute;top:6px;right:8px;background:#12131c;border:1.5px solid rgba(205,210,223,.3);color:#cdd2df;border-radius:7px 4px 8px 4px;padding:2px 8px;font-size:12px;cursor:pointer;pointer-events:auto;z-index:2;}
+  .fh-sound[aria-pressed="true"]{border-color:#46bd62;color:#46bd62;}
+
+  .verdict.go{color:var(--pos);} .verdict.watch{color:var(--hot);} .verdict.pass{color:var(--ink-soft);} .verdict.fomo{color:var(--neg);}
+  .collapsed-form>summary{cursor:pointer;font-size:13px;color:var(--ink-soft);padding:4px 0;list-style:none;}
+  .collapsed-form>summary::-webkit-details-marker{display:none;}
+  .collapsed-form>summary::before{content:"\25B8 ";}
+  .collapsed-form[open]>summary::before{content:"\25BE ";}
+
   /* ---- ticker tape ---- */
   .ticker{margin:12px 0 4px;border:2px solid var(--ink);border-radius:9px 6px 10px 6px / 6px 10px 6px 9px;background:#171821;overflow:hidden;position:relative;filter:url(#rough);}
   .ticker::after{content:"";position:absolute;top:0;bottom:0;right:0;width:44px;background:linear-gradient(90deg,transparent,#171821);pointer-events:none;}
@@ -205,6 +244,9 @@
     .trow:hover{box-shadow:0 0 0 2px var(--accent-wash),3px 4px 0 rgba(44,53,80,.18);}
     .dot.live{animation:wob 2.6s ease-in-out infinite;}
     @keyframes wob{0%,100%{transform:rotate(-6deg)}50%{transform:rotate(6deg)}}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .shead h2 .sweep::after{animation:spin 2.4s linear infinite;}
+    .bc.r1{animation:rmppulse 2.4s ease-in-out infinite;}
   }
 </style>
 </head>
@@ -222,9 +264,8 @@
   <div class="ticker" id="ticker"><div class="ticker-track" id="tickerTrack"></div></div>
 
   <div class="tabs" role="tablist">
-    <button role="tab" data-tab="scan" aria-selected="true">Scan narratives</button>
-    <button role="tab" data-tab="research" aria-selected="false">Research a coin</button>
-    <button role="tab" data-tab="journal" aria-selected="false">Trade journal</button>
+    <button role="tab" data-tab="scan" aria-selected="true">Live radar</button>
+    <button role="tab" data-tab="research" aria-selected="false">Coin x-ray</button>
   </div>
 
   <div class="controls">
@@ -238,52 +279,33 @@
 
   <!-- SCAN -->
   <section id="tab-scan">
-    <div class="shead"><h2>Spotted a meme?</h2><span class="hint">TikTok / Reels / X &rarr; check if a coin exists</span></div>
-    <p class="lead">Saw a meme going viral? Type it here. If a coin exists you get its research card &mdash; check holders, socials and trajectory before you decide it can travel.</p>
+    <div class="shead"><h2><span class="sweep"></span>Hot right now</h2><span class="hint"><button class="btn sm" id="flexBoard">&#128248; flex the board</button></span></div>
+    <p class="lead">Top coins by attention momentum, this minute. Not advice &mdash; just where the eyeballs are.</p>
+    <div class="board" id="board"><div class="empty">reading the tape&hellip;</div></div>
+
+    <div class="shead"><h2>Spotted a meme?</h2><span class="hint">TikTok / Reels / X &rarr; is there a coin?</span></div>
     <div class="controls">
       <input id="scanQ" type="text" placeholder="meme, ticker or contract (e.g. la, jalapeno, nuli)" style="flex:1;min-width:200px" />
       <button class="btn pri" id="scanGo">Check</button>
     </div>
     <div id="scanQResult"></div>
 
-    <div class="shead"><h2>Attention right now</h2><span class="hint" id="scanHint">boosts + trending + new pools &middot; ~90s</span></div>
-    <p class="lead">Every coin currently pulling volume or paying to be seen, ranked by attention momentum. The tag is a <i>guess</i> &mdash; you decide the real narrative. Tap a row to research it.</p>
+    <div class="shead"><h2>Everything moving</h2><span class="hint" id="scanHint">boosts + trending + new &middot; ~90s</span></div>
     <div class="controls" id="scanFilters"></div>
     <div class="rows" id="attnList"><div class="empty">loading&hellip;</div></div>
   </section>
 
   <!-- RESEARCH -->
   <section id="tab-research" hidden>
-    <p class="lead">Paste a contract address or type a ticker. You fill the narrative read; the radar fills the attention data. The verdict is <b>your</b> research, not a buy signal.</p>
+    <p class="lead">Paste a contract or type a ticker. The radar pulls every public data point &mdash; live trades, holders, socials, safety, the whole story.</p>
     <div class="controls">
       <input id="q" type="text" placeholder="contract address or ticker (e.g. jalapeno)" style="flex:1;min-width:200px" />
-      <button class="btn pri" id="qgo">Research</button>
+      <button class="btn pri" id="qgo">X-ray</button>
     </div>
     <div id="rcardHost"></div>
   </section>
-
-  <!-- JOURNAL -->
-  <section id="tab-journal" hidden>
-    <p class="lead">A trade isn't real until it's realized. Log why you entered and why you exited &mdash; then review what the narrative actually did.</p>
-    <div class="shead"><h2>Review</h2><span class="hint" id="jscope"></span></div>
-    <div class="jstats" id="jstats"></div>
-    <div class="shead"><h2>Open</h2><span class="hint">live mcap marked from DexScreener</span></div>
-    <div id="jopen"><div class="empty">No open positions. Research a coin and add it here.</div></div>
-    <div class="shead"><h2>Closed</h2><span class="hint">wins & mistakes</span></div>
-    <div id="jclosed"><div class="empty">nothing closed yet</div></div>
-    <div class="reminders">
-      <h3>Orangie&rsquo;s reminders</h3>
-      <ul>
-        <li>You&rsquo;re betting on <b>virality curves</b> &mdash; will more people care soon, not is the tech good.</li>
-        <li>If you feel compelled because <b>everyone&rsquo;s buying</b>, that&rsquo;s usually the top.</li>
-        <li>100x&ndash;1000x is a <b>1-in-1000</b> trade. Size every position so a total loss won&rsquo;t hurt.</li>
-        <li>Copy trading puts you in <b>late</b> and trains zero skill. Read theses, form your own.</li>
-        <li>Up $50k isn&rsquo;t real until you realize it. Have an exit before you enter.</li>
-      </ul>
-    </div>
-  </section>
 </div>
-<div class="disclaimer"><div><b>Not financial advice.</b> Public data only: DexScreener, GeckoTerminal, RugCheck, Honeypot. Memecoins are extreme risk and most go to zero. This tool structures your own research and journaling &mdash; it does not tell you what to buy.</div></div>
+<div class="disclaimer"><div><b>Not financial advice.</b> Public data only: DexScreener, GeckoTerminal, RugCheck, Honeypot. Memecoins are extreme risk and most go to zero. This tool shows you data &mdash; it does not tell you what to buy.</div></div>
 <script src="/app.js" defer></script>
 </body>
 </html>
