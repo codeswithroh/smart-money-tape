@@ -532,7 +532,7 @@ function firehosePanel(){
    +'<div class="s"><div class="k">buy pressure</div><div class="v g" id="fhBP">&mdash;</div></div>'
    +'<div class="s"><div class="k">streak</div><div class="v h" id="fhST">&mdash;</div></div>'
    +'<div class="s"><div class="k">&#128011; biggest buy</div><div class="v" id="fhBIG">&mdash;</div></div>'
-   +'<div class="s"><div class="k">flow / min</div><div class="v" id="fhFLOW">&mdash;</div></div>'
+   +'<div class="s"><div class="k">trades / 5m</div><div class="v" id="fhFLOW">&mdash;</div></div>'
   +'</div>'
   +'<div class="fh-wrap"><canvas class="fh-canvas"></canvas>'
    +'<div class="fh-top"><span>&#9679; buys rise &nbsp; &#9679; sells sink</span><span id="fhHint">watching the tape&hellip;</span></div>'
@@ -610,7 +610,7 @@ function feedFirehose(fresh){
   fh.flow.push(t.ts);
   fhBlip(t.usd,t.buy);
  });
- fh.flow=fh.flow.filter(function(ts){return Date.now()-ts<60000;});
+ fh.flow=fh.flow.filter(function(ts){return Date.now()-ts<300000;});
  var bp=fh.buys.length?Math.round(fh.buys.reduce(function(a,b){return a+b;},0)/fh.buys.length*100):50;
  var bpEl=q1('fhBP'),stEl=q1('fhST'),bgEl=q1('fhBIG'),flEl=q1('fhFLOW'),barEl=q1('fhBar'),hintEl=q1('fhHint');
  if(bpEl){bpEl.textContent=bp+'%';bpEl.className='v '+(bp>=55?'g':bp<=45?'r':'');}
