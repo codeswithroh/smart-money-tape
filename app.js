@@ -523,8 +523,13 @@ function fitCanvas(cv){var dpr=window.devicePixelRatio||1,w=cv.clientWidth||cv.p
 function chartBlock(pp,plan){
  var net=gtNet(pp.chain),hasGT=gtOk(pp.chain),canEmbed=!!(pp.pairAddr&&hasGT),mode=state.chartMode;if(!canEmbed)mode='entries';
  if(!hasGT){
-  return '<div><div class="lwchart" style="display:flex;align-items:center;justify-content:center;text-align:center;color:#8a8a76;font-family:\'Share Tech Mono\',monospace;font-size:12px;padding:20px">No candle feed for '+esc(pp.chain)+' &mdash; GeckoTerminal doesn\'t index it.<br>Use the DexScreener link above for the chart.</div>'
-   +'<div class="lwchart-note">Mechanical levels: entry '+fPrice(plan.lo)+'&ndash;'+fPrice(plan.hi)+', stop '+fPrice(plan.stop)+' (-'+plan.stopPct+'%), targets '+fPrice(plan.t1)+' / '+fPrice(plan.t2)+' / '+fPrice(plan.t3)+'. Not advice.</div></div>';
+  // GeckoTerminal has no network for this chain (e.g. robinhood) -> use the DexScreener embed, the only source that indexes it
+  var dsBase=pp.url||('https://dexscreener.com/'+esc(pp.chain)+'/'+esc(pp.pairAddr));
+  var dsSrc=pp.pairAddr?dsBase.split('?')[0]+'?embed=1&theme=dark&info=0&trades=0':'';
+  return '<div>'
+   +(dsSrc?'<div class="chart-embed"><iframe loading="lazy" title="chart" src="'+esc(dsSrc)+'"></iframe></div>'
+        :'<div class="lwchart" style="display:flex;align-items:center;justify-content:center;color:#8a8a76;font-family:\'Share Tech Mono\',monospace;font-size:12px;padding:20px">no chart source for this token</div>')
+   +'<div class="lwchart-note">DexScreener chart ('+esc(pp.chain)+') &middot; mechanical levels: entry '+fPrice(plan.lo)+'&ndash;'+fPrice(plan.hi)+', stop '+fPrice(plan.stop)+' (-'+plan.stopPct+'%), targets '+fPrice(plan.t1)+' / '+fPrice(plan.t2)+' / '+fPrice(plan.t3)+'. Not advice.</div></div>';
  }
  var toggle='<div class="ctoggle"><button data-cm="entries" aria-pressed="'+(mode==='entries')+'">TradingView + levels</button>'+(canEmbed?'<button data-cm="chart" aria-pressed="'+(mode==='chart')+'">Full toolbar</button>':'')+'</div>';
  var embSrc=canEmbed?'https://www.geckoterminal.com/'+net+'/pools/'+esc(pp.pairAddr)+'?embed=1&info=0&swaps=0&grayscale=0&light_chart=0&resolution=15m':'';
@@ -701,8 +706,8 @@ function startTrades(){
  clearInterval(state._tradesPoll);state.trades=[];_pumpN=0;
  var pp=state.rcPair;
  if(pp&&!gtOk(pp.chain)){
-  var f=q1('tradesFeed');if(f)f.innerHTML='<div style="padding:14px;color:#6b7180;font-size:12px">Live trades + candles come from GeckoTerminal, which doesn\'t index '+esc(pp.chain)+' yet. The attention data, holders, socials and project info above are still live.</div>';
-  var r=q1('tradeRate');if(r)r.textContent='n/a for '+esc(pp.chain);
+  var f=q1('tradesFeed');if(f)f.innerHTML='<div style="padding:14px;color:#6b7180;font-size:12px">The streaming trade feed isn\'t available on '+esc(pp.chain)+' (no GeckoTerminal index). The DexScreener chart above shows this pair\'s live candles &amp; trades. Everything else on this card is live.</div>';
+  var r=q1('tradeRate');if(r)r.textContent='see chart';
   return;
  }
  pumpTrades();
