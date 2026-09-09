@@ -32,7 +32,7 @@
   function showOrder(o){
    amtEl.textContent=o.amount;addrEl.textContent=o.address;
    panel.hidden=false;buyBtn.hidden=true;
-   setStat('waiting for payment… auto-unlocks within ~1 min');
+   setStat('also checking automatically…');
    poll(o.orderId);
   }
   async function checkOnce(oid,tx){
@@ -407,8 +407,9 @@
         <div class="amt"><span id="gateAmt">&mdash;</span> USDC <button type="button" data-copy="amt">copy amount</button></div>
         <p class="pi">to this address:</p>
         <div class="addr"><code id="gateAddr">&mdash;</code> <button type="button" data-copy="addr">copy address</button></div>
-        <div id="gateStat" class="stat">&hellip;</div>
-        <div class="txrow"><input id="gateTx" type="text" placeholder="paste tx hash (optional, instant)" autocomplete="off" /><button id="gateTxBtn" type="button">check</button></div>
+        <p class="pi" style="margin-top:10px">then paste your <b>transaction hash</b> (your wallet &rarr; the sent tx &rarr; copy tx ID / hash):</p>
+        <div class="txrow"><input id="gateTx" type="text" placeholder="0x&hellip;" autocomplete="off" /><button id="gateTxBtn" type="button">Unlock</button></div>
+        <div id="gateStat" class="stat">also checking automatically&hellip;</div>
       </div>
     </div>
     <div class="foot">Questions? DM <a href="https://x.com/codeswithroh" target="_blank" rel="noopener">@codeswithroh</a> on X.</div>

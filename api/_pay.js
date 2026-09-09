@@ -60,20 +60,29 @@ function logMatches(lg, want) {
   } catch (_) { return false; }
 }
 
-// A) auto scan: small recent window (base.org caps getLogs at 2000 blocks)
+// A) best-effort auto scan of the last ~40 blocks (~90s). Public RPCs choke on wide
+// getLogs, so this only catches a payment made in the last minute or two while polling.
+// The reliable path is paymentByTx().
 export async function paymentLanded(rawAmount) {
-  const bn = await rpc('eth_blockNumber', [], 'https://mainnet.base.org');
-  if (!bn) return { ok: false, reason: 'rpc' };
-  const latest = parseInt(bn, 16);
   const want = BigInt(rawAmount);
-  const from = '0x' + Math.max(0, latest - 1800).toString(16);
-  const logs = await rpc('eth_getLogs', [{
-    address: USDC_BASE, fromBlock: from, toBlock: 'latest',
-    topics: [TRANSFER_TOPIC, null, topicToAddr()],
-  }], 'https://mainnet.base.org');
-  if (!Array.isArray(logs)) return { ok: false, reason: 'rpc' };
-  for (const lg of logs) if (logMatches(lg, want)) return { ok: true, tx: lg.transactionHash };
-  return { ok: false, reason: 'not_found' };
+  for (const url of RPCS) {
+    try {
+      const bnr = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_blockNumber', params: [] }) }).then((r) => r.json());
+      if (!bnr || !bnr.result) continue;
+      const latest = parseInt(bnr.result, 16);
+      const from = '0x' + Math.max(0, latest - 40).toString(16);
+      const lr = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_getLogs', params: [{
+          address: USDC_BASE, fromBlock: from, toBlock: 'latest',
+          topics: [TRANSFER_TOPIC, null, topicToAddr()],
+        }] }) }).then((r) => r.json());
+      if (!lr || lr.error || !Array.isArray(lr.result)) continue;
+      for (const lg of lr.result) if (logMatches(lg, want)) return { ok: true, tx: lg.transactionHash };
+      return { ok: false, reason: 'not_found' }; // one RPC gave a clean answer
+    } catch (_) { /* next RPC */ }
+  }
+  return { ok: false, reason: 'rpc' };
 }
 
 // B) bulletproof: verify one pasted tx hash (no range limit, works forever)
