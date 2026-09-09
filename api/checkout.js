@@ -1,21 +1,15 @@
-import { PAYTO, priceFor, corsJson, PRICE_USDC } from './_pay.js';
+import { PAYTO, corsJson, PRICE_USDC } from './_pay.js';
 
 export const config = { runtime: 'edge' };
 
-export default async function handler(req) {
-  if (req.method === 'OPTIONS') return corsJson({}, 204);
-  // random opaque order id; the exact amount is derived from it, so no storage needed
-  const orderId = crypto.randomUUID().replace(/-/g, '').slice(0, 20);
-  const p = await priceFor(orderId);
+export default async function handler() {
   return corsJson({
-    orderId,
     chain: 'base',
     token: 'USDC',
     address: PAYTO,
-    amount: p.human,      // e.g. "10.004731" — send this EXACT amount
-    amountRaw: p.raw,
+    amount: String(PRICE_USDC),        // flat: send this or more
     priceUsdc: PRICE_USDC,
     decimals: 6,
-    note: 'Send this exact USDC amount on Base. Confirms automatically within ~1 min.',
+    note: 'Send ' + PRICE_USDC + ' USDC (or more) on Base. Then paste your tx hash, or wait ~1 min for auto-confirm.',
   });
 }
