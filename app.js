@@ -530,18 +530,18 @@ function chartBlock(pp,plan){
 /* ---------- ATTENTION RADAR hex ---------- */
 function radarAxes(pp,a,sf,proj,hr){
  return [
-  {label:'BUY',v:a.skew1},
-  {label:'VOL ACC',v:Math.min(1,(a.accel||1)/2)},
-  {label:'HOLDERS',v:hr?Math.min(1,Math.max(0,(hr.perHr||0)/150)):0.12},
-  {label:'SAFETY',v:sf&&sf.ok===true?1:(!sf||sf.ok==null?0.5:0)},
-  {label:'PROJECT',v:(proj.surface||0)/4},
-  {label:'FRESH',v:pp.ageMs!=null?Math.max(0.05,Math.pow(0.5,(pp.ageMs/864e5)/3)):0.3}
+  {label:'BUY',full:'buy pressure',v:a.skew1},
+  {label:'VOL',full:'volume acceleration',v:Math.min(1,(a.accel||1)/2)},
+  {label:'HOLD',full:'holder growth',v:hr?Math.min(1,Math.max(0,(hr.perHr||0)/150)):0.12},
+  {label:'SAFE',full:'safety',v:sf&&sf.ok===true?1:(!sf||sf.ok==null?0.5:0)},
+  {label:'PROJ',full:'project surface',v:(proj.surface||0)/4},
+  {label:'AGE',full:'freshness',v:pp.ageMs!=null?Math.max(0.05,Math.pow(0.5,(pp.ageMs/864e5)/3)):0.3}
  ];
 }
 function drawRadar(cv,axes){
  var c=fitCanvas(cv),x=c.x,w=c.w,h=c.h;
  x.fillStyle='#08090d';x.fillRect(0,0,w,h);
- var cx=w/2,cy=h/2,R=Math.min(w,h)/2-24,n=axes.length;
+ var cx=w/2,cy=h/2,R=Math.min(w,h)/2-40,n=axes.length;
  var pt=function(i,rr){var ang=-Math.PI/2+i/n*Math.PI*2;return [cx+Math.cos(ang)*rr,cy+Math.sin(ang)*rr,ang];};
  for(var ring=1;ring<=4;ring++){
   x.beginPath();for(var i=0;i<=n;i++){var q=pt(i%n,R*ring/4);i?x.lineTo(q[0],q[1]):x.moveTo(q[0],q[1]);}
@@ -562,12 +562,21 @@ function drawRadar(cv,axes){
  axes.forEach(function(a2,i){var q=pt(i,R*Math.max(0.04,Math.min(1,a2.v)));x.beginPath();x.arc(q[0],q[1],2.6,0,7);x.fillStyle='#ffdf6b';x.fill();});
 }
 function radarTile(axes){
- var rows=axes.map(function(a2){var p=Math.round(a2.v*100);var cl=p>=60?'g':p<=30?'r':'';return '<div><b>'+a2.label+'</b> <span class="'+cl+'">'+p+'</span></div>';}).join('');
- return '<div class="radar-tile"><canvas class="radar-cv"></canvas><div class="rl"><div style="color:#eef1f7;margin-bottom:4px">ATTENTION PROFILE</div>'+rows+'</div></div>';
+ var strong=axes.filter(function(a2){return a2.v>=0.6;}),weak=axes.filter(function(a2){return a2.v<0.3;});
+ var chips=axes.map(function(a2){var p=Math.round(a2.v*100);var cl=p>=60?'g':p<=30?'r':'';return '<div class="rc"><span>'+esc(a2.full||a2.label)+'</span><b class="'+cl+'">'+p+'</b></div>';}).join('');
+ var s;
+ if(strong.length&&weak.length)s='Strong on <b>'+strong.map(function(a2){return a2.full;}).join(', ')+'</b>. Thin on <b>'+weak.map(function(a2){return a2.full;}).join(', ')+'</b>.';
+ else if(strong.length)s='Broad strength: <b>'+strong.map(function(a2){return a2.full;}).join(', ')+'</b>.';
+ else if(weak.length)s='Weak shape &mdash; thin on <b>'+weak.map(function(a2){return a2.full;}).join(', ')+'</b>.';
+ else s='Balanced &mdash; nothing standing out yet.';
+ return '<div class="radar-tile"><canvas class="radar-cv"></canvas>'
+  +'<div class="rl"><div class="rl-h">ATTENTION PROFILE</div>'
+  +'<div class="rc-grid">'+chips+'</div>'
+  +'<p class="rl-s">'+s+'</p></div></div>';
 }
-/* ---------- FIREHOSE (terminal / fire-gradient live trades) ---------- */
-var BUCKET_MS=5000,N_BUCKETS=48;
-var fh={parts:[],raf:0,buys:[],streak:0,streakSide:0,biggest:null,flow:[],ac:null,t0:0,buckets:[],curBucket:null};
+/* ---------- FIREHOSE (github-style contribution grid of trades) ---------- */
+var GH_COLS=52,GH_ROWS=7;
+var fh={buys:[],streak:0,streakSide:0,biggest:null,flow:[],ac:null};
 function firehosePanel(){
  return '<div class="firehose">'
   +'<div class="fh-stats">'
@@ -576,75 +585,33 @@ function firehosePanel(){
    +'<div class="s"><div class="k">biggest buy</div><div class="v" id="fhBIG">--</div></div>'
    +'<div class="s"><div class="k">trades / 5m</div><div class="v" id="fhFLOW">--</div></div>'
   +'</div>'
-  +'<div class="dot-tape"><div class="dt-track" id="dotTape"></div></div>'
-  +'<div class="fh-wrap"><canvas class="fh-canvas"></canvas>'
-   +'<div class="fh-top"><span>buys rise &nbsp;/&nbsp; sells sink &nbsp;/&nbsp; flow at base</span><span id="fhHint">watching the tape...</span></div>'
-   +'<button class="fh-sound" id="fhSound" aria-pressed="'+(state.fhSound?'true':'false')+'">'+(state.fhSound?'&#128266;':'&#128263;')+'</button>'
-   +'<div class="fh-duel"><i class="g" id="fhG" style="width:50%"></i><i class="r" id="fhR" style="width:50%"></i><span class="seam" id="fhSeam" style="left:50%"></span><span class="pc l" id="fhPL">50</span><span class="pc rr" id="fhPR">50</span></div>'
-  +'</div></div>';
+  +'<div class="gh-wrap">'
+   +'<div class="gh-head"><span id="fhHint">every square = one trade &middot; newest bottom-right</span>'
+   +'<span class="gh-leg">small<i></i><i></i><i></i><i></i>big &nbsp;<b class="lg">&#9632;buy</b> <b class="ls">&#9632;sell</b></span>'
+   +'<button class="fh-sound" id="fhSound" aria-pressed="'+(state.fhSound?'true':'false')+'">'+(state.fhSound?'&#128266;':'&#128263;')+'</button></div>'
+   +'<div class="gh-grid" id="ghGrid"></div>'
+  +'</div>'
+  +'<div class="fh-duel"><i class="g" id="fhG" style="width:50%"></i><i class="r" id="fhR" style="width:50%"></i><span class="seam" id="fhSeam" style="left:50%"></span><span class="pc l" id="fhPL">50</span><span class="pc rr" id="fhPR">50</span></div>'
+  +'</div>';
 }
-function fhReset(){fh.parts=[];fh.buys=[];fh.streak=0;fh.streakSide=0;fh.biggest=null;fh.flow=[];fh.buckets=[];fh.curBucket=null;fh.t0=performance.now();}
-function fhBucketRoll(ts){
- var slot=Math.floor(ts/BUCKET_MS);
- if(!fh.curBucket||fh.curBucket.slot!==slot){
-  if(fh.curBucket)fh.buckets.push(fh.curBucket);
-  while(fh.buckets.length>N_BUCKETS)fh.buckets.shift();
-  fh.curBucket={slot:slot,buy:0,sell:0};
- }
- return fh.curBucket;
+function fhReset(){fh.buys=[];fh.streak=0;fh.streakSide=0;fh.biggest=null;fh.flow=[];}
+function startFirehose(){if(!state.trades.length)fhReset();renderGrid();feedFirehose();}
+function stopFirehose(){}
+function ghLevel(usd){return usd>=2000?4:usd>=500?3:usd>=80?2:1;}
+function renderGrid(freshIds){
+ var el=q1('ghGrid');if(!el)return;
+ var N=GH_COLS*GH_ROWS;
+ var BUY=['#0e4429','#006d32','#26a641','#39d353'],SELL=['#5c1a14','#8a241b','#c62f22','#ff5c4d'];
+ var tr=state.trades.slice(0,N).slice().reverse(); // oldest -> newest
+ var pad=N-tr.length,cells=[];
+ for(var i=0;i<pad;i++)cells.push('<i></i>');
+ tr.forEach(function(t,ix){
+  var lv=ghLevel(t.usd),pal=t.buy?BUY:SELL;
+  var isNew=freshIds&&freshIds.indexOf(t.id)>=0&&!reduceMotion;
+  cells.push('<i class="'+(ix===tr.length-1?'now':'')+(isNew?' now':'')+'" style="background:'+pal[lv-1]+'" title="'+(t.buy?'BUY ':'SELL ')+fUsd(t.usd)+' &middot; '+fAgo(t.ts)+' ago"></i>');
+ });
+ el.innerHTML=cells.join('');
 }
-function startFirehose(){
- stopFirehose();fhReset();
- var cv=document.querySelector('canvas.fh-canvas');if(!cv)return;
- function frame(now){
-  var c=fitCanvas(cv),x=c.x,w=c.w,h=c.h;
-  x.fillStyle='#08090d';x.fillRect(0,0,w,h);
-  var baseY=h-16, colArea=Math.min(120,h*0.5);
-  // faint grid drift in the particle zone
-  x.strokeStyle='rgba(205,210,223,.045)';x.lineWidth=1;
-  for(var gy=(now/50%38);gy<baseY-colArea;gy+=38){x.beginPath();x.moveTo(0,gy);x.lineTo(w,gy);x.stroke();}
-  // ---- live fire-gradient flow columns ----
-  var cols=fh.buckets.concat(fh.curBucket?[fh.curBucket]:[]);
-  if(cols.length){
-   var maxV=1;cols.forEach(function(b){maxV=Math.max(maxV,b.buy+b.sell);});
-   var cw=w/N_BUCKETS,off=(N_BUCKETS-cols.length)*cw;
-   cols.forEach(function(b,i){
-    var cx=off+i*cw, tot=b.buy+b.sell;
-    var colH=(tot/maxV)*colArea;
-    var bh=tot?colH*(b.buy/tot):0, sh=colH-bh;
-    // sell (ember) base
-    if(sh>0){x.fillStyle='rgba(180,50,40,.55)';x.fillRect(cx+1,baseY-sh,cw-2,sh);}
-    // buy stacked fire gradient
-    if(bh>0){
-     var gr=x.createLinearGradient(0,baseY-sh-bh,0,baseY-sh);
-     gr.addColorStop(0,'#ff4d2e');gr.addColorStop(0.55,'#ff9636');gr.addColorStop(1,'#ffdf6b');
-     x.fillStyle=gr;x.fillRect(cx+1,baseY-sh-bh,cw-2,bh);
-    }
-   });
-   x.strokeStyle='rgba(205,210,223,.12)';x.beginPath();x.moveTo(0,baseY);x.lineTo(w,baseY);x.stroke();
-  }
-  // ---- rising / sinking trade bubbles ----
-  var dt=reduceMotion?0:1;
-  for(var k=fh.parts.length-1;k>=0;k--){
-   var p=fh.parts[k];
-   p.life-=0.0055*(dt||1);
-   if(p.life<=0){fh.parts.splice(k,1);continue;}
-   p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy*=0.995;
-   p.vx+=Math.sin((now/600)+p.seed)*0.03*dt;
-   var a=Math.min(1,p.life*1.6);
-   var col=p.buy?'77,217,122':'255,92,77';
-   x.beginPath();x.arc(p.x,p.y,p.r,0,7);
-   x.fillStyle='rgba('+col+','+(0.14*a).toFixed(3)+')';x.fill();
-   x.strokeStyle='rgba('+col+','+(0.72*a).toFixed(3)+')';x.lineWidth=p.whale?2.4:1.2;x.stroke();
-   if(p.whale){x.beginPath();x.arc(p.x,p.y,p.r*(2-p.life)*1.7,0,7);x.strokeStyle='rgba('+col+','+(0.28*a).toFixed(3)+')';x.lineWidth=1;x.stroke();}
-   if(p.r>12){x.fillStyle='rgba(238,241,247,'+(0.85*a).toFixed(3)+')';x.font='11px "Share Tech Mono",monospace';x.textAlign='center';x.fillText(p.label,p.x,p.y+4);}
-  }
-  if(reduceMotion){fh.raf=0;return;}
-  fh.raf=requestAnimationFrame(frame);
- }
- fh.raf=requestAnimationFrame(frame);
-}
-function stopFirehose(){if(fh.raf)cancelAnimationFrame(fh.raf);fh.raf=0;}
 function fhCtx(){if(!fh.ac){try{fh.ac=new (window.AudioContext||window.webkitAudioContext)();}catch(_){fh.ac=null;}}return fh.ac;}
 function fhBlip(usd,buy){
  if(!state.fhSound)return;var ac=fhCtx();if(!ac)return;
@@ -660,24 +627,8 @@ function fhBlip(usd,buy){
  o.connect(g);g.connect(ac.destination);o.start();o.stop(ac.currentTime+0.4);
 }
 function feedFirehose(fresh){
- if(!fresh||!fresh.length)return;
- var cv=document.querySelector('canvas.fh-canvas');
- var W=cv?(cv.clientWidth||cv.parentNode.clientWidth||600):600,H=cv?(cv.clientHeight||250):250;
- var colArea=Math.min(120,H*0.5),topZone=16,botZone=H-colArea-24;
- var mx=Math.max.apply(null,state.trades.slice(0,40).map(function(t){return t.usd;}))||1;
- fresh.slice(0,12).forEach(function(t){
-  var norm=Math.min(1,Math.log10(1+t.usd)/Math.log10(1+Math.max(mx,50)));
-  var r=6+norm*24,whale=t.usd>=1000;
-  fh.parts.push({
-   x:20+Math.random()*(W-40),
-   y:t.buy?botZone:topZone,
-   vx:(Math.random()-0.5)*0.6,
-   vy:t.buy?-(0.5+norm*1.5):(0.5+norm*1.5),
-   r:r,life:1,seed:Math.random()*6,buy:t.buy,whale:whale,
-   label:whale?fUsd(t.usd):''
-  });
-  if(fh.parts.length>90)fh.parts.shift();
-  var b=fhBucketRoll(t.ts||Date.now());b[t.buy?'buy':'sell']+=t.usd||1;
+ var seed=!fresh||!fresh.length;
+ (fresh||[]).forEach(function(t){
   fh.buys.push(t.buy?1:0);if(fh.buys.length>40)fh.buys.shift();
   if(t.buy){if(fh.streakSide===1)fh.streak++;else{fh.streakSide=1;fh.streak=1;}}
   else{if(fh.streakSide===-1)fh.streak++;else{fh.streakSide=-1;fh.streak=1;}}
@@ -685,7 +636,13 @@ function feedFirehose(fresh){
   fh.flow.push(t.ts);
   fhBlip(t.usd,t.buy);
  });
+ if(seed){
+  fh.buys=state.trades.slice(0,40).map(function(t){return t.buy?1:0;});
+  var bb=state.trades.filter(function(t){return t.buy;}).sort(function(a,b){return b.usd-a.usd;})[0];fh.biggest=bb||null;
+  fh.flow=state.trades.map(function(t){return t.ts;});
+ }
  fh.flow=fh.flow.filter(function(ts){return Date.now()-ts<300000;});
+ renderGrid(seed?null:(fresh||[]).map(function(t){return t.id;}));
  var bp=fh.buys.length?Math.round(fh.buys.reduce(function(a,b){return a+b;},0)/fh.buys.length*100):50;
  var bpEl=q1('fhBP'),stEl=q1('fhST'),bgEl=q1('fhBIG'),flEl=q1('fhFLOW'),hintEl=q1('fhHint');
  var g=q1('fhG'),rr=q1('fhR'),seam=q1('fhSeam'),pl=q1('fhPL'),pr=q1('fhPR');
@@ -694,18 +651,7 @@ function feedFirehose(fresh){
  if(stEl){stEl.textContent=fh.streak+(fh.streakSide===1?'G':'R')+(fh.streak>=5?'*':'');stEl.className='v '+(fh.streakSide===1?'g':'r');}
  if(bgEl)bgEl.textContent=fh.biggest?fUsd(fh.biggest.usd).replace('$',''):'--';
  if(flEl)flEl.textContent=fh.flow.length;
- if(hintEl){var last=fresh[fresh.length-1];hintEl.textContent=(last.buy?'BUY ':'SELL ')+fUsd(last.usd)+(last.usd>=1000?' WHALE':'');}
- // dot-matrix tape
- var dtEl=q1('dotTape');
- if(dtEl){
-  var rows=state.trades.slice(0,60).slice().reverse();
-  var dmx=Math.max.apply(null,rows.map(function(t){return t.usd;}))||1;
-  dtEl.innerHTML=rows.map(function(t){
-   var n=1+Math.round(Math.min(5,Math.log10(1+t.usd)/Math.log10(1+dmx)*5));
-   var dots='';for(var i=0;i<n;i++)dots+='<i></i>';
-   return '<span class="dcol '+(t.buy?'b':'s')+'">'+dots+'</span>';
-  }).join('');
- }
+ if(hintEl&&fresh&&fresh.length){var last=fresh[fresh.length-1];hintEl.textContent=(last.buy?'BUY ':'SELL ')+fUsd(last.usd)+(last.usd>=1000?' WHALE':'')+' just landed';}
 }
 function tradesPanel(){
  return '<div class="trades"><h3><span class="pulse"></span>The tape &middot; <span id="tradeRate" style="color:#8a8a76">&hellip;</span></h3>'
@@ -739,16 +685,10 @@ function pumpTrades(){
   var merged=list.concat(state.trades.filter(function(t){return list.every(function(n){return n.id!==t.id;});}));
   merged.sort(function(a,b){return b.ts-a.ts;});
   var firstFill=!state.trades.length;
-  state.trades=merged.slice(0,60);
+  state.trades=merged.slice(0,120);
   renderTrades(reduceMotion?[]:freshIds.slice(0,8));
-  if(!firstFill)feedFirehose(freshTrades.sort(function(a,b){return a.ts-b.ts;}));
-  else{ // seed stats + flow buckets from history without spraying 60 particles
-   fh.buys=state.trades.slice(0,40).map(function(t){return t.buy?1:0;});
-   var bb=state.trades.filter(function(t){return t.buy;}).sort(function(a,b){return b.usd-a.usd;})[0];fh.biggest=bb||null;
-   fh.flow=state.trades.map(function(t){return t.ts;}).filter(function(ts){return Date.now()-ts<300000;});
-   state.trades.slice().reverse().forEach(function(t){var bk=fhBucketRoll(t.ts||Date.now());bk[t.buy?'buy':'sell']+=t.usd||1;});
-   feedFirehose([state.trades[0]]);
-  }
+  if(firstFill)feedFirehose();
+  else feedFirehose(freshTrades.sort(function(a,b){return a.ts-b.ts;}));
  });
 }
 function startTrades(){

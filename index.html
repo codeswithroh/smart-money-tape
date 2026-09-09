@@ -183,31 +183,38 @@
   .fh-stats .s .v{font-family:"Share Tech Mono",monospace;font-size:22px;line-height:1;margin-top:5px;color:#eef1f7;letter-spacing:.02em;}
   .fh-stats .s .v::before{content:"[ ";color:#3a3f4d;} .fh-stats .s .v::after{content:" ]";color:#3a3f4d;}
   .fh-stats .s .v.g{color:#4dd97a;text-shadow:0 0 10px rgba(77,217,122,.5);} .fh-stats .s .v.r{color:#ff5c4d;text-shadow:0 0 10px rgba(255,92,77,.5);} .fh-stats .s .v.h{color:#ffab3d;text-shadow:0 0 10px rgba(255,171,61,.5);}
-  .fh-wrap{position:relative;height:250px;}
-  canvas.fh-canvas{width:100%;height:100%;display:block;}
-  .fh-duel{position:absolute;left:0;right:0;bottom:0;height:15px;background:#14151c;overflow:hidden;}
+  /* github-style contribution grid of trades */
+  .gh-wrap{padding:10px 12px 12px;}
+  .gh-head{display:flex;align-items:center;gap:10px;font-family:"Share Tech Mono",monospace;font-size:10px;color:#6b7180;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;}
+  .gh-head #fhHint{color:#8a8a76;}
+  .gh-leg{margin-left:auto;display:flex;align-items:center;gap:4px;}
+  .gh-leg i{width:9px;height:9px;border-radius:2px;background:#151620;display:inline-block;}
+  .gh-leg i:nth-child(1){background:#0e4429;} .gh-leg i:nth-child(2){background:#006d32;} .gh-leg i:nth-child(3){background:#26a641;} .gh-leg i:nth-child(4){background:#39d353;}
+  .gh-leg b{font-weight:400;} .gh-leg b.lg{color:#39d353;} .gh-leg b.ls{color:#ff5c4d;}
+  .gh-grid{display:grid;grid-template-rows:repeat(7,1fr);grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:3px;}
+  .gh-grid i{aspect-ratio:1;border-radius:2px;background:#151620;transition:background .3s;}
+  .gh-grid i.now{outline:1.5px solid rgba(255,255,255,.55);}
+  .fh-sound{background:#0c0d12;border:1.5px solid rgba(205,210,223,.25);color:#cdd2df;border-radius:7px 4px 8px 4px;padding:2px 8px;font-size:12px;cursor:pointer;}
+  .fh-sound[aria-pressed="true"]{border-color:#4dd97a;color:#4dd97a;}
+  .fh-duel{position:relative;height:16px;background:#14151c;overflow:hidden;}
   .fh-duel .g{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,#1f6b3f,#4dd97a);transition:width .35s;}
   .fh-duel .r{position:absolute;right:0;top:0;bottom:0;background:linear-gradient(90deg,#7a1d15,#ff5c4d);transition:width .35s;}
   .fh-duel .seam{position:absolute;top:-3px;bottom:-3px;width:2px;background:#fff;box-shadow:0 0 10px #fff,0 0 4px #fff;transition:left .35s;}
   .fh-duel .pc{position:absolute;top:0;bottom:0;display:flex;align-items:center;font-family:"Share Tech Mono",monospace;font-size:10px;color:#fff;padding:0 5px;text-shadow:0 0 4px #000;}
   .fh-duel .pc.l{left:0;} .fh-duel .pc.rr{right:0;}
-  .fh-top{position:absolute;top:8px;left:10px;right:10px;display:flex;justify-content:space-between;align-items:center;font-size:10px;color:#6b7180;font-family:"Share Tech Mono",monospace;pointer-events:none;text-transform:uppercase;letter-spacing:.05em;}
-  .fh-sound{position:absolute;top:6px;right:8px;background:#0c0d12;border:1.5px solid rgba(205,210,223,.25);color:#cdd2df;border-radius:7px 4px 8px 4px;padding:2px 8px;font-size:12px;cursor:pointer;pointer-events:auto;z-index:2;}
-  .fh-sound[aria-pressed="true"]{border-color:#4dd97a;color:#4dd97a;}
-  /* dot-matrix tape */
-  .dot-tape{display:flex;overflow:hidden;background:#0c0d12;border-bottom:1px dashed rgba(205,210,223,.14);height:30px;align-items:center;padding:0 6px;}
-  .dot-tape .dt-track{display:flex;gap:5px;min-width:100%;justify-content:flex-end;}
-  .dot-tape .dcol{display:flex;flex-direction:column-reverse;gap:2px;flex:none;}
-  .dot-tape .dcol i{width:5px;height:5px;border-radius:1px;}
-  .dot-tape .dcol.b i{background:#4dd97a;box-shadow:0 0 4px rgba(77,217,122,.6);}
-  .dot-tape .dcol.s i{background:#ff5c4d;box-shadow:0 0 4px rgba(255,92,77,.6);}
   /* attention radar tile */
-  .radar-tile{border:2px solid var(--ink);border-radius:12px 7px 13px 7px;background:#08090d;padding:10px;display:flex;gap:12px;align-items:center;}
-  .radar-tile canvas{flex:none;width:170px;height:170px;}
-  .radar-tile .rl{font-family:"Share Tech Mono",monospace;font-size:11.5px;color:#8a8a76;line-height:1.7;}
-  .radar-tile .rl b{color:#eef1f7;}
-  .radar-tile .rl .g{color:#4dd97a;} .radar-tile .rl .r{color:#ff5c4d;}
-  @media(max-width:620px){ .radar-tile{flex-direction:column;} }
+  .radar-tile{border:2px solid var(--ink);border-radius:12px 7px 13px 7px;background:#08090d;padding:14px 16px;display:flex;gap:18px;align-items:stretch;}
+  .radar-tile canvas{flex:none;width:230px;height:230px;}
+  .radar-tile .rl{flex:1;display:flex;flex-direction:column;min-width:0;}
+  .radar-tile .rl-h{color:#eef1f7;font-family:"Share Tech Mono",monospace;font-size:12px;letter-spacing:.12em;margin-bottom:12px;}
+  .radar-tile .rc-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px 14px;}
+  .radar-tile .rc{display:flex;flex-direction:column;gap:2px;}
+  .radar-tile .rc span{font-size:9px;text-transform:uppercase;letter-spacing:.05em;color:#6b7180;font-family:"Share Tech Mono",monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .radar-tile .rc b{font-family:"Share Tech Mono",monospace;font-size:24px;font-weight:400;color:#cdd2df;line-height:1;}
+  .radar-tile .rc b.g{color:#4dd97a;text-shadow:0 0 8px rgba(77,217,122,.4);} .radar-tile .rc b.r{color:#ff5c4d;text-shadow:0 0 8px rgba(255,92,77,.4);}
+  .radar-tile .rl-s{margin:16px 0 0;font-size:13px;color:#8a8a76;line-height:1.55;font-family:"Patrick Hand",cursive;}
+  .radar-tile .rl-s b{color:#cdd2df;}
+  @media(max-width:640px){ .radar-tile{flex-direction:column;align-items:center;} .radar-tile .rl{width:100%;} }
 
   .verdict.go{color:var(--pos);} .verdict.watch{color:var(--hot);} .verdict.pass{color:var(--ink-soft);} .verdict.fomo{color:var(--neg);}
   .collapsed-form>summary{cursor:pointer;font-size:13px;color:var(--ink-soft);padding:4px 0;list-style:none;}
@@ -266,6 +273,8 @@
     @keyframes spin{to{transform:rotate(360deg)}}
     .shead h2 .sweep::after{animation:spin 2.4s linear infinite;}
     .bc.r1{animation:rmppulse 2.4s ease-in-out infinite;}
+    @keyframes ghpop{0%{transform:scale(.2);opacity:.3}60%{transform:scale(1.35)}100%{transform:scale(1);opacity:1}}
+    .gh-grid i.now{animation:ghpop .5s cubic-bezier(.2,.8,.3,1);}
   }
 </style>
 </head>
