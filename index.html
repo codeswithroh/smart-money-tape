@@ -9,7 +9,8 @@
   html.locked #gate{display:flex}</style>
 <script>
 (function(){
- var KEY='ar-gate-v1', ORD='ar-order-v1', HASH='375082520142eb43c477caf1f04e8a7e296d97d07e74fa43eab935321dae87c0';
+ var KEY='ar-gate-v1', ORD='ar-order-v2', HASH='375082520142eb43c477caf1f04e8a7e296d97d07e74fa43eab935321dae87c0';
+ try{localStorage.removeItem('ar-order-v1');}catch(_){}
  function norm(s){return String(s||'').toLowerCase().replace(/[^a-z0-9]/g,'');}
  async function sha(s){var b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));return Array.from(new Uint8Array(b)).map(function(x){return x.toString(16).padStart(2,'0');}).join('');}
  function unlock(){document.documentElement.classList.remove('locked');try{localStorage.setItem(KEY,HASH);localStorage.removeItem(ORD);}catch(_){}}
@@ -51,6 +52,7 @@
    try{
     var r=await fetch('/api/checkout',{cache:'no-store'});var o=await r.json();
     if(!o||!o.address)throw 0;
+    o.ts=Date.now();
     try{localStorage.setItem(ORD,JSON.stringify(o));}catch(_){}
     showOrder(o);
    }catch(_){buyBtn.disabled=false;buyBtn.textContent='Buy access · USDC on Base';setStat('could not reach payment server, try again',false);}
@@ -71,8 +73,11 @@
     try{navigator.clipboard.writeText(t);b.textContent='copied';setTimeout(function(){b.textContent=b.getAttribute('data-copy')==='amt'?'copy amount':'copy address';},1200);}catch(_){}
    });
   });
-  // resume a pending order after refresh
-  try{var saved=JSON.parse(localStorage.getItem(ORD)||'null');if(saved&&saved.orderId)showOrder(saved);}catch(_){}
+  // resume a pending order after refresh (only if fresh - avoids showing a stale amount)
+  try{var saved=JSON.parse(localStorage.getItem(ORD)||'null');
+   if(saved&&saved.orderId&&saved.ts&&Date.now()-saved.ts<1800000)showOrder(saved);
+   else localStorage.removeItem(ORD);
+  }catch(_){}
   if(!document.getElementById('gateBuyPanel')||document.getElementById('gateBuyPanel').hidden)i.focus();
  });
 })();
