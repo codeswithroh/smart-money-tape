@@ -53,7 +53,7 @@
     if(!o||!o.address)throw 0;
     try{localStorage.setItem(ORD,JSON.stringify(o));}catch(_){}
     showOrder(o);
-   }catch(_){buyBtn.disabled=false;buyBtn.textContent='Buy access · 10 USDC (Base)';setStat('could not reach payment server, try again',false);}
+   }catch(_){buyBtn.disabled=false;buyBtn.textContent='Buy access · USDC on Base';setStat('could not reach payment server, try again',false);}
   });
   var txBtn=document.getElementById('gateTxBtn'),txIn=document.getElementById('gateTx');
   if(txBtn)txBtn.addEventListener('click',async function(){
@@ -401,7 +401,7 @@
     </form>
     <div class="msg" id="gateMsg"></div>
     <div class="buy">
-      <button id="gateBuyBtn" type="button">Buy access &middot; 10 USDC (Base)</button>
+      <button id="gateBuyBtn" type="button">Buy access &middot; USDC on Base</button>
       <div id="gateBuyPanel" hidden>
         <p class="pi">Send this <b>exact</b> amount of <b>USDC on Base</b>:</p>
         <div class="amt"><span id="gateAmt">&mdash;</span> USDC <button type="button" data-copy="amt">copy amount</button></div>

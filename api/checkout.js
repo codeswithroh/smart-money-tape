@@ -1,4 +1,4 @@
-import { PAYTO, priceFor, corsJson } from './_pay.js';
+import { PAYTO, priceFor, corsJson, PRICE_USDC } from './_pay.js';
 
 export const config = { runtime: 'edge' };
 
@@ -14,6 +14,7 @@ export default async function handler(req) {
     address: PAYTO,
     amount: p.human,      // e.g. "10.004731" — send this EXACT amount
     amountRaw: p.raw,
+    priceUsdc: PRICE_USDC,
     decimals: 6,
     note: 'Send this exact USDC amount on Base. Confirms automatically within ~1 min.',
   });

@@ -14,6 +14,8 @@ export const RPCS = [
 
 const SECRET = (globalThis.process && process.env && process.env.GATE_SECRET) || 'ar-salt-9f2c-2026';
 export const ACCESS_CODE = (globalThis.process && process.env && process.env.ACCESS_CODE) || 'get it';
+// price in USDC. override with env PRICE_USDC (e.g. set to 10 for launch, no code change).
+export const PRICE_USDC = Number((globalThis.process && process.env && process.env.PRICE_USDC)) || 1;
 
 const enc = (s) => new TextEncoder().encode(s);
 
@@ -28,7 +30,7 @@ async function hmacHex(key, msg) {
 export async function priceFor(orderId) {
   const h = await hmacHex(SECRET, 'amt:' + orderId);
   const micro = (parseInt(h.slice(0, 6), 16) % 8000) + 1000; // 1000..8999
-  const raw = 10 * 1e6 + micro;
+  const raw = Math.round(PRICE_USDC * 1e6) + micro;
   return { raw, human: (raw / 1e6).toFixed(6) };
 }
 
