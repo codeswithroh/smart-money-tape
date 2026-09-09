@@ -64,8 +64,9 @@ function parsePair(p){
  var liq=(p.liquidity&&+p.liquidity.usd)||0;
  return {
   addr:String(p.baseToken&&p.baseToken.address||'').toLowerCase(),
+  addrRaw:String(p.baseToken&&p.baseToken.address||''),
   sym:(p.baseToken&&p.baseToken.symbol)||'?',name:(p.baseToken&&p.baseToken.name)||'',
-  chain:normChain(p.chainId),pairAddr:String(p.pairAddress||'').toLowerCase(),
+  chain:normChain(p.chainId),pairAddr:String(p.pairAddress||''),
   priceUsd:+p.priceUsd||0,mc:+p.marketCap||+p.fdv||0,fdv:+p.fdv||+p.marketCap||0,liq:liq,
   vol:{m5:(p.volume&&+p.volume.m5)||0,h1:(p.volume&&+p.volume.h1)||0,h6:(p.volume&&+p.volume.h6)||0,h24:(p.volume&&+p.volume.h24)||0},
   tx:{m5:(p.txns&&p.txns.m5)||{},h1:(p.txns&&p.txns.h1)||{},h6:(p.txns&&p.txns.h6)||{},h24:(p.txns&&p.txns.h24)||{}},
@@ -106,10 +107,10 @@ function fetchProfiles(){
   });
  }).catch(function(){});
 }
-function fetchTokenInfo(addr,chain){
+function fetchTokenInfo(addr,chain,urlAddr){
  var c=state.tinfo.get(addr);if(c&&Date.now()-c.ts<600000)return Promise.resolve(c.v);
  var net=gtNet(chain||'solana');
- return fetch(GT+'/networks/'+net+'/tokens/'+addr+'/info').then(function(r){return r.ok?r.json():null;}).then(function(j){
+ return fetch(GT+'/networks/'+net+'/tokens/'+(urlAddr||addr)+'/info').then(function(r){return r.ok?r.json():null;}).then(function(j){
   var at=j&&j.data&&j.data.attributes;var v=null;
   if(at)v={desc:at.description||'',x:at.twitter_handle||'',tg:at.telegram_handle||'',discord:at.discord_url||'',sites:at.websites||[],cats:at.categories||[],cg:at.coingecko_coin_id||'',gtScore:at.gt_score,img:at.image_url||null};
   state.tinfo.set(addr,{ts:Date.now(),v:v});return v;
@@ -140,11 +141,11 @@ function fetchTrending(){
   state.trending=all;
  });
 }
-function fetchSafety(addr,chain){
+function fetchSafety(addr,chain,urlAddr){
  var c=state.safety.get(addr);if(c&&Date.now()-c.ts<300000)return Promise.resolve(c);
  var done=function(res){res.ts=Date.now();state.safety.set(addr,res);return res;};
  if(chain==='solana'){
-  return fetch(RUG+'/'+addr+'/report').then(function(r){return r.ok?r.json():null;}).then(function(j){
+  return fetch(RUG+'/'+(urlAddr||addr)+'/report').then(function(r){return r.ok?r.json():null;}).then(function(j){
    if(!j)return done({ok:null,reasons:['no rug data'],src:'rugcheck'});
    var risks=j.risks||[];var danger=risks.filter(function(x){return String(x.level||'').toLowerCase()==='danger';}).map(function(x){return x.name;});
    var top=(j.topHolders||[]).filter(function(h){return !h.insider&&h.pct!=null;});var topPct=top.length?top[0].pct:null;
@@ -311,12 +312,13 @@ function openResearch(addr,chain){
  p0.then(function(pp){
   if(!pp){q1('rcardHost').innerHTML='<div class="empty">No DexScreener data for that address on the selected chains.</div>';return;}
   state.rcPair=pp;
+  var raw=pp.addrRaw||addr;
   return Promise.all([
-   fetchSafety(addr,pp.chain),
+   fetchSafety(addr,pp.chain,raw),
    fetchOhlcv(addr,pp.pairAddr,pp.chain),
    fomoWatchers(addr),
    primeThemePeers(pp),
-   fetchTokenInfo(addr,pp.chain)
+   fetchTokenInfo(addr,pp.chain,raw)
   ]).then(function(r){state.rcInfo=r[4];renderResearch(pp,r[0],r[2],r[4]);startTrades();});
  });
 }
