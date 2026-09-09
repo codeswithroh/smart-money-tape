@@ -156,10 +156,60 @@
   .disclaimer{position:fixed;left:0;right:0;bottom:0;z-index:5;background:var(--paper-2);border-top:2px dashed var(--ink);font-size:12px;color:var(--ink-soft);line-height:1.4;}
   .disclaimer div{max-width:1040px;margin:0 auto;padding:8px 20px;} .disclaimer b{color:var(--ink);}
   @media(max-width:720px){ .cat{grid-template-columns:110px 1fr 26px;} .rcard .body{padding:12px;} }
+
+  /* ---- ticker tape ---- */
+  .ticker{margin:12px 0 4px;border:2px solid var(--ink);border-radius:9px 6px 10px 6px / 6px 10px 6px 9px;background:#171821;overflow:hidden;position:relative;filter:url(#rough);}
+  .ticker::after{content:"";position:absolute;top:0;bottom:0;right:0;width:44px;background:linear-gradient(90deg,transparent,#171821);pointer-events:none;}
+  .ticker-track{display:flex;gap:0;white-space:nowrap;padding:6px 0;width:max-content;}
+  .tk-item{padding:0 16px;font-size:13.5px;color:#cdd2df;border-right:1px dashed rgba(205,210,223,.18);cursor:pointer;flex:none;}
+  .tk-item b{color:#f4ecd9;} .tk-item .up{color:#46bd62;} .tk-item .dn{color:#f2594f;} .tk-item .rmp{color:#f2a63d;}
+  .tk-item:hover{background:rgba(255,255,255,.06);}
+
+  /* ---- live trades feed ---- */
+  .trades{border:2px solid var(--ink);border-radius:11px 7px 12px 7px;background:#12131c;overflow:hidden;}
+  .trades h3{margin:0;padding:8px 12px;font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:#f2a63d;border-bottom:1px dashed rgba(205,210,223,.2);display:flex;align-items:center;gap:8px;}
+  .trades .pulse{width:8px;height:8px;border-radius:50%;background:#46bd62;flex:none;}
+  .tape-h{display:flex;gap:0;white-space:nowrap;overflow:hidden;border-bottom:1px dashed rgba(205,210,223,.2);height:26px;align-items:center;position:relative;}
+  .tape-h .th-track{display:flex;width:max-content;}
+  .tape-h span{padding:0 12px;font-size:12px;border-right:1px solid rgba(205,210,223,.12);flex:none;}
+  .tape-h .b{color:#46bd62;} .tape-h .s{color:#f2594f;}
+  .tfeed{max-height:280px;overflow-y:auto;}
+  .trd{display:grid;grid-template-columns:52px 1fr auto auto;gap:8px;align-items:center;padding:5px 12px;font-size:12.5px;border-bottom:1px dashed rgba(205,210,223,.1);color:#cdd2df;}
+  .trd .side{font-family:"Caveat",cursive;font-weight:700;font-size:15px;}
+  .trd.b .side{color:#46bd62;} .trd.s .side{color:#f2594f;}
+  .trd .szwrap{position:relative;height:14px;background:rgba(255,255,255,.04);border-radius:3px;overflow:hidden;}
+  .trd .szbar{position:absolute;left:0;top:0;bottom:0;}
+  .trd.b .szbar{background:rgba(70,185,98,.35);} .trd.s .szbar{background:rgba(242,89,79,.35);}
+  .trd .szwrap b{position:relative;padding-left:5px;color:#eef1f7;line-height:14px;}
+  .trd .px{color:#8a8a76;} .trd .wal{color:#6b7180;font-family:"Patrick Hand",cursive;}
+
+  /* ---- ambient motion (opt-in) ---- */
+  @media(prefers-reduced-motion:no-preference){
+    @keyframes marquee{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+    .ticker-track{animation:marquee 42s linear infinite;}
+    .ticker:hover .ticker-track{animation-play-state:paused;}
+    .tape-h .th-track{animation:marquee 24s linear infinite;}
+    @keyframes trdin{from{opacity:0;transform:translateX(26px)}to{opacity:1;transform:translateX(0)}}
+    .trd.fresh{animation:trdin .5s cubic-bezier(.2,.7,.3,1);}
+    @keyframes breathe{0%,100%{opacity:.55}50%{opacity:1}}
+    .trades .pulse{animation:breathe 1.6s ease-in-out infinite;}
+    @keyframes paperdrift{0%{background-position:0 0,0 0}100%{background-position:120px 120px,0 0}}
+    body{animation:paperdrift 90s linear infinite;}
+    @keyframes shimmer{0%{background-position:0 0}100%{background-position:40px 0}}
+    .theme .heatbar>i,.meter>i{background-size:40px 40px;animation:shimmer 1.4s linear infinite;}
+    @keyframes rmppulse{0%,100%{filter:drop-shadow(0 0 0 rgba(242,166,61,0))}50%{filter:drop-shadow(0 0 5px rgba(242,166,61,.6))}}
+    .traj.ramping{animation:rmppulse 2s ease-in-out infinite;}
+    @keyframes fadethrob{0%,100%{opacity:1}50%{opacity:.55}}
+    .traj.fading{animation:fadethrob 2.6s ease-in-out infinite;}
+    .trow,.theme,.btn{transition:box-shadow .18s,transform .12s;}
+    .trow:hover{box-shadow:0 0 0 2px var(--accent-wash),3px 4px 0 rgba(44,53,80,.18);}
+    .dot.live{animation:wob 2.6s ease-in-out infinite;}
+    @keyframes wob{0%,100%{transform:rotate(-6deg)}50%{transform:rotate(6deg)}}
+  }
 </style>
 </head>
 <body>
-<svg width="0" height="0" style="position:absolute" aria-hidden="true"><filter id="rough"><feTurbulence type="fractalNoise" baseFrequency="0.045" numOctaves="2" seed="7" result="t" /><feDisplacementMap in="SourceGraphic" in2="t" scale="3" /></filter></svg>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><filter id="rough"><feTurbulence type="fractalNoise" baseFrequency="0.045" numOctaves="2" seed="7" result="t"><animate attributeName="baseFrequency" dur="10s" values="0.042;0.052;0.045;0.042" repeatCount="indefinite"/></feTurbulence><feDisplacementMap in="SourceGraphic" in2="t" scale="3" /></filter></svg>
 <div class="wrap">
   <header class="top">
     <div class="brand">
@@ -168,6 +218,8 @@
     </div>
     <div class="status"><span class="dot" id="dot"></span><span id="statusText">warming up&hellip;</span></div>
   </header>
+
+  <div class="ticker" id="ticker"><div class="ticker-track" id="tickerTrack"></div></div>
 
   <div class="tabs" role="tablist">
     <button role="tab" data-tab="scan" aria-selected="true">Scan narratives</button>
