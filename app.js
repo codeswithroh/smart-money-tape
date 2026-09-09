@@ -6,9 +6,9 @@ var LS_CFG='ar-cfg-v1',LS_RES='ar-research-v1',LS_JRNL='ar-journal-v1',LS_HOLD='
 var EVM_CHAIN_ID={bsc:56,base:8453,ethereum:1};
 var reduceMotion=!!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 // GeckoTerminal free tier ~25 req/min and 429s without CORS headers -> throttle every GT call
-var _gtQ=[],_gtLast=0,_gtBusy=false,GT_GAP=2600;
-function gtFetch(url){
- return new Promise(function(resolve){_gtQ.push({url:url,resolve:resolve});drainGt();});
+var _gtQ=[],_gtLast=0,_gtBusy=false,GT_GAP=2200;
+function gtFetch(url,priority){
+ return new Promise(function(resolve){var job={url:url,resolve:resolve};if(priority)_gtQ.unshift(job);else _gtQ.push(job);drainGt();});
 }
 function drainGt(){
  if(_gtBusy||!_gtQ.length)return;
@@ -17,8 +17,8 @@ function drainGt(){
  setTimeout(function(){
   var job=_gtQ.shift();_gtLast=Date.now();
   fetch(job.url).then(function(r){
-   if(r&&r.status===429){GT_GAP=Math.min(9000,GT_GAP+1200);}
-   else if(r&&r.ok&&GT_GAP>2600){GT_GAP=Math.max(2600,GT_GAP-300);}
+   if(r&&r.status===429){GT_GAP=Math.min(9000,GT_GAP+1400);}
+   else if(r&&r.ok&&GT_GAP>2200){GT_GAP=Math.max(2200,GT_GAP-250);}
    job.resolve(r&&r.ok?r:{ok:false,status:r?r.status:0,json:function(){return Promise.resolve(null);}});
   },function(){job.resolve({ok:false,status:0,json:function(){return Promise.resolve(null);}});}).then(function(){_gtBusy=false;drainGt();});
  },wait);
@@ -153,7 +153,8 @@ function gtPools(net,path){
 function fetchTrending(){
  var nets=[];if(state.chains.solana)nets.push('solana');if(state.chains.base)nets.push('base');if(state.chains.bsc)nets.push('bsc');
  nets=nets.slice(0,3);if(!nets.length){state.trending=[];return Promise.resolve();}
- var reqs=[];nets.forEach(function(n){reqs.push(gtPools(n,'trending_pools'));reqs.push(gtPools(n,'new_pools'));});
+ var reqs=[];nets.forEach(function(n){reqs.push(gtPools(n,'trending_pools'));});
+ reqs.push(gtPools(nets[0],'new_pools')); // one fresh-pool pull, primary chain only
  return Promise.all(reqs).then(function(res){
   var all=[],seen={};res.forEach(function(x){x.forEach(function(t){if(seen[t.addr])return;seen[t.addr]=1;all.push(t);});});
   state.trending=all;
@@ -189,7 +190,7 @@ function fetchOhlcv(addr,pairAddr,chain){
  var c=state.ohlcv.get(addr);if(c&&Date.now()-c.ts<14000)return Promise.resolve(c.rows);
  if(!pairAddr)return Promise.resolve([]);
  var net=gtNet(chain||'solana');
- return gtFetch(GT+'/networks/'+net+'/pools/'+pairAddr+'/ohlcv/minute?aggregate=5&limit=90&currency=usd').then(function(r){return r.ok?r.json():null;}).then(function(j){
+ return gtFetch(GT+'/networks/'+net+'/pools/'+pairAddr+'/ohlcv/minute?aggregate=5&limit=90&currency=usd',true).then(function(r){return r.ok?r.json():null;}).then(function(j){
   var rows=(j&&j.data&&j.data.attributes&&j.data.attributes.ohlcv_list)||[];rows=rows.slice().reverse();
   state.ohlcv.set(addr,{ts:Date.now(),rows:rows});return rows;
  }).catch(function(){state.ohlcv.set(addr,{ts:Date.now(),rows:[]});return [];});
@@ -197,7 +198,7 @@ function fetchOhlcv(addr,pairAddr,chain){
 function fetchTrades(addr,pairAddr,chain){
  if(!pairAddr)return Promise.resolve(null);
  var net=gtNet(chain||'solana');
- return gtFetch(GT+'/networks/'+net+'/pools/'+pairAddr+'/trades?trade_volume_in_usd_greater_than=0').then(function(r){return r.ok?r.json():null;}).then(function(j){
+ return gtFetch(GT+'/networks/'+net+'/pools/'+pairAddr+'/trades?trade_volume_in_usd_greater_than=0',true).then(function(r){return r.ok?r.json():null;}).then(function(j){
   if(!j||!j.data)return null;
   return j.data.map(function(t){var at=t.attributes||{};
    var isBuy=at.kind==='buy';
