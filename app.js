@@ -470,6 +470,7 @@ function renderResearch(pp,sf,watchers,tinfo){
   +'<span class="nm">$'+esc(pp.sym)+'</span><span class="chain">'+esc(pp.chain)+'</span>'
   +(proj.x?'<a class="xh" href="'+esc(proj.xUrl)+'" target="_blank" rel="noopener">@'+esc(proj.x)+'</a>':'')
   +'<span class="lnks">'+lnk.join('')+'</span></div>'
+  +(gtOk(pp.chain)?'':'<div class="rc-banner"><b>&#9888; '+esc(pp.chain)+' chain &mdash; slow data.</b> The network is congested and there\'s no fast indexer for it, so the chart and trade feed load slowly and can read a little stale. The attention score, holders, socials and project info are unaffected.</div>')
   +'<div class="body">'
   +'<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><div class="verdict '+v.cls+'">'+v.label+'</div>'
    +'<button class="btn" data-act="savefav">'+(state.watch.has(pp.addr)?'&#9733; watching':'&#9734; watch')+'</button>'
