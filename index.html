@@ -9,21 +9,61 @@
   html.locked #gate{display:flex}</style>
 <script>
 (function(){
- var KEY='ar-gate-v1', HASH='375082520142eb43c477caf1f04e8a7e296d97d07e74fa43eab935321dae87c0';
+ var KEY='ar-gate-v1', ORD='ar-order-v1', HASH='375082520142eb43c477caf1f04e8a7e296d97d07e74fa43eab935321dae87c0';
  function norm(s){return String(s||'').toLowerCase().replace(/[^a-z0-9]/g,'');}
  async function sha(s){var b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));return Array.from(new Uint8Array(b)).map(function(x){return x.toString(16).padStart(2,'0');}).join('');}
- function unlock(){document.documentElement.classList.remove('locked');try{localStorage.setItem(KEY,HASH);}catch(_){}}
+ function unlock(){document.documentElement.classList.remove('locked');try{localStorage.setItem(KEY,HASH);localStorage.removeItem(ORD);}catch(_){}}
  try{if(localStorage.getItem(KEY)===HASH){unlock();return;}}catch(_){}
+ var pollT=0;
  document.addEventListener('DOMContentLoaded',function(){
   var f=document.getElementById('gateForm'),i=document.getElementById('gateInput'),m=document.getElementById('gateMsg');
   if(!f)return;
   f.addEventListener('submit',async function(e){
    e.preventDefault();m.textContent='';
-   var h; try{ h=await sha(norm(i.value)); }catch(_){ h=''; }
-   if(h===HASH){m.style.color='var(--pos)';m.textContent='in. welcome.';setTimeout(unlock,350);}
-   else{m.style.color='var(--neg)';m.textContent='wrong passcode.';i.value='';i.focus();}
+   var v=i.value.trim(),h;
+   try{ h=await sha(norm(v)); }catch(_){ h=''; }
+   if(h===HASH){m.style.color='var(--pos)';m.textContent='in. welcome.';setTimeout(unlock,350);return;}
+   m.style.color='var(--neg)';m.textContent='wrong passcode.';i.value='';i.focus();
   });
-  i.focus();
+  // ---- pay flow ----
+  var buyBtn=document.getElementById('gateBuyBtn'),panel=document.getElementById('gateBuyPanel'),
+      amtEl=document.getElementById('gateAmt'),addrEl=document.getElementById('gateAddr'),statEl=document.getElementById('gateStat');
+  function setStat(t,ok){statEl.textContent=t;statEl.style.color=ok?'var(--pos)':'var(--ink-soft)';}
+  function showOrder(o){
+   amtEl.textContent=o.amount;addrEl.textContent=o.address;
+   panel.hidden=false;buyBtn.hidden=true;
+   setStat('waiting for payment… auto-unlocks within ~1 min');
+   poll(o.orderId);
+  }
+  async function poll(oid){
+   clearInterval(pollT);
+   async function tick(){
+    try{
+     var r=await fetch('/api/verify?orderId='+encodeURIComponent(oid),{cache:'no-store'});
+     var j=await r.json();
+     if(j&&j.paid){clearInterval(pollT);setStat('payment confirmed ✔ unlocking…',true);i.value=j.code||'';setTimeout(unlock,400);}
+    }catch(_){}
+   }
+   tick();pollT=setInterval(tick,8000);
+  }
+  if(buyBtn)buyBtn.addEventListener('click',async function(){
+   buyBtn.disabled=true;buyBtn.textContent='getting address…';
+   try{
+    var r=await fetch('/api/checkout',{cache:'no-store'});var o=await r.json();
+    if(!o||!o.address)throw 0;
+    try{localStorage.setItem(ORD,JSON.stringify(o));}catch(_){}
+    showOrder(o);
+   }catch(_){buyBtn.disabled=false;buyBtn.textContent='Buy access · 10 USDC (Base)';setStat('could not reach payment server, try again',false);}
+  });
+  document.querySelectorAll('#gateBuyPanel [data-copy]').forEach(function(b){
+   b.addEventListener('click',function(){
+    var t=b.getAttribute('data-copy')==='amt'?amtEl.textContent:addrEl.textContent;
+    try{navigator.clipboard.writeText(t);b.textContent='copied';setTimeout(function(){b.textContent=b.getAttribute('data-copy')==='amt'?'copy amount':'copy address';},1200);}catch(_){}
+   });
+  });
+  // resume a pending order after refresh
+  try{var saved=JSON.parse(localStorage.getItem(ORD)||'null');if(saved&&saved.orderId)showOrder(saved);}catch(_){}
+  if(!document.getElementById('gateBuyPanel')||document.getElementById('gateBuyPanel').hidden)i.focus();
  });
 })();
 </script>
@@ -191,6 +231,15 @@
   #gate button{font-family:"Patrick Hand",cursive;font-size:15px;padding:9px 16px;border:2px solid var(--ink);border-radius:12px 6px 14px 7px / 7px 13px 6px 12px;background:var(--accent);color:var(--paper);cursor:pointer;box-shadow:2px 2px 0 rgba(44,53,80,.2);}
   #gate button:hover{transform:translate(1px,1px);box-shadow:1px 1px 0 rgba(44,53,80,.2);}
   #gate .msg{font-size:13px;margin-top:10px;min-height:16px;}
+  #gate .buy{margin-top:16px;border-top:2px dashed var(--ink);padding-top:14px;}
+  #gate #gateBuyBtn{width:100%;background:var(--ink);border-color:var(--ink);color:var(--paper);}
+  #gate #gateBuyPanel{margin-top:12px;}
+  #gate .pi{font-size:12.5px;color:var(--ink-soft);margin:0 0 5px;}
+  #gate .amt{font-family:"Share Tech Mono",monospace;font-size:19px;color:var(--ink);margin-bottom:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  #gate .addr{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;}
+  #gate .addr code{font-family:"Share Tech Mono",monospace;font-size:12px;color:var(--ink);word-break:break-all;background:var(--paper);border:1.5px solid var(--pencil);border-radius:5px;padding:4px 6px;flex:1;min-width:0;}
+  #gate [data-copy]{font-family:"Patrick Hand",cursive;font-size:12px;padding:4px 9px;border:1.5px solid var(--ink);border-radius:7px 4px 8px 4px;background:var(--card);color:var(--ink);cursor:pointer;box-shadow:none;}
+  #gate .stat{font-size:13px;color:var(--ink-soft);margin-top:8px;min-height:16px;}
   #gate .foot{font-size:12px;color:var(--ink-faint);margin-top:16px;line-height:1.5;}
   #gate .foot a{color:var(--accent);}
 
@@ -332,13 +381,23 @@
 <div id="gate">
   <div class="card">
     <h1>Attention Radar</h1>
-    <p>Private access. Enter your passcode to open the dashboard.</p>
+    <p>Private access. Have a passcode? Enter it. Don't? Pay and it unlocks itself.</p>
     <form id="gateForm" autocomplete="off">
       <input id="gateInput" type="password" placeholder="passcode" autocomplete="off" aria-label="passcode" />
       <button type="submit">Enter</button>
     </form>
     <div class="msg" id="gateMsg"></div>
-    <div class="foot">No passcode? It's <b>10 USDC</b>. DM <a href="https://x.com/codeswithroh" target="_blank" rel="noopener">@codeswithroh</a> on X and be ready to send.</div>
+    <div class="buy">
+      <button id="gateBuyBtn" type="button">Buy access &middot; 10 USDC (Base)</button>
+      <div id="gateBuyPanel" hidden>
+        <p class="pi">Send this <b>exact</b> amount of <b>USDC on Base</b>:</p>
+        <div class="amt"><span id="gateAmt">&mdash;</span> USDC <button type="button" data-copy="amt">copy amount</button></div>
+        <p class="pi">to this address:</p>
+        <div class="addr"><code id="gateAddr">&mdash;</code> <button type="button" data-copy="addr">copy address</button></div>
+        <div id="gateStat" class="stat">&hellip;</div>
+      </div>
+    </div>
+    <div class="foot">Questions? DM <a href="https://x.com/codeswithroh" target="_blank" rel="noopener">@codeswithroh</a> on X.</div>
   </div>
 </div>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><filter id="rough"><feTurbulence type="fractalNoise" baseFrequency="0.045" numOctaves="2" seed="7" result="t"><animate attributeName="baseFrequency" dur="10s" values="0.042;0.052;0.045;0.042" repeatCount="indefinite"/></feTurbulence><feDisplacementMap in="SourceGraphic" in2="t" scale="3" /></filter></svg>
