@@ -323,9 +323,17 @@ function tokenRow(pp){
 }
 
 /* ---------- RESEARCH ---------- */
-function openResearch(addr,chain){
+function setUrl(addr,chain){
+ try{
+  if(addr){var q='?coin='+encodeURIComponent(addr)+(chain?'&chain='+encodeURIComponent(chain):'');
+   if(location.search!==q)history.pushState({coin:addr},'',q);}
+  else if(location.search)history.replaceState(null,'',location.pathname);
+ }catch(_){}
+}
+function openResearch(addr,chain,fromUrl){
  addr=String(addr||'').toLowerCase();
  state.rcAddr=addr;state.tab='research';syncTabs();saveCfg();
+ if(!fromUrl)setUrl(addr,chain);
  q1('rcardHost').innerHTML='<div class="empty">pulling data&hellip;</div>';
  var c=state.tokenCache.get(addr);
  var p0=(c&&c.pair)?Promise.resolve(c.pair):dexTokens([addr]).then(function(){var c2=state.tokenCache.get(addr);return c2&&c2.pair;});
@@ -1051,7 +1059,12 @@ function setStatus(){
 }
 
 /* events */
-document.querySelectorAll('.tabs button').forEach(function(b){b.addEventListener('click',function(){state.tab=b.getAttribute('data-tab');saveCfg();syncTabs();if(state.tab==='scan')scan();});});
+document.querySelectorAll('.tabs button').forEach(function(b){b.addEventListener('click',function(){state.tab=b.getAttribute('data-tab');saveCfg();syncTabs();if(state.tab==='scan'){setUrl(null);scan();}});});
+window.addEventListener('popstate',function(){
+ var c=new URLSearchParams(location.search).get('coin');
+ if(c)openResearch(c,new URLSearchParams(location.search).get('chain')||'',true);
+ else{state.tab='scan';saveCfg();syncTabs();}
+});
 document.querySelectorAll('.chip-toggle[data-chain]').forEach(function(b){b.addEventListener('click',function(){var c=b.getAttribute('data-chain');state.chains[c]=!state.chains[c];b.setAttribute('aria-pressed',state.chains[c]?'true':'false');saveCfg();state.searchCache.clear();scan();});});
 q1('apiKey').addEventListener('change',function(e){state.apiKey=e.target.value.trim();saveCfg();});
 q1('tickerTrack').addEventListener('click',function(ev){var t=ev.target.closest('[data-addr]');if(!t)return;openResearch(t.getAttribute('data-addr'),t.getAttribute('data-chain'));});
@@ -1090,6 +1103,10 @@ document.querySelectorAll('.chip-toggle[data-chain]').forEach(function(b){var c=
 syncTabs();
 renderTicker();
 scan().then(setStatus);
+// deep link: ?coin=<addr>&chain=<chain> reopens that coin on load / refresh
+(function(){var q=new URLSearchParams(location.search),c=q.get('coin');
+ if(c&&/^(0x[0-9a-f]{40}|[1-9A-HJ-NP-Za-km-z]{32,44})$/i.test(c))openResearch(c,q.get('chain')||'',true);
+})();
 // keep the ticker refreshed from the latest pool even between scans, and re-scan on any tab
 setInterval(function(){if(state._pool){renderTicker();renderBoard();}},30000);
 setInterval(function(){if(state._pool&&state.tab==='scan')renderIdeas();},120000);
