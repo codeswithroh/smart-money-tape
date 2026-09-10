@@ -16,7 +16,9 @@ export default async function handler(req) {
   const txHash = (body && body.txHash || '').trim();
   const chain = (body && body.chain || '').trim().toLowerCase() || null;
   if (!token) return json({ error: 'missing privyToken' }, 400);
-  if (!/^0x[0-9a-fA-F]{64}$/.test(txHash)) return json({ error: 'paste a valid transaction hash' }, 400);
+  const isEvm = /^0x[0-9a-fA-F]{64}$/.test(txHash);
+  const isSol = /^[1-9A-HJ-NP-Za-km-z]{80,90}$/.test(txHash);
+  if (!isEvm && !isSol) return json({ error: 'invalid transaction id' }, 400);
 
   let userId;
   try { ({ userId } = await verifyPrivyToken(token)); }

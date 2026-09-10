@@ -44,6 +44,52 @@ export const CHAINS = {
 };
 export const CHAIN_KEYS = Object.keys(CHAINS);
 
+// Solana (SPL USDC). Separate receiver address (base58), different verification path.
+export const SOLANA = {
+  key: 'solana',
+  name: 'Solana',
+  kind: 'svm',
+  usdcMint: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+  receiver: env('SOLANA_PAYTO') || 'A9T1veUXiAGwmNPniJPCdAw923DxTHtvPescD1Nk8yxj',
+  rpcs: [
+    'https://api.mainnet-beta.solana.com',
+    'https://solana-rpc.publicnode.com',
+    'https://solana.drpc.org',
+  ],
+};
+
+const isSolSig = (s) => /^[1-9A-HJ-NP-Za-km-z]{80,90}$/.test(String(s || ''));
+
+// verify a Solana payment by signature: a confirmed tx whose USDC balance for the
+// receiver increased by >= the price.
+export async function verifySolana(sig) {
+  if (!isSolSig(sig)) return { ok: false, reason: 'bad_tx' };
+  let sawTx = false;
+  for (const url of SOLANA.rpcs) {
+    try {
+      const tx = await rpc(url, 'getTransaction', [sig, { maxSupportedTransactionVersion: 0, commitment: 'confirmed', encoding: 'json' }]);
+      if (!tx) continue;
+      sawTx = true;
+      if (tx.meta && tx.meta.err) return { ok: false, reason: 'tx_failed' };
+      const pre = (tx.meta && tx.meta.preTokenBalances) || [];
+      const post = (tx.meta && tx.meta.postTokenBalances) || [];
+      const key = (b) => b.accountIndex;
+      const preFor = {};
+      for (const b of pre) {
+        if (b.mint === SOLANA.usdcMint && b.owner === SOLANA.receiver) preFor[key(b)] = BigInt(b.uiTokenAmount.amount);
+      }
+      for (const b of post) {
+        if (b.mint === SOLANA.usdcMint && b.owner === SOLANA.receiver) {
+          const delta = BigInt(b.uiTokenAmount.amount) - (preFor[key(b)] || 0n);
+          if (delta >= PRICE_RAW) return { ok: true, amountRaw: delta.toString(), chain: 'solana' };
+        }
+      }
+      return { ok: false, reason: 'no_match' };
+    } catch (_) { /* next rpc */ }
+  }
+  return { ok: false, reason: sawTx ? 'no_match' : 'rpc' };
+}
+
 function matchTransfer(log, usdc) {
   try {
     if ((log.address || '').toLowerCase() !== usdc) return null;
@@ -90,8 +136,9 @@ export async function verifyOnChain(txHash, chainKey) {
   return { ok: false, reason: sawReceipt ? 'no_match' : 'rpc' };
 }
 
-// try a hint chain first, then the rest
+// route by tx format / hint. Solana signatures are base58 (~88 chars); EVM is 0x + 64 hex.
 export async function verifyPayment(txHash, hintChain) {
+  if (hintChain === 'solana' || isSolSig(txHash)) return verifySolana(txHash);
   const order = hintChain && CHAINS[hintChain]
     ? [hintChain, ...CHAIN_KEYS.filter((k) => k !== hintChain)]
     : CHAIN_KEYS;

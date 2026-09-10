@@ -68,9 +68,52 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { createRoot } from 'react-dom/client';
 import htm from 'https://esm.sh/htm@3.1.1';
 import { PrivyProvider, usePrivy, useWallets } from 'https://esm.sh/@privy-io/react-auth@2?external=react,react-dom';
+import { useSolanaWallets, toSolanaWalletConnectors } from 'https://esm.sh/@privy-io/react-auth@2/solana?external=react,react-dom';
+import { Connection, PublicKey, Transaction, TransactionInstruction, SystemProgram } from 'https://esm.sh/@solana/web3.js@1.95.8';
 
 const html = htm.bind(React.createElement);
 const APP_ID = 'cml5e131s01tbjn0cl00eormz';
+const solanaConnectors = toSolanaWalletConnectors();
+
+// ---- minimal SPL-token helpers (avoid pulling @solana/spl-token) ----
+const TOKEN_PROGRAM = new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
+const ATA_PROGRAM = new PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL');
+function ataFor(owner, mint) {
+  return PublicKey.findProgramAddressSync(
+    [owner.toBuffer(), TOKEN_PROGRAM.toBuffer(), mint.toBuffer()], ATA_PROGRAM,
+  )[0];
+}
+function u64le(n) {
+  const b = new Uint8Array(8); let x = BigInt(n);
+  for (let i = 0; i < 8; i++) { b[i] = Number(x & 0xffn); x >>= 8n; }
+  return b;
+}
+function ixCreateAtaIdempotent(payer, ata, owner, mint) {
+  return new TransactionInstruction({
+    programId: ATA_PROGRAM,
+    keys: [
+      { pubkey: payer, isSigner: true, isWritable: true },
+      { pubkey: ata, isSigner: false, isWritable: true },
+      { pubkey: owner, isSigner: false, isWritable: false },
+      { pubkey: mint, isSigner: false, isWritable: false },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+      { pubkey: TOKEN_PROGRAM, isSigner: false, isWritable: false },
+    ],
+    data: new Uint8Array([1]), // idempotent create
+  });
+}
+function ixTransferChecked(source, mint, dest, owner, amount, decimals) {
+  return new TransactionInstruction({
+    programId: TOKEN_PROGRAM,
+    keys: [
+      { pubkey: source, isSigner: false, isWritable: true },
+      { pubkey: mint, isSigner: false, isWritable: false },
+      { pubkey: dest, isSigner: false, isWritable: true },
+      { pubkey: owner, isSigner: true, isWritable: false },
+    ],
+    data: new Uint8Array([12, ...u64le(amount), decimals]),
+  });
+}
 
 function humanErr(e) {
   if (!e) return 'something went wrong';
@@ -82,6 +125,7 @@ function humanErr(e) {
 function Gate() {
   const { ready, authenticated, user, login, logout, getAccessToken } = usePrivy();
   const { wallets } = useWallets();
+  const { wallets: solWallets } = useSolanaWallets();
   const [phase, setPhase] = useState('boot');   // boot | need-login | checking | need-pay | paying | confirming | error
   const [msg, setMsg] = useState('');
   const [account, setAccount] = useState(null);
@@ -153,11 +197,41 @@ function Gate() {
     }
   }, [getAccessToken]);
 
+  const paySolana = useCallback(async () => {
+    const c = info.chains.find((x) => x.key === 'solana');
+    const w = (solWallets || [])[0];
+    if (!w) throw new Error('connect a Solana wallet (Phantom, Solflare…) to pay on Solana');
+    const rpc = 'https://solana-rpc.publicnode.com';
+    const conn = new Connection(rpc, 'confirmed');
+    const from = new PublicKey(w.address);
+    const mint = new PublicKey(c.usdcMint);
+    const receiver = new PublicKey(c.receiver);
+    const fromAta = ataFor(from, mint);
+    const toAta = ataFor(receiver, mint);
+    const amount = Math.round(info.priceUsdc * 1e6);
+    const tx = new Transaction();
+    tx.add(ixCreateAtaIdempotent(from, toAta, receiver, mint));
+    tx.add(ixTransferChecked(fromAta, mint, toAta, from, amount, 6));
+    const { blockhash } = await conn.getLatestBlockhash('confirmed');
+    tx.recentBlockhash = blockhash;
+    tx.feePayer = from;
+    setMsg('confirm the ' + info.priceUsdc + ' USDC transfer in your wallet…');
+    let sig;
+    try { sig = await w.sendTransaction(tx, conn); }
+    catch (e1) {
+      try { sig = await w.sendTransaction({ transaction: tx, connection: conn }); }
+      catch (_) { throw e1; }
+    }
+    const s = typeof sig === 'string' ? sig : (sig && (sig.signature || sig.hash)) || '';
+    await confirmLoop(s, 'solana', 0);
+  }, [info, solWallets, confirmLoop]);
+
   const payWithWallet = useCallback(async () => {
     if (!info) return;
     setPending(null);
     setPhase('paying'); setMsg('opening your wallet…');
     try {
+      if (chain === 'solana') { await paySolana(); return; }
       const w = evmWallet();
       if (!w) throw new Error('connect an EVM wallet to pay');
       let target = info.chains.find((x) => x.key === chain) || info.chains.find((x) => x.key === 'base');
@@ -183,7 +257,7 @@ function Gate() {
       });
       await confirmLoop(hash, target.key, 0);
     } catch (e) { setPhase('need-pay'); setMsg(humanErr(e)); }
-  }, [info, chain, evmWallet, confirmLoop]);
+  }, [info, chain, evmWallet, confirmLoop, paySolana]);
 
   // ---- render ----
   if (phase === 'boot' || !ready) {
@@ -268,11 +342,13 @@ function App() {
   return html`<${ErrorBoundary}><${PrivyProvider} appId=${APP_ID} config=${{
     loginMethods: ['wallet', 'email'],
     embeddedWallets: { createOnLogin: 'off' },
+    externalWallets: { solana: { connectors: solanaConnectors } },
     appearance: {
       theme: 'light',
       accentColor: '#cf3a26',
       logo: '/morty.png',
-      walletList: ['detected_wallets', 'metamask', 'coinbase_wallet', 'wallet_connect', 'rabby_wallet', 'rainbow'],
+      walletChainType: 'ethereum-and-solana',
+      walletList: ['detected_wallets', 'phantom', 'solflare', 'metamask', 'coinbase_wallet', 'wallet_connect', 'rabby_wallet', 'rainbow'],
     },
   }}><${Gate} /><//><//>`;
 }
