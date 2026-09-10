@@ -11,7 +11,7 @@ export const RPCS = [
   'https://base.llamarpc.com',
 ];
 
-export const ACCESS_CODE = (globalThis.process && process.env && process.env.ACCESS_CODE) || 'get it';
+export const ACCESS_CODE = (globalThis.process && process.env && process.env.ACCESS_CODE) || 'Morty-x7QK$9pf-Rug$2wZ!vhn6';
 // flat price in USDC. override with env PRICE_USDC. buyers send this OR MORE.
 export const PRICE_USDC = Number((globalThis.process && process.env && process.env.PRICE_USDC)) || 10;
 const PRICE_RAW = BigInt(Math.round(PRICE_USDC * 1e6)); // micro-USDC threshold

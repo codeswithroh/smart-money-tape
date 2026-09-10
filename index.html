@@ -9,7 +9,7 @@
   html.locked #gate{display:flex}</style>
 <script>
 (function(){
- var KEY='ar-gate-v1', HASH='375082520142eb43c477caf1f04e8a7e296d97d07e74fa43eab935321dae87c0';
+ var KEY='ar-gate-v2', HASH='aa83cb3b0591127460022dbc3ec5a42d72aba9504737ab0825eefb8b2f40c77f';
  try{localStorage.removeItem('ar-order-v1');localStorage.removeItem('ar-order-v2');}catch(_){}
  function norm(s){return String(s||'').toLowerCase().replace(/[^a-z0-9]/g,'');}
  async function sha(s){var b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));return Array.from(new Uint8Array(b)).map(function(x){return x.toString(16).padStart(2,'0');}).join('');}
