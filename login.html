@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sign in — Attention Radar</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Patrick+Hand&display=swap">
+<style>
+  :root{ --paper:#f4ecd9; --card:#fdfaf0; --note:#fdf3cf; --ink:#2c3550; --soft:#565d70; --faint:#8a8a76; --accent:#cf3a26; --pos:#2f7c4d; --neg:#a5301c; }
+  *{box-sizing:border-box}
+  body{
+    margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center; padding:26px;
+    background:var(--paper); background-image:repeating-linear-gradient(var(--paper) 0 26px, rgba(110,100,70,.14) 26px 27px);
+    color:var(--ink); font-family:"Patrick Hand","Comic Sans MS",cursive; font-size:16px;
+  }
+  .card{
+    width:100%; max-width:440px; background:var(--card); border:2px solid var(--ink);
+    border-radius:14px 8px 15px 7px / 8px 15px 7px 14px; padding:30px 26px 26px;
+    box-shadow:6px 7px 0 rgba(44,53,80,.12);
+  }
+  h1{ font-family:"Caveat",cursive; font-size:36px; margin:0 0 2px; transform:rotate(-1deg); }
+  .tag{ color:var(--soft); font-size:14px; margin:0 0 18px; }
+  .row{ display:flex; flex-direction:column; gap:10px; }
+  button, .btn{
+    font:inherit; cursor:pointer; border:2px solid var(--ink); background:var(--card); color:var(--ink);
+    border-radius:9px 5px 10px 5px; padding:11px 14px; text-align:center; text-decoration:none;
+  }
+  button.pri{ background:var(--accent); color:var(--paper); border-color:var(--ink); }
+  button:disabled{ opacity:.55; cursor:default; }
+  button:hover:not(:disabled){ transform:translateY(-1px); }
+  select, input{
+    font:inherit; color:var(--ink); background:#fff; border:2px solid var(--ink);
+    border-radius:8px 5px 9px 5px; padding:9px 10px; width:100%;
+  }
+  .lbl{ font-size:13px; color:var(--soft); margin:2px 0 -2px; }
+  .msg{ font-size:13.5px; margin-top:12px; line-height:1.5; min-height:1.2em; }
+  .msg.err{ color:var(--neg); } .msg.ok{ color:var(--pos); }
+  .note{ margin-top:16px; border:2px dashed var(--ink); border-radius:10px; background:var(--note); padding:12px 13px; font-size:13px; line-height:1.55; color:var(--soft); }
+  .note b{ color:var(--ink); }
+  .foot{ margin-top:16px; font-size:12.5px; color:var(--faint); text-align:center; }
+  a{ color:var(--accent); }
+  .mono{ font-family:ui-monospace,Menlo,monospace; font-size:12px; word-break:break-all; color:var(--ink); }
+  .hr{ height:0; border-top:1.5px dashed var(--faint); margin:16px 0; }
+  .spin{ display:inline-block; animation:sp 1s linear infinite; } @keyframes sp{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div id="root"><div class="card"><h1>Attention Radar</h1><p class="tag">loading sign-in…</p></div></div>
+
+<script>
+  // small shims some wallet deps expect in the browser
+  window.global = window.global || window;
+  window.process = window.process || { env: {}, nextTick: (f) => setTimeout(f, 0) };
+</script>
+<script type="module">
+import React, { useState, useEffect, useCallback } from 'https://esm.sh/react@18.3.1';
+import { createRoot } from 'https://esm.sh/react-dom@18.3.1/client';
+import htm from 'https://esm.sh/htm@3.1.1';
+import { PrivyProvider, usePrivy, useWallets } from 'https://esm.sh/@privy-io/react-auth@2?deps=react@18.3.1,react-dom@18.3.1&target=es2022';
+
+const html = htm.bind(React.createElement);
+const APP_ID = 'cml5e131s01tbjn0cl00eormz';
+
+function humanErr(e) {
+  if (!e) return 'something went wrong';
+  if (e.code === 4001 || /reject/i.test(e.message || '')) return 'you rejected the transaction';
+  if (/insufficient/i.test(e.message || '')) return 'not enough balance for the transfer + gas';
+  return (e.message || String(e)).slice(0, 180);
+}
+
+function Gate() {
+  const { ready, authenticated, user, login, logout, getAccessToken } = usePrivy();
+  const { wallets } = useWallets();
+  const [phase, setPhase] = useState('boot');   // boot | need-login | checking | need-pay | paying | error
+  const [msg, setMsg] = useState('');
+  const [account, setAccount] = useState(null);
+  const [info, setInfo] = useState(null);
+  const [chain, setChain] = useState('base');
+  const [tx, setTx] = useState('');
+
+  useEffect(() => { fetch('/api/pay-info').then((r) => r.json()).then(setInfo).catch(() => {}); }, []);
+
+  const doSession = useCallback(async () => {
+    setPhase('checking'); setMsg('');
+    try {
+      const t = await getAccessToken();
+      if (!t) { setPhase('need-login'); return; }
+      const r = await fetch('/api/session', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ privyToken: t }) });
+      const j = await r.json();
+      if (r.ok && j.paid) { window.location.href = '/'; return; }
+      setAccount(j.account || null);
+      setPhase('need-pay');
+    } catch (e) { setMsg(humanErr(e)); setPhase('error'); }
+  }, [getAccessToken]);
+
+  useEffect(() => {
+    if (!ready) return;
+    if (!authenticated) { setPhase('need-login'); return; }
+    doSession();
+  }, [ready, authenticated, doSession]);
+
+  const confirm = useCallback(async (hash) => {
+    setMsg('confirming on-chain…');
+    try {
+      const t = await getAccessToken();
+      const r = await fetch('/api/pay-confirm', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ privyToken: t, txHash: hash, chain }) });
+      const j = await r.json();
+      if (r.ok && j.paid) { window.location.href = '/'; return; }
+      setPhase('need-pay'); setMsg(j.error || 'could not confirm — check the hash and chain, then retry');
+    } catch (e) { setPhase('need-pay'); setMsg(humanErr(e)); }
+  }, [getAccessToken, chain]);
+
+  const payWithWallet = useCallback(async () => {
+    if (!info) return;
+    setPhase('paying'); setMsg('switching network…');
+    try {
+      const w = wallets.find((x) => /ethereum|evm|metamask|coinbase|wallet|privy|rabby|rainbow/i.test(x.walletClientType || x.type || '')) || wallets[0];
+      if (!w) throw new Error('connect a wallet first');
+      const c = info.chains.find((x) => x.key === chain);
+      try { await w.switchChain(c.id); } catch (_) { /* some wallets prompt on send instead */ }
+      const provider = await w.getEthereumProvider();
+      const amount = BigInt(Math.round(info.priceUsdc * 1e6));
+      const data = '0xa9059cbb'
+        + info.payTo.toLowerCase().replace(/^0x/, '').padStart(64, '0')
+        + amount.toString(16).padStart(64, '0');
+      setMsg('confirm the transfer in your wallet…');
+      const hash = await provider.request({ method: 'eth_sendTransaction', params: [{ from: w.address, to: c.usdc, data }] });
+      setTx(hash);
+      await confirm(hash);
+    } catch (e) { setPhase('need-pay'); setMsg(humanErr(e)); }
+  }, [info, wallets, chain, confirm]);
+
+  // ---- render ----
+  if (phase === 'boot' || !ready) {
+    return html`<div class="card"><h1>Attention Radar</h1><p class="tag">starting up…</p></div>`;
+  }
+
+  if (phase === 'need-login') {
+    return html`<div class="card">
+      <h1>Attention Radar</h1>
+      <p class="tag">Memecoins are attention markets. Sign in to continue.</p>
+      <div class="row">
+        <button class="pri" onClick=${() => login()}>Connect wallet or email</button>
+      </div>
+      <div class="note">One account per person. Connect a wallet or use email, pay once in USDC, and you're in for good.</div>
+      <p class="foot">Not financial advice · <a href="/bot.html">about Morty Bot</a></p>
+    </div>`;
+  }
+
+  if (phase === 'checking') {
+    return html`<div class="card"><h1>Attention Radar</h1><p class="tag"><span class="spin">◠</span> checking your access…</p></div>`;
+  }
+
+  if (phase === 'error') {
+    return html`<div class="card">
+      <h1>Attention Radar</h1>
+      <p class="tag">Hit a snag.</p>
+      <div class="msg err">${msg}</div>
+      <div class="row" style="margin-top:12px"><button onClick=${doSession}>Try again</button>
+      <button onClick=${() => logout().then(() => setPhase('need-login'))}>Sign out</button></div>
+    </div>`;
+  }
+
+  // need-pay / paying
+  const who = account?.email || user?.email?.address || user?.wallet?.address || 'your wallet';
+  const busy = phase === 'paying';
+  return html`<div class="card">
+    <h1>One-time access</h1>
+    <p class="tag">Signed in as <b>${who}</b>. Pay <b>${info ? info.priceUsdc : 10} USDC</b> once to unlock the dashboard.</p>
+
+    <div class="row">
+      <span class="lbl">Pay on</span>
+      <select value=${chain} onChange=${(e) => setChain(e.target.value)} disabled=${busy}>
+        ${(info?.chains || [{ key: 'base', name: 'Base' }]).map((c) => html`<option key=${c.key} value=${c.key}>${c.name}</option>`)}
+      </select>
+      <button class="pri" onClick=${payWithWallet} disabled=${busy || !info}>
+        ${busy ? html`<span class="spin">◠</span> working…` : `Pay ${info ? info.priceUsdc : 10} USDC with my wallet`}
+      </button>
+    </div>
+
+    <div class="hr"></div>
+
+    <div class="row">
+      <span class="lbl">Already sent the payment? Paste the transaction hash.</span>
+      <input placeholder="0x…" value=${tx} onInput=${(e) => setTx(e.target.value)} disabled=${busy} />
+      <button onClick=${() => confirm(tx.trim())} disabled=${busy || !/^0x[0-9a-fA-F]{64}$/.test(tx.trim())}>Verify payment</button>
+    </div>
+
+    <div class="msg ${/could not|failed|reject|snag|no USDC|invalid|already/i.test(msg) ? 'err' : 'ok'}">${msg}</div>
+
+    <div class="note">
+      Send exactly <b>${info ? info.priceUsdc : 10} USDC</b> (or more) to<br>
+      <span class="mono">${info ? info.payTo : '…'}</span><br><br>
+      Arranged access with <b><a href="https://x.com/codeswithroh" target="_blank" rel="noopener">@codeswithroh</a></b>? Once your account is marked paid, hit
+      <a href="#" onClick=${(e) => { e.preventDefault(); doSession(); }}>refresh</a>.
+    </div>
+
+    <p class="foot"><a href="#" onClick=${(e) => { e.preventDefault(); logout().then(() => setPhase('need-login')); }}>use a different account</a></p>
+  </div>`;
+}
+
+function App() {
+  return html`<${PrivyProvider} appId=${APP_ID} config=${{
+    loginMethods: ['wallet', 'email'],
+    embeddedWallets: { createOnLogin: 'off' },
+    appearance: { theme: 'light', accentColor: '#cf3a26', logo: '/morty.png' },
+  }}><${Gate} /><//>`;
+}
+
+createRoot(document.getElementById('root')).render(html`<${App} />`);
+</script>
+</body>
+</html>

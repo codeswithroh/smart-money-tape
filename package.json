@@ -1,6 +1,8 @@
 {
   "private": true,
   "dependencies": {
-    "@vercel/og": "0.6.8"
+    "@vercel/og": "0.6.8",
+    "@supabase/supabase-js": "2.45.4",
+    "jose": "5.9.6"
   }
 }
