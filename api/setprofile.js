@@ -14,6 +14,8 @@ const SHORT = "Every Rick needs a Morty. I read the chart before you ape. Aw gee
 
 const COMMANDS = [
   { command: 'radar', description: '⚡ Top attention movers right now' },
+  { command: 'setalert', description: '🔔 Alert me at a market cap — /setalert <ca> <mc>' },
+  { command: 'alerts', description: '🔔 Your active market-cap alerts' },
   { command: 'flex', description: '📸 Shareable multiplier card — /flex <ca> [entry mc]' },
   { command: 'idea', description: '💡 Fresh coin concepts riding the hot narratives' },
   { command: 'help', description: '📖 What I can do' },

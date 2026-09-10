@@ -1,4 +1,5 @@
 import { tokenCard, pickAddr, resolveCoin, topMovers } from './_token.js';
+import { kvReady, newId, alertsAll, alertPut, alertDel } from './_kv.js';
 
 export const config = { runtime: 'edge' };
 
@@ -16,6 +17,8 @@ const HELP = [
   '<b>Commands</b>',
   '/radar — top attention movers right now ⚡',
   '/flex &lt;ca&gt; [entry mc] — shareable multiplier card (e.g. <code>/flex So111… 3.8M</code>) 📸',
+  '/setalert &lt;ca&gt; &lt;mc&gt; — ping me when it hits that market cap (e.g. <code>/setalert So111… 5M</code>) 🔔',
+  '/alerts — your active alerts',
   '/idea — fresh coin concepts riding the hot narratives 💡',
   '/help — this menu 📖',
   '',
@@ -31,6 +34,7 @@ const START = [
   '',
   '🔥 <b>What I do</b>',
   '• <code>/radar</code> — top attention movers right now ⚡',
+  '• <code>/setalert &lt;ca&gt; &lt;mc&gt;</code> — ping you when it hits a market cap 🔔',
   '• <code>/flex &lt;ca&gt; [entry mc]</code> — shareable multiplier card built for X 📸',
   '• <code>/idea</code> — fresh coin concepts riding the hot narratives 💡',
   '• paste a CA — instant full x-ray 🔬',
@@ -67,9 +71,71 @@ function parseMc(s) {
   return n || null;
 }
 
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+
 async function tg(method, body) {
   return fetch(`https://api.telegram.org/bot${TOKEN}/${method}`, {
     method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
+  });
+}
+
+const MAX_ALERTS_PER_USER = 15;
+
+async function cmdSetAlert(chatId, from, parts, reply) {
+  if (!kvReady) {
+    await tg('sendMessage', { chat_id: chatId, text: "🔔 Alerts aren't switched on yet — the admin needs to add the Upstash env vars.", ...reply });
+    return;
+  }
+  const addr = pickAddr(parts.join(' '));
+  const target = parseMc(parts.find((p) => p !== addr && /[\d.]/.test(p)));
+  if (!addr || !target) {
+    await tg('sendMessage', { chat_id: chatId, parse_mode: 'HTML', text: 'usage: <code>/setalert &lt;contract&gt; &lt;market cap&gt;</code>\ne.g. <code>/setalert So111… 5M</code>', ...reply });
+    return;
+  }
+  let mine = [];
+  try { mine = (await alertsAll()).filter((a) => a.user === from.id); } catch (_) {}
+  if (mine.length >= MAX_ALERTS_PER_USER) {
+    await tg('sendMessage', { chat_id: chatId, text: `you already have ${MAX_ALERTS_PER_USER} alerts — /alerts to clear some.`, ...reply });
+    return;
+  }
+  const rc = await resolveCoin(addr);
+  if (!rc) { await tg('sendMessage', { chat_id: chatId, text: "couldn't find a pair for that address.", ...reply }); return; }
+  const base = rc.best.mc || 0;
+  const dir = target >= base ? 'up' : 'down';
+  const id = newId();
+  try {
+    await alertPut(id, { chat: chatId, user: from.id, addr: rc.best.addr, chain: rc.best.chain, sym: rc.best.sym, target, base, dir, ts: Date.now() });
+  } catch (_) {
+    await tg('sendMessage', { chat_id: chatId, text: "couldn't save that alert, try again in a moment.", ...reply });
+    return;
+  }
+  await tg('sendMessage', {
+    chat_id: chatId, parse_mode: 'HTML', disable_web_page_preview: true,
+    text:
+      `🔔 <b>Alert set — $${esc(rc.best.sym)}</b>\n` +
+      `I'll ping you when MC ${dir === 'up' ? 'crosses <b>above</b>' : 'falls <b>below</b>'} <b>${fUsd(target)}</b>.\n` +
+      `now: ${fUsd(base)}  ·  checked every ~5 min  ·  fires once`,
+    reply_markup: { inline_keyboard: [[{ text: '❌ cancel this alert', callback_data: 'da:' + id }]] },
+    ...reply,
+  });
+}
+
+async function cmdAlerts(chatId, from, reply) {
+  if (!kvReady) {
+    await tg('sendMessage', { chat_id: chatId, text: "🔔 Alerts aren't switched on yet.", ...reply });
+    return;
+  }
+  let mine = [];
+  try { mine = (await alertsAll()).filter((a) => a.user === from.id); } catch (_) {}
+  if (!mine.length) {
+    await tg('sendMessage', { chat_id: chatId, parse_mode: 'HTML', text: 'No active alerts. Set one with <code>/setalert &lt;ca&gt; &lt;mc&gt;</code>.', ...reply });
+    return;
+  }
+  const rows = mine.map((a) => [{ text: `❌ $${a.sym} ${a.dir === 'up' ? '▲' : '▼'} ${fUsd(a.target)}`, callback_data: 'da:' + a.id }]);
+  await tg('sendMessage', {
+    chat_id: chatId, parse_mode: 'HTML',
+    text: `🔔 <b>Your alerts (${mine.length})</b>\nTap one to cancel it.`,
+    reply_markup: { inline_keyboard: rows }, ...reply,
   });
 }
 
@@ -226,6 +292,13 @@ export default async function handler(req) {
       } else if (data === 'idea') {
         await tg('answerCallbackQuery', { callback_query_id: cq.id });
         await tg('sendMessage', { chat_id: cid, text: '💡 spinoff ideas:\n\n• <b>' + [idea(), idea(), idea()].join('</b>\n• <b>') + '</b>', parse_mode: 'HTML' });
+      } else if (data.startsWith('da:')) {
+        await tg('answerCallbackQuery', { callback_query_id: cq.id, text: 'alert cancelled' });
+        try {
+          const id = data.slice(3);
+          const a = (await alertsAll()).find((x) => x.id === id);
+          if (a && a.user === cq.from.id) await alertDel([id]);
+        } catch (_) {}
       } else {
         await tg('answerCallbackQuery', { callback_query_id: cq.id });
       }
@@ -249,6 +322,25 @@ export default async function handler(req) {
     return new Response('ok');
   }
   if (/^\/radar\b/i.test(text)) { await sendRadar(chatId); return new Response('ok'); }
+  if (/^\/(setalert|set_alert|alert)\b/i.test(text)) {
+    await cmdSetAlert(chatId, msg.from || {}, text.split(/\s+/).slice(1), reply);
+    return new Response('ok');
+  }
+  if (/^\/(alerts|myalerts)\b/i.test(text)) {
+    await cmdAlerts(chatId, msg.from || {}, reply);
+    return new Response('ok');
+  }
+  if (/^\/(delalert|delelert|rmalert)\b/i.test(text)) {
+    const id = (text.split(/\s+/)[1] || '').trim();
+    if (id && kvReady) {
+      try {
+        const a = (await alertsAll()).find((x) => x.id === id);
+        if (a && a.user === (msg.from && msg.from.id)) { await alertDel([id]); await tg('sendMessage', { chat_id: chatId, text: 'alert removed.', ...reply }); }
+        else await tg('sendMessage', { chat_id: chatId, text: 'no alert with that id.', ...reply });
+      } catch (_) {}
+    } else await tg('sendMessage', { chat_id: chatId, parse_mode: 'HTML', text: 'usage: <code>/delalert &lt;id&gt;</code> — or use /alerts and tap one.', ...reply });
+    return new Response('ok');
+  }
   if (/^\/idea\b/i.test(text)) {
     await tg('sendMessage', { chat_id: chatId, text: '💡 spinoff ideas:\n\n• <b>' + [idea(), idea(), idea()].join('</b>\n• <b>') + '</b>', parse_mode: 'HTML' });
     return new Response('ok');
