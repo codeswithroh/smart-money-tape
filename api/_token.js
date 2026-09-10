@@ -43,10 +43,62 @@ function parsePair(p) {
     mc: +p.marketCap || +p.fdv || 0,
     vol: p.volume || {}, txns: p.txns || {}, pc: p.priceChange || {},
     ageMs: p.pairCreatedAt ? Date.now() - p.pairCreatedAt : null,
+    pairAddr: p.pairAddress || '',
     socials: ((p.info && p.info.socials) || []).map((s) => String(s.type || '').toLowerCase()),
     sites: ((p.info && p.info.websites) || []).length,
     url: p.url || '',
   };
+}
+
+const GT_PROXY = 'https://meme-attention-radar.vercel.app/api/gt?path=';
+const GT_NET = { solana: 'solana', bsc: 'bsc', base: 'base', ethereum: 'eth' };
+
+// peak market cap estimate from OHLCV highs since the pool was created
+export async function peakMc(best) {
+  const net = GT_NET[best.chain];
+  if (!net || !best.pairAddr || !best.price || !best.mc) return null;
+  const path = `/networks/${net}/pools/${best.pairAddr}/ohlcv/minute?aggregate=15&limit=300&currency=usd`;
+  const j = await jget(GT_PROXY + encodeURIComponent(path));
+  const rows = (j && j.data && j.data.attributes && j.data.attributes.ohlcv_list) || [];
+  if (!rows.length) return null;
+  let hi = 0;
+  for (const r of rows) hi = Math.max(hi, +r[2] || 0);
+  if (hi <= best.price) return best.mc;
+  return best.mc * (hi / best.price);
+}
+
+// top attention movers right now (for /radar)
+export async function topMovers() {
+  const paths = [
+    '/networks/solana/trending_pools?page=1',
+    '/networks/base/trending_pools?page=1',
+    '/networks/bsc/trending_pools?page=1',
+  ];
+  const addrs = [];
+  const seen = {};
+  await Promise.all(paths.map(async (p) => {
+    const j = await jget(GT_PROXY + encodeURIComponent(p));
+    const d = (j && j.data) || [];
+    for (const pool of d.slice(0, 12)) {
+      const rel = pool.relationships && pool.relationships.base_token && pool.relationships.base_token.data;
+      const a = rel ? String(rel.id || '').split('_').pop() : '';
+      if (a && !seen[a]) { seen[a] = 1; addrs.push(a); }
+    }
+  }));
+  const b = await jget(`${DEX}/token-boosts/top/v1`);
+  (Array.isArray(b) ? b : []).slice(0, 10).forEach((x) => {
+    const a = x.tokenAddress || '';
+    if (a && !seen[a]) { seen[a] = 1; addrs.push(a); }
+  });
+  const out = [];
+  await Promise.all(addrs.slice(0, 24).map(async (a) => {
+    try {
+      const c = await resolveCoin(a);
+      if (c && c.best.mc && c.best.mc < 8e7) out.push({ sym: c.best.sym, chain: c.best.chain, mc: c.best.mc, addr: c.best.addr, ch1: +c.best.pc.h1 || 0, ...c.a });
+    } catch (_) {}
+  }));
+  out.sort((x, y) => y.score - x.score);
+  return out.slice(0, 6);
 }
 
 function attn(p) {
@@ -116,17 +168,24 @@ function spinoff(tags) {
   return `${name} $${tk}`;
 }
 
-export async function tokenCard(addr, site) {
+export async function resolveCoin(addr) {
   let j = await jget(`${DEX}/latest/dex/tokens/${encodeURIComponent(addr)}`);
   let pairs = (j && j.pairs) || [];
   if (!pairs.length) {
     j = await jget(`${DEX}/latest/dex/search?q=${encodeURIComponent(addr)}`);
     pairs = (j && j.pairs) || [];
   }
-  if (!pairs.length) return { ok: false, text: "Couldn't find a pair for that address." };
+  if (!pairs.length) return null;
   const best = pairs.map(parsePair).sort((a, b) => b.liq - a.liq)[0];
-  const a = attn(best);
-  const tags = tagThemes(best);
+  return { best, a: attn(best), tags: tagThemes(best), _needSafety: true };
+}
+
+export async function tokenCard(addr, site) {
+  const rc = await resolveCoin(addr);
+  if (!rc) return { ok: false, text: "Couldn't find a pair for that address." };
+  const best = rc.best;
+  const a = rc.a;
+  const tags = rc.tags;
   const sf = await safety(best.addr, best.chain);
 
   const holders = sf && sf.holders;
