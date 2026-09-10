@@ -5,7 +5,7 @@ export const config = { runtime: 'edge' };
 // prefer the env var; the inline fallback is a stopgap so it works without Vercel config.
 const TOKEN = (globalThis.process && process.env && process.env.TELEGRAM_BOT_TOKEN) || '8502456422:AAEGuU-kgmBGxXFAOYCy9K9XOb_wlgM-WC0';
 const SECRET = (globalThis.process && process.env && process.env.TELEGRAM_SECRET) || '';
-const SITE = (globalThis.process && process.env && process.env.SITE_URL) || 'https://smart-money-tape-v4-codeswithrohs-projects.vercel.app';
+const SITE = (globalThis.process && process.env && process.env.SITE_URL) || 'https://meme-attention-radar.vercel.app';
 
 const HELP = [
   '<b>Attention Radar</b> — paste a contract address in any chat and I drop a card:',
