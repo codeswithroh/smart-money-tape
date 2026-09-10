@@ -52,11 +52,21 @@
   window.global = window.global || window;
   window.process = window.process || { env: {}, nextTick: (f) => setTimeout(f, 0) };
 </script>
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@18.3.1",
+    "react-dom": "https://esm.sh/react-dom@18.3.1",
+    "react-dom/client": "https://esm.sh/react-dom@18.3.1/client",
+    "react/jsx-runtime": "https://esm.sh/react@18.3.1/jsx-runtime"
+  }
+}
+</script>
 <script type="module">
-import React, { useState, useEffect, useCallback } from 'https://esm.sh/react@18.3.1';
-import { createRoot } from 'https://esm.sh/react-dom@18.3.1/client';
+import React, { useState, useEffect, useCallback } from 'react';
+import { createRoot } from 'react-dom/client';
 import htm from 'https://esm.sh/htm@3.1.1';
-import { PrivyProvider, usePrivy, useWallets } from 'https://esm.sh/@privy-io/react-auth@2?deps=react@18.3.1,react-dom@18.3.1&target=es2022';
+import { PrivyProvider, usePrivy, useWallets } from 'https://esm.sh/@privy-io/react-auth@2?external=react,react-dom';
 
 const html = htm.bind(React.createElement);
 const APP_ID = 'cml5e131s01tbjn0cl00eormz';
@@ -257,7 +267,12 @@ function App() {
   return html`<${ErrorBoundary}><${PrivyProvider} appId=${APP_ID} config=${{
     loginMethods: ['wallet', 'email'],
     embeddedWallets: { createOnLogin: 'off' },
-    appearance: { theme: 'light', accentColor: '#cf3a26', logo: '/morty.png' },
+    appearance: {
+      theme: 'light',
+      accentColor: '#cf3a26',
+      logo: '/morty.png',
+      walletList: ['detected_wallets', 'metamask', 'coinbase_wallet', 'wallet_connect', 'rabby_wallet', 'rainbow'],
+    },
   }}><${Gate} /><//><//>`;
 }
 
