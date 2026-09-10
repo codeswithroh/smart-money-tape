@@ -71,14 +71,27 @@ function humanErr(e) {
 function Gate() {
   const { ready, authenticated, user, login, logout, getAccessToken } = usePrivy();
   const { wallets } = useWallets();
-  const [phase, setPhase] = useState('boot');   // boot | need-login | checking | need-pay | paying | error
+  const [phase, setPhase] = useState('boot');   // boot | need-login | checking | need-pay | paying | confirming | error
   const [msg, setMsg] = useState('');
   const [account, setAccount] = useState(null);
   const [info, setInfo] = useState(null);
   const [chain, setChain] = useState('base');
-  const [tx, setTx] = useState('');
+  const [pending, setPending] = useState(null); // { hash, chainKey } after a send, for a no-repay re-check
 
   useEffect(() => { fetch('/api/pay-info').then((r) => r.json()).then(setInfo).catch(() => {}); }, []);
+
+  const evmWallet = useCallback(() => {
+    const list = wallets || [];
+    return list.find((w) => String(w.chainId || '').startsWith('eip155:'))
+      || list.find((w) => /ethereum|evm|metamask|coinbase|wallet|privy|rabby|rainbow|injected/i.test(w.walletClientType || w.type || ''))
+      || list[0] || null;
+  }, [wallets]);
+
+  const walletChainId = () => {
+    const w = evmWallet();
+    const n = parseInt(String((w && w.chainId) || '').split(':')[1], 10);
+    return Number.isFinite(n) ? n : null;
+  };
 
   const doSession = useCallback(async () => {
     setPhase('checking'); setMsg('');
@@ -99,36 +112,67 @@ function Gate() {
     doSession();
   }, [ready, authenticated, doSession]);
 
-  const confirm = useCallback(async (hash) => {
-    setMsg('confirming on-chain…');
+  // auto-verify the sent tx, retrying while the chain / RPC catches up
+  const confirmLoop = useCallback(async (hash, chainKey, n) => {
+    setPhase('confirming');
+    setMsg('payment sent — confirming on-chain… (' + (n + 1) + '/8)');
     try {
       const t = await getAccessToken();
-      const r = await fetch('/api/pay-confirm', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ privyToken: t, txHash: hash, chain }) });
+      const r = await fetch('/api/pay-confirm', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ privyToken: t, txHash: hash, chain: chainKey }),
+      });
       const j = await r.json();
       if (r.ok && j.paid) { window.location.href = '/'; return; }
-      setPhase('need-pay'); setMsg(j.error || 'could not confirm — check the hash and chain, then retry');
-    } catch (e) { setPhase('need-pay'); setMsg(humanErr(e)); }
-  }, [getAccessToken, chain]);
+      if (j.reason === 'tx_failed') {
+        setPending(null); setPhase('need-pay');
+        setMsg('that transaction failed on-chain — tap Pay to try again.');
+        return;
+      }
+      const retryable = j.reason === 'no_match' || j.reason === 'rpc';
+      if (retryable && n < 7) { setTimeout(() => confirmLoop(hash, chainKey, n + 1), 5000); return; }
+      setPending({ hash, chainKey });
+      setPhase('need-pay');
+      setMsg((j.error || 'could not confirm that payment yet') + ' — use “Check payment” below, do not pay again.');
+    } catch (e) {
+      if (n < 7) { setTimeout(() => confirmLoop(hash, chainKey, n + 1), 5000); return; }
+      setPending({ hash, chainKey });
+      setPhase('need-pay');
+      setMsg(humanErr(e) + ' — use “Check payment” below.');
+    }
+  }, [getAccessToken]);
 
   const payWithWallet = useCallback(async () => {
     if (!info) return;
-    setPhase('paying'); setMsg('switching network…');
+    setPending(null);
+    setPhase('paying'); setMsg('opening your wallet…');
     try {
-      const w = wallets.find((x) => /ethereum|evm|metamask|coinbase|wallet|privy|rabby|rainbow/i.test(x.walletClientType || x.type || '')) || wallets[0];
-      if (!w) throw new Error('connect a wallet first');
-      const c = info.chains.find((x) => x.key === chain);
-      try { await w.switchChain(c.id); } catch (_) { /* some wallets prompt on send instead */ }
+      const w = evmWallet();
+      if (!w) throw new Error('connect an EVM wallet to pay');
+      let target = info.chains.find((x) => x.key === chain) || info.chains.find((x) => x.key === 'base');
+      // switch to the chosen network; if the user declines, fall back to whatever the wallet is on (if supported)
+      setMsg('switching to ' + target.name + '…');
+      try {
+        await w.switchChain(target.id);
+      } catch (_) {
+        const cur = walletChainId();
+        const onChain = cur && info.chains.find((x) => x.id === cur);
+        if (!onChain) throw new Error('approve the network switch, or move your wallet to a supported network, then tap Pay');
+        target = onChain;
+      }
       const provider = await w.getEthereumProvider();
       const amount = BigInt(Math.round(info.priceUsdc * 1e6));
       const data = '0xa9059cbb'
         + info.payTo.toLowerCase().replace(/^0x/, '').padStart(64, '0')
         + amount.toString(16).padStart(64, '0');
-      setMsg('confirm the transfer in your wallet…');
-      const hash = await provider.request({ method: 'eth_sendTransaction', params: [{ from: w.address, to: c.usdc, data }] });
-      setTx(hash);
-      await confirm(hash);
+      setMsg('confirm the ' + info.priceUsdc + ' USDC transfer in your wallet…');
+      const hash = await provider.request({
+        method: 'eth_sendTransaction',
+        params: [{ from: w.address, to: target.usdc, data }],
+      });
+      await confirmLoop(hash, target.key, 0);
     } catch (e) { setPhase('need-pay'); setMsg(humanErr(e)); }
-  }, [info, wallets, chain, confirm]);
+  }, [info, chain, evmWallet, confirmLoop]);
 
   // ---- render ----
   if (phase === 'boot' || !ready) {
@@ -161,37 +205,30 @@ function Gate() {
     </div>`;
   }
 
-  // need-pay / paying
+  // need-pay / paying / confirming
   const who = account?.email || user?.email?.address || user?.wallet?.address || 'your wallet';
-  const busy = phase === 'paying';
+  const busy = phase === 'paying' || phase === 'confirming';
+  const priceStr = info ? info.priceUsdc : 10;
   return html`<div class="card">
     <h1>One-time access</h1>
-    <p class="tag">Signed in as <b>${who}</b>. Pay <b>${info ? info.priceUsdc : 10} USDC</b> once to unlock the dashboard.</p>
+    <p class="tag">Signed in as <b>${who}</b>. Pay <b>${priceStr} USDC</b> once to unlock the dashboard.</p>
 
     <div class="row">
-      <span class="lbl">Pay on</span>
+      <span class="lbl">Network</span>
       <select value=${chain} onChange=${(e) => setChain(e.target.value)} disabled=${busy}>
         ${(info?.chains || [{ key: 'base', name: 'Base' }]).map((c) => html`<option key=${c.key} value=${c.key}>${c.name}</option>`)}
       </select>
       <button class="pri" onClick=${payWithWallet} disabled=${busy || !info}>
-        ${busy ? html`<span class="spin">◠</span> working…` : `Pay ${info ? info.priceUsdc : 10} USDC with my wallet`}
+        ${busy ? html`<span class="spin">◠</span> ${phase === 'confirming' ? 'confirming…' : 'working…'}` : `Pay ${priceStr} USDC`}
       </button>
+      ${pending ? html`<button onClick=${() => confirmLoop(pending.hash, pending.chainKey, 0)} disabled=${busy}>Check payment</button>` : ''}
     </div>
 
-    <div class="hr"></div>
-
-    <div class="row">
-      <span class="lbl">Already sent the payment? Paste the transaction hash.</span>
-      <input placeholder="0x…" value=${tx} onInput=${(e) => setTx(e.target.value)} disabled=${busy} />
-      <button onClick=${() => confirm(tx.trim())} disabled=${busy || !/^0x[0-9a-fA-F]{64}$/.test(tx.trim())}>Verify payment</button>
-    </div>
-
-    <div class="msg ${/could not|failed|reject|snag|no USDC|invalid|already/i.test(msg) ? 'err' : 'ok'}">${msg}</div>
+    <div class="msg ${/could not|fail|reject|snag|no USDC|approve|supported|already/i.test(msg) ? 'err' : 'ok'}">${msg}</div>
 
     <div class="note">
-      <div>Send exactly <b>${info ? info.priceUsdc : 10} USDC</b> (or more) to</div>
-      <div class="mono" style="margin:4px 0 10px">${info ? info.payTo : '…'}</div>
-      <div>Arranged access with <b><a href="https://x.com/codeswithroh" target="_blank" rel="noopener">@codeswithroh</a></b>? Once your account is marked paid, hit ${' '}
+      <div>Pick a network, tap <b>Pay</b>, and approve the network switch + the <b>${priceStr} USDC</b> transfer in your wallet. It's picked up automatically.</div>
+      <div style="margin-top:8px">Arranged access with <b><a href="https://x.com/codeswithroh" target="_blank" rel="noopener">@codeswithroh</a></b>? Once your account is marked paid, hit ${' '}
       <a href="#" onClick=${(e) => { e.preventDefault(); doSession(); }}>refresh</a>.</div>
     </div>
 
