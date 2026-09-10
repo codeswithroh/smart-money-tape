@@ -177,6 +177,9 @@ function fetchSafety(addr,chain,urlAddr){
    var creator=j.creator||(j.fileMeta&&j.fileMeta.creator)||'';
    var devH=creator?allH.filter(function(h){return String(h.address||h.owner||'')===String(creator);})[0]:null;
    var devPct=devH?devH.pct:(j.creatorBalancePct!=null?j.creatorBalancePct:null);
+   // insider SUPPLY % = sum of pct across holders RugCheck flags as insider (the metric that matters, not a wallet count)
+   var insiderPct=allH.filter(function(h){return h.insider;}).reduce(function(s,h){return s+(+h.pct||0);},0);
+   insiderPct=insiderPct||null;
    var insiderCount=j.graphInsidersDetected||(j.insiderNetworks||[]).reduce(function(s,n){return s+(+n.activeAccounts||+n.size||0);},0)||0;
    // bundle pattern: 4+ non-LP wallets clustered at near-identical small stakes
    var cl=nonLp.slice(0,10).filter(function(h){return h.pct>=0.25&&h.pct<=5;}).map(function(h){return h.pct;});
@@ -185,12 +188,12 @@ function fetchSafety(addr,chain,urlAddr){
    var reasons=[];if(j.rugged)reasons.push('flagged rugged');if(j.mintAuthority)reasons.push('mint not renounced');if(j.freezeAuthority)reasons.push('freeze not renounced');
    if(topPct!=null&&topPct>25)reasons.push('top holder '+topPct.toFixed(0)+'%');if(lp!=null&&lp<50)reasons.push('LP '+lp.toFixed(0)+'% locked');
    if(devPct!=null&&devPct>5)reasons.push('dev holds '+devPct.toFixed(1)+'%');
-   if(insiderCount>20)reasons.push(insiderCount+' insider wallets');
+   if(insiderPct!=null&&insiderPct>20)reasons.push('insiders hold '+insiderPct.toFixed(0)+'%');
    if(bundleSuspected)reasons.push('bundle-pattern holders');
    danger.forEach(function(d){reasons.push(d);});
-   var ok=!j.rugged&&!j.mintAuthority&&!j.freezeAuthority&&!(topPct!=null&&topPct>35)&&!(devPct!=null&&devPct>5)&&!(insiderCount>20)&&!bundleSuspected&&!danger.length;
+   var ok=!j.rugged&&!j.mintAuthority&&!j.freezeAuthority&&!(topPct!=null&&topPct>35)&&!(devPct!=null&&devPct>5)&&!(insiderPct!=null&&insiderPct>20)&&!bundleSuspected&&!danger.length;
    recordHolders(addr,j.totalHolders);
-   return done({ok:ok,norm:j.score_normalised,reasons:reasons,lpPct:lp,holders:j.totalHolders,renounced:!j.mintAuthority&&!j.freezeAuthority,topPct:topPct,top5Pct:top5Pct,devPct:devPct,insiders:insiderCount,bundle:bundleSuspected,src:'rugcheck'});
+   return done({ok:ok,norm:j.score_normalised,reasons:reasons,lpPct:lp,holders:j.totalHolders,renounced:!j.mintAuthority&&!j.freezeAuthority,topPct:topPct,top5Pct:top5Pct,devPct:devPct,insiderPct:insiderPct,insiders:insiderCount,bundle:bundleSuspected,src:'rugcheck'});
   }).catch(function(){return done({ok:null,reasons:['rug check failed'],src:'rugcheck'});});
  }
  var cid=EVM_CHAIN_ID[chain];if(!cid)return Promise.resolve(done({ok:null,reasons:['no safety source for '+chain],src:'none'}));
@@ -473,14 +476,14 @@ function bundlePanel(pp,sf){
  if(sf&&sf.src==='rugcheck'){
   rows.push(flag(sf.devPct!=null&&sf.devPct>5, sf.devPct!=null?('dev holds '+sf.devPct.toFixed(1)+'%'+(sf.devPct>5?' (want &le;5%)':'')):'dev holding not surfaced'));
   rows.push(flag(sf.top5Pct!=null&&sf.top5Pct>25, sf.top5Pct!=null?('top 5 non-LP wallets hold '+sf.top5Pct.toFixed(0)+'%'+(sf.top5Pct>25?' (want &le;25%)':'')):'top-holder spread not surfaced'));
-  rows.push(flag(sf.insiders>20, (sf.insiders||0)+' insider / linked wallets'+(sf.insiders>20?' (want &le;20)':'')));
+  rows.push(flag(sf.insiderPct!=null&&sf.insiderPct>20, sf.insiderPct!=null?('insiders hold '+sf.insiderPct.toFixed(0)+'% of supply'+(sf.insiderPct>20?' (want &le;20%)':'')+(sf.insiders?' &middot; '+sf.insiders+' linked wallets':'')):'insider supply not flagged'));
   rows.push(flag(!!sf.bundle, sf.bundle?'holders clustered at near-identical small stakes &mdash; looks bundled':'no obvious bundle cluster in top holders'));
   rows.push(flag(sf.lpPct!=null&&sf.lpPct<50, 'LP '+(sf.lpPct!=null?sf.lpPct.toFixed(0)+'% locked/burned':'lock status unknown')));
  } else {
   rows.push('<div class="bchk">RugCheck data unavailable right now &mdash; retry in a moment.</div>');
  }
  if(ls)rows.push(flag(ls.bundleish,'launch candle '+(ls.pump>0?'+':'')+ls.pump.toFixed(0)+'% '+(ls.bundleish?'straight up with no pullback &mdash; classic bundle-launch shape':'with normal staggered follow-through')));
- var verdict=(sf&&(sf.bundle||(sf.devPct>5)||(sf.insiders>20)||(sf.top5Pct>25)))||(ls&&ls.bundleish)
+ var verdict=(sf&&(sf.bundle||(sf.devPct>5)||(sf.insiderPct>20)||(sf.top5Pct>25)))||(ls&&ls.bundleish)
   ?'<b class="neg">Treat as bundled / insider-heavy until proven otherwise.</b> Cross-check holder SOL balances + funding times yourself (see checklist).'
   :'<b class="pos">No bundle red flags in the automated checks.</b> Still eyeball holder balances + funding times before you buy.';
  return '<div class="panel"><h3>Bundle &amp; insider check</h3><div class="bchks">'+rows.join('')+'</div>'
@@ -553,7 +556,7 @@ function renderResearch(pp,sf,watchers,tinfo){
  var safeLine='<div style="margin-top:9px;font-size:12.5px;color:var(--ink-soft)"><b>Rug screen ('+esc((sf&&sf.src)||'?')+'):</b> '
   +(sf&&sf.ok===true?'passed':sf&&sf.ok===false?'FAILED &mdash; '+esc((sf.reasons||[]).join(', ')):'unverified')
   +(sf&&sf.renounced?' &middot; renounced':'')+(sf&&sf.lpPct!=null?' &middot; LP '+sf.lpPct.toFixed(0)+'%':'')+(sf&&sf.topPct!=null?' &middot; top holder '+sf.topPct.toFixed(1)+'%':'')
-  +(sf&&sf.devPct!=null?' &middot; dev '+sf.devPct.toFixed(1)+'%':'')+(sf&&sf.insiders?' &middot; '+sf.insiders+' insiders':'')+(sf&&sf.bundle?' &middot; <b class="neg">bundle pattern</b>':'')+'</div>';
+  +(sf&&sf.devPct!=null?' &middot; dev '+sf.devPct.toFixed(1)+'%':'')+(sf&&sf.insiderPct?' &middot; insiders '+sf.insiderPct.toFixed(0)+'%':'')+(sf&&sf.bundle?' &middot; <b class="neg">bundle pattern</b>':'')+'</div>';
  var watchLine=watchers&&watchers.buys?'<div style="margin-top:6px;font-size:12.5px;color:var(--ink-faint)">fomo feed: '+watchers.buys+' recent buy'+(watchers.buys>1?'s':'')+(watchers.traders.length?' &mdash; '+esc(watchers.traders.slice(0,4).join(', ')):'')+' &middot; <i>info only, do not copy</i></div>':'';
 
  var chart=chartBlock(pp,plan);
