@@ -12,7 +12,7 @@ export default async function handler(req) {
 
   const u = new URL(req.url);
   let path = u.searchParams.get('path') || '';
-  if (!path.startsWith('/networks/') || path.length > 300 || /[<>"'`\\]/.test(path)) {
+  if (!path.startsWith('/networks/') || path.length > 300 || path.includes('..') || /[<>"'`\\\s]/.test(path)) {
     return new Response(JSON.stringify({ error: 'bad path' }), { status: 400, headers: { ...cors, 'content-type': 'application/json' } });
   }
 

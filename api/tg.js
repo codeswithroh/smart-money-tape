@@ -266,7 +266,9 @@ function idea() {
 export default async function handler(req) {
   if (req.method !== 'POST') return new Response('ok');
   if (!TOKEN) return new Response('no token', { status: 500 });
-  if (SECRET && req.headers.get('x-telegram-bot-api-secret-token') !== SECRET) return new Response('no', { status: 401 });
+  // fail closed: only accept updates that carry Telegram's secret_token (set via setWebhook)
+  if (!SECRET) return new Response('webhook secret not configured', { status: 503 });
+  if (req.headers.get('x-telegram-bot-api-secret-token') !== SECRET) return new Response('unauthorized', { status: 401 });
 
   let u;
   try { u = await req.json(); } catch (_) { return new Response('ok'); }

@@ -2,6 +2,8 @@ export const config = { runtime: 'edge' };
 
 const TOKEN = globalThis.process && process.env && process.env.TELEGRAM_BOT_TOKEN;
 const SITE = (globalThis.process && process.env && process.env.SITE_URL) || 'https://meme-attention-radar.vercel.app';
+const ADMIN = (globalThis.process && process.env && process.env.CRON_SECRET) || '';
+const TG_SECRET = (globalThis.process && process.env && process.env.TELEGRAM_SECRET) || '';
 
 const DESCRIPTION =
   "Aw geez... ok. I'm Morty. Rick's got the portal gun, I've got the data. A genius with no Morty " +
@@ -35,7 +37,12 @@ export default async function handler(req) {
   if (!TOKEN) return new Response('no token', { status: 500 });
   const url = new URL(req.url);
 
-  // GET = diagnostic only, no writes
+  // admin-only: needs ?key=<CRON_SECRET>
+  if (!ADMIN || url.searchParams.get('key') !== ADMIN) {
+    return new Response('unauthorized', { status: 401 });
+  }
+
+  // GET (no ?apply) = diagnostic only, no writes
   if (req.method === 'GET' && !url.searchParams.has('apply')) {
     const [me, hook, desc, sdesc, cmds] = await Promise.all([
       api('getMe'),
@@ -54,7 +61,10 @@ export default async function handler(req) {
   out.setWebhook = await api('setWebhook', {
     url: SITE + '/api/tg',
     allowed_updates: ['message', 'edited_message', 'channel_post', 'callback_query'],
+    secret_token: TG_SECRET || undefined,
+    drop_pending_updates: true,
   });
+  out.webhookSecretSet = !!TG_SECRET;
   out.commands = {};
   for (const scope of [{ type: 'default' }, { type: 'all_private_chats' }, { type: 'all_group_chats' }]) {
     out.commands[scope.type] = await api('setMyCommands', { commands: COMMANDS, scope });
