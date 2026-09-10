@@ -102,6 +102,34 @@
   .pf-card .pf-links{display:flex;flex-wrap:wrap;gap:7px;}
   .pf-card .pf-meta{font-size:11.5px;color:var(--ink-faint);margin-top:9px;}
 
+  /* header account cluster */
+  .hgroup{display:flex;align-items:center;gap:14px;}
+  .usermenu-wrap{position:relative;}
+  .avatar-btn{padding:0;border:2px solid var(--ink);border-radius:50%;background:var(--card);width:38px;height:38px;cursor:pointer;overflow:hidden;display:grid;place-items:center;box-shadow:2px 2px 0 rgba(44,53,80,.16);flex:none;}
+  .avatar-btn:hover{transform:translateY(-1px);}
+  .avatar-btn img{width:34px;height:34px;border-radius:50%;display:block;}
+  .usermenu{position:absolute;right:0;top:46px;z-index:40;width:230px;background:var(--card);border:2px solid var(--ink);border-radius:12px 8px 13px 8px / 8px 13px 8px 12px;box-shadow:4px 5px 0 rgba(44,53,80,.18);padding:8px;}
+  .um-head{display:flex;align-items:center;gap:10px;padding:6px 6px 10px;border-bottom:2px dashed var(--ink);margin-bottom:6px;}
+  .um-head img{width:40px;height:40px;border-radius:50%;border:2px solid var(--ink);flex:none;}
+  .um-id{min-width:0;}
+  .um-name{font-family:"Caveat",cursive;font-weight:700;font-size:19px;line-height:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .um-sub{font-size:11px;color:var(--ink-faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .um-item{display:block;width:100%;text-align:left;border:none;background:none;font:inherit;font-size:14px;color:var(--ink);padding:8px 8px;border-radius:7px;cursor:pointer;text-decoration:none;}
+  .um-item:hover{background:var(--paper-2);}
+
+  /* profile modal */
+  .pf-modal{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;padding:20px;}
+  .pf-backdrop{position:absolute;inset:0;background:rgba(30,28,40,.42);}
+  .pf-dialog{position:relative;width:100%;max-width:520px;max-height:88vh;overflow:auto;background:var(--note);border:2px solid var(--ink);border-radius:18px 10px 20px 9px / 9px 18px 11px 18px;box-shadow:5px 7px 0 rgba(44,53,80,.22);}
+  .pf-dialog-head{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:2px dashed var(--ink);}
+  .pf-dialog-head h2{margin:0;font-family:"Caveat",cursive;font-size:24px;}
+  .pf-x{border:none;background:none;font-size:24px;line-height:1;cursor:pointer;color:var(--ink-soft);padding:0 4px;}
+  .pf-x:hover{color:var(--accent);}
+  .pf-dialog-body{padding:14px 16px 18px;display:flex;flex-direction:column;gap:12px;}
+  .pf-hero{display:flex;align-items:center;gap:12px;}
+  .pf-hero img{width:56px;height:56px;border-radius:50%;border:2px solid var(--ink);flex:none;background:var(--card);}
+  .pf-preview-label{font-family:"Caveat",cursive;font-weight:700;font-size:20px;margin-top:4px;}
+
   /* RESEARCH CARD */
   .rcard{border:2px solid var(--ink);border-radius:20px 9px 22px 8px / 9px 20px 11px 20px;background:var(--note);box-shadow:3px 4px 0 rgba(44,53,80,.18);margin:14px 0;overflow:hidden;}
   .rcard .cap{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:2px dashed var(--ink);}
@@ -354,7 +382,22 @@
       <h1>Attention Radar</h1>
       <span class="sub">Memecoins are <b>attention markets</b>. Live trades, holders, socials, safety and the story behind every coin &mdash; all the public data, none of the noise. A radar, not a shortcut.</span>
     </div>
-    <div class="status"><span class="dot" id="dot"></span><span id="statusText">warming up&hellip;</span></div>
+    <div class="hgroup">
+      <div class="status"><span class="dot" id="dot"></span><span id="statusText">warming up&#8230;</span></div>
+      <div class="usermenu-wrap">
+        <button class="avatar-btn" id="avatarBtn" aria-haspopup="true" aria-expanded="false" aria-label="account">
+          <img id="avatarImg" alt="" width="34" height="34" />
+        </button>
+        <div class="usermenu" id="userMenu" hidden>
+          <div class="um-head">
+            <img id="umAvatar" alt="" width="40" height="40" />
+            <div class="um-id"><div class="um-name" id="umName">You</div><div class="um-sub" id="umSub"></div></div>
+          </div>
+          <button class="um-item" id="umProfile">Edit profile</button>
+          <a class="um-item" href="/api/logout">Sign out</a>
+        </div>
+      </div>
+    </div>
   </header>
 
   <div class="botbar" id="botbar" hidden>
@@ -370,7 +413,6 @@
     <button role="tab" data-tab="scan" aria-selected="true">Radar</button>
     <button role="tab" data-tab="watch" aria-selected="false">Watchlist</button>
     <button role="tab" data-tab="research" aria-selected="false">X-ray</button>
-    <button role="tab" data-tab="profile" aria-selected="false">Profile</button>
   </div>
 
   <div class="controls">
@@ -380,7 +422,6 @@
     <button class="chip-toggle" data-chain="bsc" aria-pressed="true">bsc</button>
     <button class="chip-toggle" data-chain="robinhood" aria-pressed="true">robinhood</button>
     <button class="chip-toggle" data-chain="ethereum" aria-pressed="false">ethereum</button>
-    <label style="margin-left:auto">fomo key <input id="apiKey" type="password" placeholder="optional &mdash; info only" autocomplete="off" style="width:120px" /></label>
   </div>
 
   <!-- SCAN -->
@@ -422,11 +463,18 @@
     <div id="rcardHost"></div>
   </section>
 
-  <!-- PROFILE -->
-  <section id="tab-profile" hidden>
-    <div class="shead"><h2>Your profile</h2><span class="hint" id="profWho"></span></div>
-    <p class="lead">Set how you show up. Name, a short bio, and where people can find you.</p>
-    <div class="panel" id="profForm">
+</div>
+
+<!-- PROFILE MODAL -->
+<div class="pf-modal" id="pfModal" hidden>
+  <div class="pf-backdrop" id="pfBackdrop"></div>
+  <div class="pf-dialog" role="dialog" aria-modal="true" aria-label="Your profile">
+    <div class="pf-dialog-head">
+      <h2>Your profile</h2>
+      <button class="pf-x" id="pfClose" aria-label="close">&times;</button>
+    </div>
+    <div class="pf-dialog-body">
+      <div class="pf-hero"><img id="pfAvatar" alt="" width="56" height="56" /><span class="hint" id="profWho"></span></div>
       <div class="formrow"><label>Display name</label><input id="pfName" type="text" maxlength="50" placeholder="how you want to be known" /></div>
       <div class="formrow"><label>Bio <span style="color:var(--ink-faint)">(280 chars)</span></label><textarea id="pfBio" maxlength="300" placeholder="degen since… / what you trade / anything"></textarea></div>
       <div class="formrow" style="flex-direction:row;gap:12px;flex-wrap:wrap">
@@ -441,10 +489,10 @@
         <button class="btn pri" id="pfSave">Save profile</button>
         <span id="pfMsg" style="font-size:13px;color:var(--ink-soft)"></span>
       </div>
+      <div class="pf-preview-label">Preview</div>
+      <div id="pfCard"></div>
     </div>
-    <div class="shead" style="margin-top:18px"><h2>Preview</h2></div>
-    <div id="pfCard"></div>
-  </section>
+  </div>
 </div>
 <div class="disclaimer"><div><b>Not financial advice.</b> Public data only: DexScreener, GeckoTerminal, RugCheck, Honeypot. Memecoins are extreme risk and most go to zero. This tool shows you data &mdash; it does not tell you what to buy. &nbsp;<a href="/api/logout" style="color:var(--ink-soft)">sign out</a></div></div>
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
