@@ -293,12 +293,27 @@ export default async function handler(req) {
         await tg('answerCallbackQuery', { callback_query_id: cq.id });
         await tg('sendMessage', { chat_id: cid, text: '💡 spinoff ideas:\n\n• <b>' + [idea(), idea(), idea()].join('</b>\n• <b>') + '</b>', parse_mode: 'HTML' });
       } else if (data.startsWith('da:')) {
-        await tg('answerCallbackQuery', { callback_query_id: cq.id, text: 'alert cancelled' });
+        const id = data.slice(3);
+        let ok = false;
         try {
-          const id = data.slice(3);
           const a = (await alertsAll()).find((x) => x.id === id);
-          if (a && a.user === cq.from.id) await alertDel([id]);
+          if (a && a.user === cq.from.id) { await alertDel([id]); ok = true; }
         } catch (_) {}
+        await tg('answerCallbackQuery', { callback_query_id: cq.id, text: ok ? 'alert cancelled' : 'that alert is already gone' });
+        const m = cq.message;
+        if (m && m.reply_markup && m.reply_markup.inline_keyboard) {
+          const rows = m.reply_markup.inline_keyboard
+            .map((r) => r.filter((b) => b.callback_data !== 'da:' + id))
+            .filter((r) => r.length);
+          if (!rows.length && (m.text || '').indexOf('Alert set') >= 0) {
+            await tg('editMessageText', {
+              chat_id: m.chat.id, message_id: m.message_id, parse_mode: 'HTML', disable_web_page_preview: true,
+              text: esc(m.text).replace(/^🔔/, '🔕') + '\n\n<i>cancelled.</i>',
+            });
+          } else {
+            await tg('editMessageReplyMarkup', { chat_id: m.chat.id, message_id: m.message_id, reply_markup: { inline_keyboard: rows } });
+          }
+        }
       } else {
         await tg('answerCallbackQuery', { callback_query_id: cq.id });
       }
