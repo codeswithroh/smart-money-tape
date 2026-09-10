@@ -189,22 +189,39 @@ function Gate() {
     <div class="msg ${/could not|failed|reject|snag|no USDC|invalid|already/i.test(msg) ? 'err' : 'ok'}">${msg}</div>
 
     <div class="note">
-      Send exactly <b>${info ? info.priceUsdc : 10} USDC</b> (or more) to<br>
-      <span class="mono">${info ? info.payTo : '…'}</span><br><br>
-      Arranged access with <b><a href="https://x.com/codeswithroh" target="_blank" rel="noopener">@codeswithroh</a></b>? Once your account is marked paid, hit
-      <a href="#" onClick=${(e) => { e.preventDefault(); doSession(); }}>refresh</a>.
+      <div>Send exactly <b>${info ? info.priceUsdc : 10} USDC</b> (or more) to</div>
+      <div class="mono" style="margin:4px 0 10px">${info ? info.payTo : '…'}</div>
+      <div>Arranged access with <b><a href="https://x.com/codeswithroh" target="_blank" rel="noopener">@codeswithroh</a></b>? Once your account is marked paid, hit ${' '}
+      <a href="#" onClick=${(e) => { e.preventDefault(); doSession(); }}>refresh</a>.</div>
     </div>
 
     <p class="foot"><a href="#" onClick=${(e) => { e.preventDefault(); logout().then(() => setPhase('need-login')); }}>use a different account</a></p>
   </div>`;
 }
 
+class ErrorBoundary extends React.Component {
+  constructor(p) { super(p); this.state = { err: null }; }
+  static getDerivedStateFromError(err) { return { err }; }
+  render() {
+    if (!this.state.err) return this.props.children;
+    return html`<div class="card">
+      <h1>Attention Radar</h1>
+      <p class="tag">The sign-in screen hit an error.</p>
+      <div class="msg err">${String(this.state.err && this.state.err.message || this.state.err).slice(0, 200)}</div>
+      <div class="row" style="margin-top:12px">
+        <button class="pri" onClick=${() => window.location.reload()}>Reload</button>
+        <button onClick=${() => { try { window.localStorage.clear(); } catch (_) {} window.location.reload(); }}>Reset & reload</button>
+      </div>
+    </div>`;
+  }
+}
+
 function App() {
-  return html`<${PrivyProvider} appId=${APP_ID} config=${{
+  return html`<${ErrorBoundary}><${PrivyProvider} appId=${APP_ID} config=${{
     loginMethods: ['wallet', 'email'],
     embeddedWallets: { createOnLogin: 'off' },
     appearance: { theme: 'light', accentColor: '#cf3a26', logo: '/morty.png' },
-  }}><${Gate} /><//>`;
+  }}><${Gate} /><//><//>`;
 }
 
 createRoot(document.getElementById('root')).render(html`<${App} />`);
