@@ -73,13 +73,77 @@ async function tg(method, body) {
   });
 }
 
-function coinKb(addr) {
-  return {
-    inline_keyboard: [[
+// trade-terminal deep links per chain
+function tradeRow(addr, chain) {
+  if (chain === 'solana') {
+    return [
+      { text: 'Axiom ↗', url: `https://axiom.trade/t/${addr}` },
+      { text: 'GMGN ↗', url: `https://gmgn.ai/sol/token/${addr}` },
+      { text: 'Photon ↗', url: `https://photon-sol.tinyastro.io/en/lens/${addr}` },
+    ];
+  }
+  const gm = { bsc: 'bsc', base: 'base', ethereum: 'eth' }[chain];
+  const row = [];
+  if (gm) row.push({ text: 'GMGN ↗', url: `https://gmgn.ai/${gm}/token/${addr}` });
+  row.push({ text: 'DEXTools ↗', url: `https://www.dextools.io/app/en/token/${addr}` });
+  return row;
+}
+
+function coinKb(card) {
+  const addr = card.addr;
+  const r1 = [
+    { text: '❌', callback_data: 'x' },
+    { text: '♻️', callback_data: 'rf:' + addr },
+  ];
+  if (card.x) r1.push({ text: '𝕏', url: card.x });
+  if (card.tg) r1.push({ text: '💬', url: card.tg });
+  r1.push({ text: '📈 Chart', url: card.dexUrl });
+
+  const rows = [
+    r1,
+    [
+      { text: '🔬 Full x-ray', url: `${SITE}/?coin=${encodeURIComponent(addr)}&chain=${encodeURIComponent(card.chain || '')}` },
       { text: '📸 Flex card', callback_data: 'fx:' + addr },
-      { text: '🔬 Full x-ray', url: `${SITE}/?coin=${encodeURIComponent(addr)}` },
-    ]],
-  };
+    ],
+    tradeRow(addr, card.chain),
+  ];
+  return { inline_keyboard: rows.filter((r) => r.length) };
+}
+
+// send a token card: photo + caption when the token has an image, else plain message
+async function sendCard(chatId, addr, extra) {
+  const card = await tokenCard(addr, SITE);
+  if (!card.ok) {
+    await tg('sendMessage', { chat_id: chatId, text: card.text, ...(extra || {}) });
+    return;
+  }
+  const kb = coinKb(card);
+  const cap = card.text.length > 1020 ? card.text.slice(0, 1020) + '…' : card.text;
+  if (card.img) {
+    const r = await tg('sendPhoto', {
+      chat_id: chatId, photo: card.img, caption: cap, parse_mode: 'HTML', reply_markup: kb, ...(extra || {}),
+    });
+    if (r.ok) return;
+  }
+  await tg('sendMessage', {
+    chat_id: chatId, text: card.text, parse_mode: 'HTML', disable_web_page_preview: true, reply_markup: kb, ...(extra || {}),
+  });
+}
+
+async function refreshCard(cq) {
+  const addr = cq.data.slice(3);
+  const m = cq.message;
+  if (!m) return;
+  const card = await tokenCard(addr, SITE);
+  if (!card.ok) return;
+  const kb = coinKb(card);
+  const body = { chat_id: m.chat.id, message_id: m.message_id, parse_mode: 'HTML', reply_markup: kb };
+  if (m.photo) {
+    const cap = card.text.length > 1020 ? card.text.slice(0, 1020) + '…' : card.text;
+    await tg('editMessageCaption', { ...body, caption: cap });
+  } else {
+    await tg('editMessageText', { ...body, text: card.text, disable_web_page_preview: true });
+  }
 }
 
 async function sendFlex(chatId, addr, entryMc, by) {
@@ -146,14 +210,24 @@ export default async function handler(req) {
     const cq = u.callback_query;
     const data = cq.data || '';
     const cid = cq.message && cq.message.chat.id;
-    await tg('answerCallbackQuery', { callback_query_id: cq.id });
     try {
       if (data.startsWith('fx:')) {
+        await tg('answerCallbackQuery', { callback_query_id: cq.id, text: 'building your flex card…' });
         await sendFlex(cid, data.slice(3), null, '@' + (cq.from.username || cq.from.first_name || 'anon'));
+      } else if (data.startsWith('rf:')) {
+        await tg('answerCallbackQuery', { callback_query_id: cq.id, text: 'refreshed ♻️' });
+        await refreshCard(cq);
+      } else if (data === 'x') {
+        await tg('answerCallbackQuery', { callback_query_id: cq.id });
+        if (cq.message) await tg('deleteMessage', { chat_id: cq.message.chat.id, message_id: cq.message.message_id });
       } else if (data === 'radar') {
+        await tg('answerCallbackQuery', { callback_query_id: cq.id });
         await sendRadar(cid);
       } else if (data === 'idea') {
+        await tg('answerCallbackQuery', { callback_query_id: cq.id });
         await tg('sendMessage', { chat_id: cid, text: '💡 spinoff ideas:\n\n• <b>' + [idea(), idea(), idea()].join('</b>\n• <b>') + '</b>', parse_mode: 'HTML' });
+      } else {
+        await tg('answerCallbackQuery', { callback_query_id: cq.id });
       }
     } catch (_) {}
     return new Response('ok');
@@ -192,11 +266,7 @@ export default async function handler(req) {
   const addr = pickAddr(text);
   if (!addr) return new Response('ok');
   try {
-    const card = await tokenCard(addr, SITE);
-    await tg('sendMessage', {
-      chat_id: chatId, text: card.text, parse_mode: 'HTML', disable_web_page_preview: true,
-      reply_markup: card.ok ? coinKb(addr) : undefined, ...reply,
-    });
+    await sendCard(chatId, addr, reply);
   } catch (e) {
     await tg('sendMessage', { chat_id: chatId, text: "couldn't pull that one — bad address or no pair.", ...reply });
   }

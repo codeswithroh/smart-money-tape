@@ -45,7 +45,10 @@ function parsePair(p) {
     ageMs: p.pairCreatedAt ? Date.now() - p.pairCreatedAt : null,
     pairAddr: p.pairAddress || '',
     socials: ((p.info && p.info.socials) || []).map((s) => String(s.type || '').toLowerCase()),
+    socialUrls: ((p.info && p.info.socials) || []).map((s) => ({ type: String(s.type || '').toLowerCase(), url: s.url || '' })).filter((s) => s.url),
+    siteUrl: ((p.info && p.info.websites) || [])[0] ? (p.info.websites[0].url || '') : '',
     sites: ((p.info && p.info.websites) || []).length,
+    img: (p.info && p.info.imageUrl) || (p.info && p.info.openGraph) || '',
     url: p.url || '',
   };
 }
@@ -219,5 +222,16 @@ export async function tokenCard(addr, site) {
   L.push(`🔬 <a href="${site}/?coin=${encodeURIComponent(best.addr)}&amp;chain=${encodeURIComponent(best.chain)}">Full x-ray + live trades</a>`);
   L.push(`💡 spinoff idea: <b>${esc(spinoff(tags))}</b>`);
   L.push(`<i>Not financial advice.</i>`);
-  return { ok: true, text: L.join('\n') };
+  const x = (best.socialUrls.find((s) => s.type === 'twitter' || s.type === 'x') || {}).url || '';
+  const tgUrl = (best.socialUrls.find((s) => s.type === 'telegram') || {}).url || '';
+  return {
+    ok: true,
+    text: L.join('\n'),
+    addr: best.addr,
+    chain: best.chain,
+    sym: best.sym,
+    img: best.img || '',
+    dexUrl: best.url || `https://dexscreener.com/${best.chain}/${best.addr}`,
+    x, tg: tgUrl, site: best.siteUrl || '',
+  };
 }

@@ -4,10 +4,13 @@ const TOKEN = globalThis.process && process.env && process.env.TELEGRAM_BOT_TOKE
 const SITE = (globalThis.process && process.env && process.env.SITE_URL) || 'https://meme-attention-radar.vercel.app';
 
 const DESCRIPTION =
-  'Paste any memecoin contract and I send back the full read: attention score (ramping / fading), buy pressure, ' +
-  'bundle and insider checks, rug screen, narrative tags and socials. Works in your DMs or drop me in a group. ' +
-  'Not financial advice.';
-const SHORT = 'Paste a contract, get the full read. Free.';
+  "Aw geez... ok. I'm Morty. Rick's got the portal gun, I've got the data. A genius with no Morty " +
+  'just YOLOs into the first bundle he sees, so somebody has to check the holders first.\n\n' +
+  'Paste any contract and I send the full read: attention score (ramping or fading), buy pressure, ' +
+  'bundle and insider checks, rug screen, narrative tags and socials. Works in your DMs, or drop me in a group ' +
+  'and I card every contract anyone pastes.\n\n' +
+  'Data over emotions. Same degens, higher standards. Not financial advice.';
+const SHORT = "Every Rick needs a Morty. I read the chart before you ape. Aw geez.";
 
 const COMMANDS = [
   { command: 'radar', description: '⚡ Top attention movers right now' },
