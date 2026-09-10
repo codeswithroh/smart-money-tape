@@ -9,12 +9,14 @@
   html.locked #gate{display:flex}</style>
 <script>
 (function(){
- var KEY='ar-gate-v2', HASH='aa83cb3b0591127460022dbc3ec5a42d72aba9504737ab0825eefb8b2f40c77f';
+ var KEY='ar-gate-v1', HASH='aa83cb3b0591127460022dbc3ec5a42d72aba9504737ab0825eefb8b2f40c77f';
+ // stored-unlock tokens that still grant access (old passcodes). typing an old passcode fresh does NOT work — only HASH does.
+ var GRANDFATHER=['aa83cb3b0591127460022dbc3ec5a42d72aba9504737ab0825eefb8b2f40c77f','375082520142eb43c477caf1f04e8a7e296d97d07e74fa43eab935321dae87c0'];
  try{localStorage.removeItem('ar-order-v1');localStorage.removeItem('ar-order-v2');}catch(_){}
  function norm(s){return String(s||'').toLowerCase().replace(/[^a-z0-9]/g,'');}
  async function sha(s){var b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));return Array.from(new Uint8Array(b)).map(function(x){return x.toString(16).padStart(2,'0');}).join('');}
- function unlock(){document.documentElement.classList.remove('locked');try{localStorage.setItem(KEY,HASH);localStorage.removeItem(ORD);}catch(_){}}
- try{if(localStorage.getItem(KEY)===HASH){unlock();return;}}catch(_){}
+ function unlock(){document.documentElement.classList.remove('locked');try{localStorage.setItem(KEY,HASH);}catch(_){}}
+ try{if(GRANDFATHER.indexOf(localStorage.getItem(KEY))>=0){unlock();return;}}catch(_){}
  var pollT=0;
  document.addEventListener('DOMContentLoaded',function(){
   var f=document.getElementById('gateForm'),i=document.getElementById('gateInput'),m=document.getElementById('gateMsg');
