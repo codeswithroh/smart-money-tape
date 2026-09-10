@@ -47,6 +47,9 @@
   .btn.ghost{background:transparent;color:var(--ink);box-shadow:inset 0 0 0 1.5px var(--line)}
   .btn.ghost:hover{box-shadow:inset 0 0 0 1.5px var(--green)}
   .btn.big{padding:16px 28px;font-size:17px;border-radius:13px}
+  .btn .tgico{width:17px;height:17px;flex:none;transition:transform .18s ease}
+  .btn:hover .tgico{transform:translateX(3px) translateY(-3px) rotate(8deg)}
+  .btn.ghost:hover .tgico{transform:none}
 
   .hero{padding:64px 0 44px}
   .hero .wrap{display:grid;grid-template-columns:1.05fr .95fr;gap:48px;align-items:center}
@@ -55,10 +58,17 @@
   h1 .hl{color:var(--green)}
   .sub{font-size:18px;color:var(--dim);max-width:46ch}
   .hero-cta{display:flex;gap:12px;flex-wrap:wrap;margin-top:26px}
-  .hero-art{position:relative}
-  .hero-art img{border-radius:18px;border:1px solid var(--line);box-shadow:var(--shadow)}
+  .hero-art{position:relative;transform-style:preserve-3d;will-change:transform;transition:transform .4s ease}
+  .hero-art.tilting{transition:transform .1s ease}
+  .hero-art .tilt{position:relative;border-radius:18px;transition:transform .3s ease}
+  .hero-art img{border-radius:18px;border:1px solid var(--line);box-shadow:var(--shadow);display:block}
+  .hero-art .glare{position:absolute;inset:0;border-radius:18px;pointer-events:none;opacity:0;transition:opacity .3s ease;
+    background:radial-gradient(220px 220px at var(--mx,50%) var(--my,50%), rgba(125,255,91,.28), rgba(125,255,91,0) 60%);mix-blend-mode:screen}
+  .hero-art.tilting .glare{opacity:1}
+  .hero-art .ring{position:absolute;inset:-1px;border-radius:19px;pointer-events:none;box-shadow:0 0 0 1px rgba(125,255,91,.25), 0 30px 60px -30px rgba(125,255,91,.35);opacity:0;transition:opacity .3s ease}
+  .hero-art.tilting .ring{opacity:1}
   .tagpill{position:absolute;left:-12px;bottom:20px;background:var(--panel);border:1px solid var(--green);color:var(--green);
-    font-family:"Permanent Marker",cursive;font-size:13px;padding:6px 12px;border-radius:10px;transform:rotate(-3deg);box-shadow:var(--shadow)}
+    font-family:"Permanent Marker",cursive;font-size:13px;padding:6px 12px;border-radius:10px;transform:rotate(-3deg);box-shadow:var(--shadow);transition:transform .3s ease}
 
   .strip{border-block:1px solid var(--line);background:var(--bg2)}
   .strip .wrap{display:flex;gap:34px;flex-wrap:wrap;justify-content:center;padding:16px 20px;font-family:"Space Grotesk",Inter,sans-serif;font-weight:500;color:var(--dim);font-size:14px}
@@ -74,10 +84,50 @@
   .row2 img{border-radius:16px;border:1px solid var(--line);box-shadow:var(--shadow)}
 
   .feat{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-top:26px}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 18px 16px}
-  .card h3{font-family:"Space Grotesk",Inter,sans-serif;font-size:16px;margin:0 0 6px;display:flex;align-items:center;gap:8px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 18px 16px;transition:border-color .2s ease, transform .2s ease}
+  .card:hover{border-color:var(--green);transform:translateY(-2px)}
+  .card h3{font-family:"Space Grotesk",Inter,sans-serif;font-size:16px;margin:0 0 6px;display:flex;align-items:center;gap:10px}
   .card p{margin:0;color:var(--dim);font-size:14px}
-  .card .ic{width:26px;height:26px;border-radius:7px;background:var(--green-deep);border:1px solid var(--green);display:grid;place-items:center;font-size:14px;flex:none}
+
+  /* premium animated icon tiles */
+  .ic{width:34px;height:34px;border-radius:9px;background:linear-gradient(160deg,#16240f,#0c1409);
+    border:1px solid var(--green);display:grid;place-items:center;flex:none;
+    box-shadow:0 0 0 1px rgba(125,255,91,.12), inset 0 0 12px -6px rgba(125,255,91,.5);position:relative;overflow:hidden}
+  .ic::after{content:"";position:absolute;inset:0;background:linear-gradient(115deg,transparent 40%,rgba(125,255,91,.28) 50%,transparent 60%);
+    transform:translateX(-120%);transition:transform .5s ease}
+  .card:hover .ic::after{transform:translateX(120%)}
+  .ic svg{width:20px;height:20px;color:var(--green);overflow:visible}
+  .ic svg [fill="none"]{fill:none}
+  .ic path,.ic circle{vector-effect:non-scaling-stroke}
+
+  @keyframes icoDraw{to{stroke-dashoffset:0}}
+  @keyframes icoDot{0%{transform:translate(0,0)}30%{transform:translate(5px,-5px)}55%{transform:translate(8px,-2px)}100%{transform:translate(15px,-10px)}0%,100%{opacity:1}}
+  @keyframes icoBeat{0%,100%{transform:scale(1);opacity:.75}50%{transform:scale(1.18);opacity:1}}
+  @keyframes icoWave{0%{transform:scale(.55);opacity:0}25%{opacity:.9}100%{transform:scale(1.15);opacity:0}}
+  @keyframes icoPulse{0%,100%{opacity:.5;transform:scale(.9)}50%{opacity:1;transform:scale(1.1)}}
+
+  .ico-chart .ln{stroke-dasharray:34;stroke-dashoffset:34;animation:icoDraw 1.4s ease forwards}
+  .ico-chart .ar{opacity:0;animation:icoDraw .01s linear .9s forwards, fadein .4s ease .9s forwards}
+  @keyframes fadein{to{opacity:1}}
+  .ico-chart .dt{animation:icoDot 2.6s ease-in-out infinite}
+  .card:hover .ico-chart .ln{animation:icoDraw .7s ease forwards}
+
+  .ico-net .n{transform-box:fill-box;transform-origin:center;animation:icoBeat 2.4s ease-in-out infinite}
+  .ico-net .n2{animation-delay:.3s}.ico-net .n3{animation-delay:.6s}.ico-net .n4{animation-delay:.9s}
+  .ico-net .ed{opacity:.4;animation:icoPulse 2.4s ease-in-out infinite}
+
+  .ico-shield .sh{filter:drop-shadow(0 0 4px rgba(125,255,91,.4))}
+  .ico-shield .ck{stroke-dasharray:14;stroke-dashoffset:14;animation:icoDraw 1.1s ease .3s forwards}
+  .card:hover .ico-shield .ck{animation:icoDraw 2.2s linear infinite}
+
+  .ico-signal .w{transform-box:fill-box;transform-origin:12px 12px;opacity:0;animation:icoWave 2.4s ease-out infinite}
+  .ico-signal .w2,.ico-signal .w2b{animation-delay:.6s}
+  .ico-signal .core{animation:icoPulse 1.6s ease-in-out infinite;transform-box:fill-box;transform-origin:center}
+
+  @media (prefers-reduced-motion:reduce){
+    .ic *{animation:none!important;stroke-dashoffset:0!important;opacity:1!important}
+    .ic::after{display:none}
+  }
 
   .cmds{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}
   .cmd{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:9px 13px;font-size:14px;color:var(--dim)}
@@ -127,7 +177,7 @@
 <header>
   <div class="wrap">
     <div class="brand"><img src="/morty.png" alt="Morty Bot" width="34" height="34"> Morty Bot</div>
-    <a class="btn tg" href="https://t.me/MortyRadarBot" target="_blank" rel="noopener">Open in Telegram &#8599;</a>
+    <a class="btn tg" href="https://t.me/MortyRadarBot" target="_blank" rel="noopener">Open in Telegram <svg class="tgico" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21.9 4.3 2.7 11.6c-1 .4-1 1.8 0 2.2l4.9 1.7 1.9 5.7c.3.9 1.4 1.1 2 .4l2.6-2.6 4.9 3.6c.7.5 1.7.1 1.9-.8l3-15.4c.2-1-.8-1.9-1.9-1.5Z"/></svg></a>
   </div>
 </header>
 
@@ -138,12 +188,16 @@
       <h1>Paste a contract. Get the <span class="hl">whole picture</span> back in seconds.</h1>
       <p class="sub">Morty Bot pulls the data a good entry actually depends on and puts a verdict on top of it. Buy pressure, bundle and insider checks, a rug screen, an attention score, and the socials. One message in, one clean read out.</p>
       <div class="hero-cta">
-        <a class="btn big" href="https://t.me/MortyRadarBot" target="_blank" rel="noopener">Start Morty Bot &rarr;</a>
+        <a class="btn big" href="https://t.me/MortyRadarBot" target="_blank" rel="noopener">Start Morty Bot <svg class="tgico" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21.9 4.3 2.7 11.6c-1 .4-1 1.8 0 2.2l4.9 1.7 1.9 5.7c.3.9 1.4 1.1 2 .4l2.6-2.6 4.9 3.6c.7.5 1.7.1 1.9-.8l3-15.4c.2-1-.8-1.9-1.9-1.5Z"/></svg></a>
         <a class="btn big ghost" href="#how">See what it returns</a>
       </div>
     </div>
-    <div class="hero-art reveal in">
-      <img src="/bot1.jpg" alt="Morty Bot at the desk: scanning, analyzing, sending alpha" width="1000" height="1000">
+    <div class="hero-art reveal in" id="heroArt">
+      <div class="tilt">
+        <img src="/bot1.jpg" alt="Morty Bot at the desk: scanning, analyzing, sending alpha" width="1000" height="1000">
+        <span class="glare"></span>
+        <span class="ring"></span>
+      </div>
       <span class="tagpill">data &gt; emotions</span>
     </div>
   </div>
@@ -164,10 +218,10 @@
     <h2>One contract in. A full read out.</h2>
     <p class="lead">Morty stitches DexScreener, GeckoTerminal, RugCheck and Honeypot into a single card, then adds the part those tools skip: a call on whether the attention is building or already leaving.</p>
     <div class="feat">
-      <div class="card"><h3><span class="ic">&#128200;</span> Attention score</h3><p>Ramping, steady or fading, on a 0 to 100 scale built from volume acceleration, buy skew and price slope. You see where the eyeballs are heading, not just where they were.</p></div>
-      <div class="card"><h3><span class="ic">&#129522;</span> Bundle and insider check</h3><p>Dev holdings, top five wallet concentration, insider supply share, and holder clusters that move like one wallet. The traps that do not show up on the chart.</p></div>
-      <div class="card"><h3><span class="ic">&#128737;</span> Rug screen</h3><p>Mint and freeze authority, LP lock status, and RugCheck danger flags on Solana. Honeypot simulation plus buy and sell tax on EVM.</p></div>
-      <div class="card"><h3><span class="ic">&#128225;</span> Narrative and socials</h3><p>The meta it is riding, the live X and Telegram links, and a spinoff ticker idea to drop in the group when the call is done.</p></div>
+      <div class="card"><h3><span class="ic"><svg class="ico-chart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path class="ln" d="M3 17l5-5 3 3 7-8"/><path class="ar" d="M15 4h5v5"/><circle class="dt" cx="3" cy="17" r="1.7" fill="currentColor" stroke="none"/></svg></span> Attention score</h3><p>Ramping, steady or fading, on a 0 to 100 scale built from volume acceleration, buy skew and price slope. You see where the eyeballs are heading, not just where they were.</p></div>
+      <div class="card"><h3><span class="ic"><svg class="ico-net" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path class="ed" d="M6 7l11 10M18 6L7 18M6 7l1 11M18 6l-1 11"/><circle class="n n1" cx="6" cy="7" r="2.3" fill="currentColor" stroke="none"/><circle class="n n2" cx="18" cy="6" r="2.3" fill="currentColor" stroke="none"/><circle class="n n3" cx="7" cy="18" r="2.3" fill="currentColor" stroke="none"/><circle class="n n4" cx="17" cy="17" r="2.3" fill="currentColor" stroke="none"/></svg></span> Bundle and insider check</h3><p>Dev holdings, top five wallet concentration, insider supply share, and holder clusters that move like one wallet. The traps that do not show up on the chart.</p></div>
+      <div class="card"><h3><span class="ic"><svg class="ico-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path class="sh" d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path class="ck" d="M8.5 12l2.5 2.6 5-5.6"/></svg></span> Rug screen</h3><p>Mint and freeze authority, LP lock status, and RugCheck danger flags on Solana. Honeypot simulation plus buy and sell tax on EVM.</p></div>
+      <div class="card"><h3><span class="ic"><svg class="ico-signal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle class="core" cx="12" cy="12" r="2.1" fill="currentColor" stroke="none"/><path class="w w1" d="M8.6 8.6a4.8 4.8 0 000 6.8"/><path class="w w1b" d="M15.4 8.6a4.8 4.8 0 010 6.8"/><path class="w w2" d="M6 6a9 9 0 000 12"/><path class="w w2b" d="M18 6a9 9 0 010 12"/></svg></span> Narrative and socials</h3><p>The meta it is riding, the live X and Telegram links, and a spinoff ticker idea to drop in the group when the call is done.</p></div>
     </div>
   </div>
 </section>
@@ -220,7 +274,7 @@
     <div class="eyebrow">Data first, then the trade</div>
     <h2>Add Morty Bot.</h2>
     <p>Free, and it works the same in your DMs or in a group of five hundred.</p>
-    <a class="btn big" href="https://t.me/MortyRadarBot" target="_blank" rel="noopener">Open Morty Bot in Telegram &#8599;</a>
+    <a class="btn big" href="https://t.me/MortyRadarBot" target="_blank" rel="noopener">Open Morty Bot in Telegram <svg class="tgico" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21.9 4.3 2.7 11.6c-1 .4-1 1.8 0 2.2l4.9 1.7 1.9 5.7c.3.9 1.4 1.1 2 .4l2.6-2.6 4.9 3.6c.7.5 1.7.1 1.9-.8l3-15.4c.2-1-.8-1.9-1.9-1.5Z"/></svg></a>
   </div>
 </section>
 
@@ -237,6 +291,39 @@
     if(!('IntersectionObserver' in window)){els.forEach(function(e){e.classList.add('in');});return;}
     var io=new IntersectionObserver(function(en){en.forEach(function(x){if(x.isIntersecting){x.target.classList.add('in');io.unobserve(x.target);}});},{rootMargin:'0px 0px -8% 0px'});
     els.forEach(function(e){if(!e.classList.contains('in'))io.observe(e);});
+  })();
+
+  /* hero 3D tilt + cursor glare */
+  (function(){
+    var art=document.getElementById('heroArt'); if(!art) return;
+    if(window.matchMedia('(prefers-reduced-motion:reduce)').matches) return;
+    if(window.matchMedia('(hover:none)').matches || 'ontouchstart' in window) return;
+    var tilt=art.querySelector('.tilt'), pill=art.querySelector('.tagpill');
+    var MAXX=9, MAXY=12, raf=0, rx=0, ry=0;
+    function move(e){
+      var r=art.getBoundingClientRect();
+      var px=(e.clientX-r.left)/r.width-0.5, py=(e.clientY-r.top)/r.height-0.5;
+      ry=px*MAXY*2; rx=-py*MAXX*2;
+      art.style.setProperty('--mx',(px*100+50).toFixed(1)+'%');
+      art.style.setProperty('--my',(py*100+50).toFixed(1)+'%');
+      if(!raf) raf=requestAnimationFrame(apply);
+    }
+    function apply(){
+      raf=0;
+      art.style.transform='perspective(1000px) rotateX('+rx.toFixed(2)+'deg) rotateY('+ry.toFixed(2)+'deg)';
+      if(tilt) tilt.style.transform='translateZ(34px)';
+      if(pill) pill.style.transform='translateZ(66px) rotate(-3deg)';
+    }
+    function enter(){ art.classList.add('tilting'); }
+    function leave(){
+      art.classList.remove('tilting');
+      art.style.transform='perspective(1000px) rotateX(0deg) rotateY(0deg)';
+      if(tilt) tilt.style.transform='';
+      if(pill) pill.style.transform='rotate(-3deg)';
+    }
+    art.addEventListener('mouseenter',enter);
+    art.addEventListener('mousemove',move);
+    art.addEventListener('mouseleave',leave);
   })();
 </script>
 </body>
