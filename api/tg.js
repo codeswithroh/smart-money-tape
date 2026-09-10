@@ -6,17 +6,48 @@ const TOKEN = globalThis.process && process.env && process.env.TELEGRAM_BOT_TOKE
 const SECRET = (globalThis.process && process.env && process.env.TELEGRAM_SECRET) || '';
 const SITE = (globalThis.process && process.env && process.env.SITE_URL) || 'https://meme-attention-radar.vercel.app';
 
+const MORTY_PIC = SITE + '/morty.png';
+const BOT_USER = 'MortyRadarBot';
+
 const HELP = [
   '<b>Morty Radar</b> — paste a contract in any chat and I drop a card:',
   'price · mc · liq · holders · buy pressure · <b>attention verdict (RAMPING/FADING + score)</b> · narrative tags · rug check · socials.',
   '',
   '<b>Commands</b>',
-  '/radar — top attention movers right now',
-  '/flex &lt;ca&gt; [entry mc] — shareable multiplier card (e.g. <code>/flex So111… 3.8M</code>)',
-  '/idea — fresh coin concepts riding the hot narratives',
+  '/radar — top attention movers right now ⚡',
+  '/flex &lt;ca&gt; [entry mc] — shareable multiplier card (e.g. <code>/flex So111… 3.8M</code>) 📸',
+  '/idea — fresh coin concepts riding the hot narratives 💡',
+  '/help — this menu 📖',
   '',
   'Every token card has a 📸 <b>Flex card</b> button and a 🔬 <b>Full x-ray</b> link into the web app.',
 ].join('\n');
+
+const START = [
+  '👋 Yo. I\'m <b>Morty Radar</b> — I read the tape so you don\'t have to.',
+  '',
+  'Paste any <b>contract address</b> in any chat and I drop a full x-ray: price · mcap · liq · holders · <b>buy pressure</b> · <b>attention verdict</b> (RAMPING / FADING + a 0–100 score) · narrative tags · rug check · socials.',
+  '',
+  '👥 <b>Drop me in a group</b> — I auto-card every CA anyone pastes. Make it a <b>supergroup</b> so tracking sticks.',
+  '',
+  '🔥 <b>What I do</b>',
+  '• <code>/radar</code> — top attention movers right now ⚡',
+  '• <code>/flex &lt;ca&gt; [entry mc]</code> — shareable multiplier card built for X 📸',
+  '• <code>/idea</code> — fresh coin concepts riding the hot narratives 💡',
+  '• paste a CA — instant full x-ray 🔬',
+  '• <code>/help</code> — the whole cheatsheet 📖',
+  '',
+  '🛰️ Full radar, discovery board & watchlist alerts live in the web app.',
+  '',
+  '<i>Not financial advice. DYOR.</i>',
+].join('\n');
+
+const START_KB = {
+  inline_keyboard: [
+    [{ text: '🛰️ Open the web app', url: SITE }],
+    [{ text: '➕ Add me to a group', url: `https://t.me/${BOT_USER}?startgroup=true` }],
+    [{ text: '⚡ Top movers', callback_data: 'radar' }, { text: '💡 Coin ideas', callback_data: 'idea' }],
+  ],
+};
 
 function fUsd(n) {
   if (n == null || isNaN(n)) return '?';
@@ -114,11 +145,17 @@ export default async function handler(req) {
   if (u.callback_query) {
     const cq = u.callback_query;
     const data = cq.data || '';
+    const cid = cq.message && cq.message.chat.id;
     await tg('answerCallbackQuery', { callback_query_id: cq.id });
-    if (data.startsWith('fx:')) {
-      const addr = data.slice(3);
-      try { await sendFlex(cq.message.chat.id, addr, null, '@' + (cq.from.username || cq.from.first_name || 'anon')); } catch (_) {}
-    }
+    try {
+      if (data.startsWith('fx:')) {
+        await sendFlex(cid, data.slice(3), null, '@' + (cq.from.username || cq.from.first_name || 'anon'));
+      } else if (data === 'radar') {
+        await sendRadar(cid);
+      } else if (data === 'idea') {
+        await tg('sendMessage', { chat_id: cid, text: '💡 spinoff ideas:\n\n• <b>' + [idea(), idea(), idea()].join('</b>\n• <b>') + '</b>', parse_mode: 'HTML' });
+      }
+    } catch (_) {}
     return new Response('ok');
   }
 
@@ -128,7 +165,12 @@ export default async function handler(req) {
   const text = msg.text.trim();
   const reply = { reply_to_message_id: msg.message_id, allow_sending_without_reply: true };
 
-  if (/^\/(start|help)\b/i.test(text)) {
+  if (/^\/start\b/i.test(text)) {
+    const r = await tg('sendPhoto', { chat_id: chatId, photo: MORTY_PIC, caption: START, parse_mode: 'HTML', reply_markup: START_KB });
+    if (!r.ok) await tg('sendMessage', { chat_id: chatId, text: START, parse_mode: 'HTML', disable_web_page_preview: true, reply_markup: START_KB });
+    return new Response('ok');
+  }
+  if (/^\/help\b/i.test(text)) {
     await tg('sendMessage', { chat_id: chatId, text: HELP, parse_mode: 'HTML', disable_web_page_preview: true });
     return new Response('ok');
   }
