@@ -168,14 +168,29 @@ function fetchSafety(addr,chain,urlAddr){
   return fetch(RUG+'/'+(urlAddr||addr)+'/report').then(function(r){return r.ok?r.json():null;}).then(function(j){
    if(!j)return done({ok:null,reasons:['no rug data'],src:'rugcheck'});
    var risks=j.risks||[];var danger=risks.filter(function(x){return String(x.level||'').toLowerCase()==='danger';}).map(function(x){return x.name;});
-   var top=(j.topHolders||[]).filter(function(h){return !h.insider&&h.pct!=null;});var topPct=top.length?top[0].pct:null;
+   var allH=(j.topHolders||[]).filter(function(h){return h.pct!=null;});
+   var top=allH.filter(function(h){return !h.insider;});var topPct=top.length?top[0].pct:null;
    var lp=j.lpLockedPct!=null?j.lpLockedPct:(j.markets&&j.markets[0]&&j.markets[0].lp&&j.markets[0].lp.lpLockedPct);
+   // non-LP holders: drop the one obvious pool/LP entry (a single very large stake)
+   var nonLp=top.filter(function(h){return h.pct<40;});
+   var top5Pct=nonLp.slice(0,5).reduce(function(s,h){return s+h.pct;},0)||null;
+   var creator=j.creator||(j.fileMeta&&j.fileMeta.creator)||'';
+   var devH=creator?allH.filter(function(h){return String(h.address||h.owner||'')===String(creator);})[0]:null;
+   var devPct=devH?devH.pct:(j.creatorBalancePct!=null?j.creatorBalancePct:null);
+   var insiderCount=j.graphInsidersDetected||(j.insiderNetworks||[]).reduce(function(s,n){return s+(+n.activeAccounts||+n.size||0);},0)||0;
+   // bundle pattern: 4+ non-LP wallets clustered at near-identical small stakes
+   var cl=nonLp.slice(0,10).filter(function(h){return h.pct>=0.25&&h.pct<=5;}).map(function(h){return h.pct;});
+   var bundleSuspected=false;
+   if(cl.length>=4){var mn=Math.min.apply(null,cl),mx=Math.max.apply(null,cl);if(mx-mn<=0.6)bundleSuspected=true;}
    var reasons=[];if(j.rugged)reasons.push('flagged rugged');if(j.mintAuthority)reasons.push('mint not renounced');if(j.freezeAuthority)reasons.push('freeze not renounced');
    if(topPct!=null&&topPct>25)reasons.push('top holder '+topPct.toFixed(0)+'%');if(lp!=null&&lp<50)reasons.push('LP '+lp.toFixed(0)+'% locked');
+   if(devPct!=null&&devPct>5)reasons.push('dev holds '+devPct.toFixed(1)+'%');
+   if(insiderCount>20)reasons.push(insiderCount+' insider wallets');
+   if(bundleSuspected)reasons.push('bundle-pattern holders');
    danger.forEach(function(d){reasons.push(d);});
-   var ok=!j.rugged&&!j.mintAuthority&&!j.freezeAuthority&&!(topPct!=null&&topPct>35)&&!danger.length;
+   var ok=!j.rugged&&!j.mintAuthority&&!j.freezeAuthority&&!(topPct!=null&&topPct>35)&&!(devPct!=null&&devPct>5)&&!(insiderCount>20)&&!bundleSuspected&&!danger.length;
    recordHolders(addr,j.totalHolders);
-   return done({ok:ok,norm:j.score_normalised,reasons:reasons,lpPct:lp,holders:j.totalHolders,renounced:!j.mintAuthority&&!j.freezeAuthority,topPct:topPct,src:'rugcheck'});
+   return done({ok:ok,norm:j.score_normalised,reasons:reasons,lpPct:lp,holders:j.totalHolders,renounced:!j.mintAuthority&&!j.freezeAuthority,topPct:topPct,top5Pct:top5Pct,devPct:devPct,insiders:insiderCount,bundle:bundleSuspected,src:'rugcheck'});
   }).catch(function(){return done({ok:null,reasons:['rug check failed'],src:'rugcheck'});});
  }
  var cid=EVM_CHAIN_ID[chain];if(!cid)return Promise.resolve(done({ok:null,reasons:['no safety source for '+chain],src:'none'}));
@@ -269,6 +284,21 @@ function attn(pp){
  return {b1:b1,s1:s1,skew1:skew1,skew24:skew24,accel:accel,slope:slope,traj:traj,score:Math.max(0,Math.min(100,Math.round(score)))};
 }
 function trajTag(a){return '<span class="traj '+a.traj+'">'+a.traj.toUpperCase()+'<small>attn '+a.score+'</small></span>';}
+/* ---------- pick-quality gates (why a coin is worth your attention) ---------- */
+var MIN_MC=7000,MIN_LIQ=5000;
+function pumpFun(pp){return pp.chain==='solana'&&/pump$/i.test(pp.addrRaw||pp.addr||'');}
+function pickQuality(pp){
+ var notes=[],ageMin=pp.ageMs!=null?pp.ageMs/60000:null,pf=pumpFun(pp);
+ var mcOk=!pp.mc||pp.mc>=MIN_MC,liqOk=!pp.liq||pp.liq>=MIN_LIQ;
+ if(!mcOk)notes.push('mc under $'+(MIN_MC/1000)+'k');
+ if(!liqOk)notes.push('liq under $'+(MIN_LIQ/1000)+'k');
+ if(pf)notes.push('Pump.fun launch');
+ else if(pp.chain==='solana')notes.push('non-Pump launchpad');
+ var sf=state.safety.get(pp.addr);
+ if(sf&&sf.bundle)notes.push('bundle-pattern holders');
+ if(sf&&sf.devPct!=null&&sf.devPct>5)notes.push('dev holds '+sf.devPct.toFixed(0)+'%');
+ return {pumpfun:pf,mcOk:mcOk,liqOk:liqOk,ageMin:ageMin,tradeable:mcOk&&liqOk&&!(sf&&sf.bundle),notes:notes};
+}
 
 /* ---------- SCAN render ---------- */
 function scan(){
@@ -284,11 +314,17 @@ function attentionPool(){
  Object.keys(srcOf).forEach(function(addr){
   if(seen[addr])return;var c=state.tokenCache.get(addr);var pp=c&&c.pair;if(!pp||!chainOk(pp.chain))return;
   if(pp.mc&&pp.mc>80000000)return;
+  if(pp.mc&&pp.mc<MIN_MC)return;           // video: min mcap floor, skip dead sub-7k tokens
+  if(pp.liq&&pp.liq<MIN_LIQ)return;        // needs real liquidity to be tradeable
   var b=state.boosts.filter(function(x){return x.addr===addr;})[0];if(b&&!pp.desc)pp.desc=b.desc;
   pp._src=srcOf[addr];seen[addr]=1;pool.push(pp);
  });
- pool.forEach(function(pp){pp._a=attn(pp);pp._tags=tagThemes(pp);});
- pool.sort(function(a,b){return b._a.score-a._a.score;});
+ pool.forEach(function(pp){
+  pp._a=attn(pp);pp._tags=tagThemes(pp);pp._q=pickQuality(pp);
+  pp._rank=pp._a.score+(pp._q.pumpfun?8:0)-((pp._q.notes.indexOf('non-Pump launchpad')>=0)?6:0);
+  var sf=state.safety.get(pp.addr);if(sf&&sf.bundle)pp._rank-=25;
+ });
+ pool.sort(function(a,b){return b._rank-a._rank;});
  return pool;
 }
 function renderScan(){
@@ -314,9 +350,12 @@ function tokenRow(pp){
  var tg=tags.length?tags.map(function(k){var t=THEMES.filter(function(x){return x.k===k;})[0];return '<span class="tag">'+esc(t?t.name:k)+'</span>';}).join('')
    :'<span class="tag n">'+esc(typeGuess(pp))+' &mdash; you tag it</span>';
  var src=(pp._src&&pp._src!=='boost')?'<span class="cchip">'+esc(pp._src)+'</span>':'';
+ var q=pp._q||pickQuality(pp);
+ var pf=q.pumpfun?'<span class="cchip pf">pump.fun</span>':'';
+ var warn=(!q.mcOk||!q.liqOk||(state.safety.get(pp.addr)||{}).bundle)?'<span class="cchip warn">&#9888;</span>':'';
  return '<button class="trow" data-addr="'+esc(pp.addr)+'" data-chain="'+esc(pp.chain)+'">'
   +(pp.img?'<img class="ava" src="'+esc(pp.img)+'" alt="" loading="lazy" onerror="this.style.visibility=\'hidden\'">':'<span></span>')
-  +'<span class="tmain"><span class="tsym">$'+esc(pp.sym)+' <span class="cchip">'+esc(pp.chain)+'</span>'+src+(pp.boosts?' <span class="cchip">boost</span>':'')+'</span>'
+  +'<span class="tmain"><span class="tsym">$'+esc(pp.sym)+' <span class="cchip">'+esc(pp.chain)+'</span>'+pf+src+(pp.boosts?' <span class="cchip">boost</span>':'')+warn+'</span>'
   +'<span class="tmeta">'+fUsd(pp.mc)+' mc &middot; '+fUsd(pp.vol.h24)+' 24h &middot; '+fAge(pp.ageMs)+' old &middot; '+fPct(+pp.pc.h1||0)+' 1h</span>'
   +'<span class="tags">'+tg+'</span></span>'
   +trajTag(a)+'</button>';
@@ -413,6 +452,62 @@ function verdict(pp,a,sf,surface){
  else{label='IT&rsquo;S GIVING NOTHING &#128164;';cls='pass';}
  return {pct:pct,label:label,cls:cls,att:att,meme:meme,cs:cs,safe:safe,conv:conv,fomo:fomo};
 }
+function launchShape(pp){
+ if(pp.ageMs==null||pp.ageMs>8*3600e3)return null; // only meaningful while we still hold the launch candles
+ var oc=state.ohlcv.get(pp.addr),rows=(oc&&oc.rows)||[];
+ if(rows.length<4)return null;
+ var first=rows[0],o=+first[1],h=+first[2];
+ if(!o||!h)return null;
+ var pump=(h-o)/o*100;
+ // did price ever pull back >15% off that early high in the next 4 candles before continuing?
+ var lowAfter=Math.min.apply(null,rows.slice(1,5).map(function(r){return +r[3]||h;}));
+ var pullback=(h-lowAfter)/h*100;
+ if(pump>=120&&pullback<15)return {bundleish:true,pump:pump};
+ return {bundleish:false,pump:pump};
+}
+function bundlePanel(pp,sf){
+ if(pp.chain!=='solana')return '<div class="panel"><h3>Bundle &amp; insider check</h3><p style="font-size:12.5px;color:var(--ink-faint)">Wallet-level bundle detection runs on Solana only (RugCheck). For '+esc(pp.chain)+', lean on the rug screen above and the manual checklist below.</p></div>';
+ var ls=launchShape(pp);
+ var rows=[];
+ var flag=function(bad,txt){return '<div class="bchk '+(bad?'bad':'ok')+'">'+(bad?'&#9888; ':'&#10003; ')+txt+'</div>';};
+ if(sf&&sf.src==='rugcheck'){
+  rows.push(flag(sf.devPct!=null&&sf.devPct>5, sf.devPct!=null?('dev holds '+sf.devPct.toFixed(1)+'%'+(sf.devPct>5?' (want &le;5%)':'')):'dev holding not surfaced'));
+  rows.push(flag(sf.top5Pct!=null&&sf.top5Pct>25, sf.top5Pct!=null?('top 5 non-LP wallets hold '+sf.top5Pct.toFixed(0)+'%'+(sf.top5Pct>25?' (want &le;25%)':'')):'top-holder spread not surfaced'));
+  rows.push(flag(sf.insiders>20, (sf.insiders||0)+' insider / linked wallets'+(sf.insiders>20?' (want &le;20)':'')));
+  rows.push(flag(!!sf.bundle, sf.bundle?'holders clustered at near-identical small stakes &mdash; looks bundled':'no obvious bundle cluster in top holders'));
+  rows.push(flag(sf.lpPct!=null&&sf.lpPct<50, 'LP '+(sf.lpPct!=null?sf.lpPct.toFixed(0)+'% locked/burned':'lock status unknown')));
+ } else {
+  rows.push('<div class="bchk">RugCheck data unavailable right now &mdash; retry in a moment.</div>');
+ }
+ if(ls)rows.push(flag(ls.bundleish,'launch candle '+(ls.pump>0?'+':'')+ls.pump.toFixed(0)+'% '+(ls.bundleish?'straight up with no pullback &mdash; classic bundle-launch shape':'with normal staggered follow-through')));
+ var verdict=(sf&&(sf.bundle||(sf.devPct>5)||(sf.insiders>20)||(sf.top5Pct>25)))||(ls&&ls.bundleish)
+  ?'<b class="neg">Treat as bundled / insider-heavy until proven otherwise.</b> Cross-check holder SOL balances + funding times yourself (see checklist).'
+  :'<b class="pos">No bundle red flags in the automated checks.</b> Still eyeball holder balances + funding times before you buy.';
+ return '<div class="panel"><h3>Bundle &amp; insider check</h3><div class="bchks">'+rows.join('')+'</div>'
+  +'<p style="font-size:12.5px;color:var(--ink-soft);margin-top:8px">'+verdict+'</p></div>';
+}
+function checklistPanel(pp,proj){
+ var xq=encodeURIComponent('$'+pp.sym);
+ var holdersUrl=pp.url?(pp.url.split('?')[0]):'https://dexscreener.com/'+pp.chain+'/'+pp.addr;
+ var items=[
+  ['Holder balances', 'Open the holders tab. Top 5 non-LP wallets should hold <b>varied</b> SOL amounts (5, 3, 1, 4.7&hellip;). Four wallets at 0.1 / 0.1 / 0.1 / 0.1 = bundle &rarr; skip.'],
+  ['Holder funding times', 'Same 5 wallets: funding ages should be <b>mixed</b> (6d, 22d, 3y, 2d). All &ldquo;25 min ago&rdquo; = bundle &rarr; skip.'],
+  ['Community, not tweet/profile', 'Tweet coin (a tweet tied to a coin) and profile coin (blue-avatar &ldquo;launching a project&rdquo;) are 99% LARP. You want a real community with people actually talking.'],
+  ['Community page', 'CA in the bio/description, a <b>pinned</b> post with CA + narrative from the admin, and real humans in &ldquo;Latest&rdquo; &mdash; not link spam / drainers. Missing any of the three &rarr; red flag.'],
+  ['Entry discipline', 'Best entries are a <b>40&ndash;50% dip from ATH</b> on a clean coin. A 10% dip (40k&rarr;36k) usually is not enough to pull in dip buyers.'],
+  ['Never marry the bag', 'Below your average and not bouncing &rarr; you&rsquo;re out. No &ldquo;maybe it comes back&rdquo;.'],
+  ['Port size', 'Under 0.1 SOL, fees eat you &mdash; go earn more first. Sizing: 0.1 port &rarr; ~0.05 new / 0.07 stretch; 0.5 &rarr; 0.1 / 0.2; 1 &rarr; 0.25 / 0.4; 5 &rarr; 1 / 1.5.'],
+  ['Default to distrust', 'Assume every coin is a scam until it passes <i>every</i> check. Narrative reading is a daily-reps skill, not a filter.']
+ ];
+ return '<details class="panel" style="padding:0"><summary style="padding:12px 14px;cursor:pointer;font-weight:700">Before you ape &mdash; manual checklist <span style="font-weight:400;color:var(--ink-faint)">(the stuff no API can check for you)</span></summary>'
+  +'<div style="padding:0 14px 14px">'
+  +'<div class="proj-links" style="margin:4px 0 10px"><a class="btn sm" href="'+esc(holdersUrl)+'" target="_blank" rel="noopener">holders on DexScreener</a>'
+  +'<a class="btn sm" href="https://x.com/search?q='+xq+'&f=live" target="_blank" rel="noopener">$'+esc(pp.sym)+' on X (Latest)</a>'
+  +(proj.x?'<a class="btn sm" href="'+esc(proj.xUrl)+'" target="_blank" rel="noopener">@'+esc(proj.x)+'</a>':'')+'</div>'
+  +'<ol class="chklist">'+items.map(function(it){return '<li><b>'+it[0]+'.</b> '+it[1]+'</li>';}).join('')+'</ol>'
+  +'<p style="font-size:11.5px;color:var(--ink-faint);margin-top:8px">Source: trader workflow notes. Not financial advice &mdash; this is a research aid, do your own checks.</p>'
+  +'</div></details>';
+}
 function planFrom(pp,r){
  var px=pp.priceUsd||0;var mc=pp.mc||pp.fdv||0;
  var tMult=(r.target&&mc&&r.target>mc)?r.target/mc:null;
@@ -448,6 +543,8 @@ function renderResearch(pp,sf,watchers,tinfo){
   +kv('price 1h / 6h',fPct(+pp.pc.h1||0)+' / '+fPct(+pp.pc.h6||0))
   +kv('holders',hr?fNum(hr.now)+'  ('+ (hr.perHr>=0?'+':'') +Math.round(hr.perHr)+'/hr)':(sf&&sf.holders?fNum(sf.holders)+' (tracking...)':'tracking...'),hr&&hr.perHr>0?'pos':'')
   +kv('boosted',pp.boosts?'yes ('+pp.boosts+')':'no')
+  +(pp.chain==='solana'?kv('launchpad',pumpFun(pp)?'Pump.fun':'not Pump.fun &mdash; 99% of other SOL launchpads are dead/scam',pumpFun(pp)?'pos':'neg'):'')
+  +kv('pick gates',(pp.mc&&pp.mc<MIN_MC?'mc &lt;$'+(MIN_MC/1000)+'k ':'')+(pp.liq&&pp.liq<MIN_LIQ?'liq &lt;$'+(MIN_LIQ/1000)+'k ':'')+((pp.mc>=MIN_MC||!pp.mc)&&(pp.liq>=MIN_LIQ||!pp.liq)?'mc + liq OK':'') ,((pp.mc&&pp.mc<MIN_MC)||(pp.liq&&pp.liq<MIN_LIQ))?'neg':'pos')
   +kv('trajectory',a.traj.toUpperCase()+' &middot; attn '+a.score,a.traj==='ramping'?'pos':a.traj==='fading'?'neg':'')
   +kv('project surface',proj.surface+'/4 '+(proj.surface>=3?'(desc + site + socials)':proj.surface===0?'(bare &mdash; no story surface)':'(partial)'),proj.surface>=3?'pos':proj.surface===0?'neg':'')
   +(proj.cg?kv('coingecko','listed'+(proj.gtScore?' &middot; GT score '+Math.round(proj.gtScore):''),'pos'):'')
@@ -455,7 +552,8 @@ function renderResearch(pp,sf,watchers,tinfo){
   +'</div>';
  var safeLine='<div style="margin-top:9px;font-size:12.5px;color:var(--ink-soft)"><b>Rug screen ('+esc((sf&&sf.src)||'?')+'):</b> '
   +(sf&&sf.ok===true?'passed':sf&&sf.ok===false?'FAILED &mdash; '+esc((sf.reasons||[]).join(', ')):'unverified')
-  +(sf&&sf.renounced?' &middot; renounced':'')+(sf&&sf.lpPct!=null?' &middot; LP '+sf.lpPct.toFixed(0)+'%':'')+(sf&&sf.topPct!=null?' &middot; top holder '+sf.topPct.toFixed(1)+'%':'')+'</div>';
+  +(sf&&sf.renounced?' &middot; renounced':'')+(sf&&sf.lpPct!=null?' &middot; LP '+sf.lpPct.toFixed(0)+'%':'')+(sf&&sf.topPct!=null?' &middot; top holder '+sf.topPct.toFixed(1)+'%':'')
+  +(sf&&sf.devPct!=null?' &middot; dev '+sf.devPct.toFixed(1)+'%':'')+(sf&&sf.insiders?' &middot; '+sf.insiders+' insiders':'')+(sf&&sf.bundle?' &middot; <b class="neg">bundle pattern</b>':'')+'</div>';
  var watchLine=watchers&&watchers.buys?'<div style="margin-top:6px;font-size:12.5px;color:var(--ink-faint)">fomo feed: '+watchers.buys+' recent buy'+(watchers.buys>1?'s':'')+(watchers.traders.length?' &mdash; '+esc(watchers.traders.slice(0,4).join(', ')):'')+' &middot; <i>info only, do not copy</i></div>':'';
 
  var chart=chartBlock(pp,plan);
@@ -488,7 +586,9 @@ function renderResearch(pp,sf,watchers,tinfo){
   +radarTile(rax)
   +chart
   +'<div class="panel"><h3>What the radar sees</h3>'+autoKv+safeLine+watchLine+'</div>'
+  +bundlePanel(pp,sf)
   +projPanel
+  +checklistPanel(pp,proj)
   +tradesPanel()
   +form
   +'</div></div>';
@@ -821,14 +921,17 @@ function renderBoard(){
  var medals=['🥇','🥈','🥉','4','5','6'];
  var mx=Math.max.apply(null,top.map(function(p){return p._a.score;}))||1;
  el.innerHTML=top.map(function(pp,i){
-  var a=pp._a,ch=+pp.pc.h1||0;
+  var a=pp._a,ch=+pp.pc.h1||0,q=pp._q||pickQuality(pp);
+  var pf=q.pumpfun?' <span class="cchip pf">pump.fun</span>':'';
+  var wr=(!q.mcOk||!q.liqOk||(state.safety.get(pp.addr)||{}).bundle)?' <span class="cchip warn">&#9888;</span>':'';
   return '<button class="bc'+(i===0?' r1':'')+'" data-addr="'+esc(pp.addr)+'" data-chain="'+esc(pp.chain)+'">'
    +'<span class="rank">'+medals[i]+'</span>'
-   +'<div class="bsym">$'+esc(pp.sym)+' <span class="cchip">'+esc(pp.chain)+'</span></div>'
+   +'<div class="bsym">$'+esc(pp.sym)+' <span class="cchip">'+esc(pp.chain)+'</span>'+pf+wr+'</div>'
    +'<div class="bmeta">'+fUsd(pp.mc)+' mc &middot; <span class="'+(ch>0?'up':ch<0?'dn':'')+'">'+fPct(ch)+' 1h</span> &middot; '+fAge(pp.ageMs)+'</div>'
    +'<div class="battn"><span class="traj-mini '+a.traj+'">'+a.traj.toUpperCase()+'</span><span class="bar"><i style="width:'+Math.round(a.score/mx*100)+'%"></i></span><b>'+a.score+'</b></div>'
    +'</button>';
- }).join('');
+ }).join('')
+ +'<div class="board-note">Filtered to &ge;$'+(MIN_MC/1000)+'k mc &amp; &ge;$'+(MIN_LIQ/1000)+'k liq &middot; Pump.fun launches ranked up, other Solana launchpads down &middot; &#9888; = failed a gate or bundle-pattern holders. This is attention, not a buy &mdash; run the checklist on the card.</div>';
 }
 /* ---------- MINT AN IDEA ---------- */
 var IDEA_BANK={
