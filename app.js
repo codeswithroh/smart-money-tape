@@ -1164,6 +1164,14 @@ function setStatus(){
  else {d.className='dot';s.textContent='warming up&hellip;';}
 }
 
+/* morty-bot banner */
+(function(){
+ var bb=q1('botbar');if(!bb)return;
+ try{if(localStorage.getItem('ar-botbar-dismissed')==='1')return;}catch(_){}
+ bb.hidden=false;
+ var x=q1('botbarX');if(x)x.addEventListener('click',function(){bb.hidden=true;try{localStorage.setItem('ar-botbar-dismissed','1');}catch(_){}});
+})();
+
 /* events */
 document.querySelectorAll('.tabs button').forEach(function(b){b.addEventListener('click',function(){state.tab=b.getAttribute('data-tab');saveCfg();syncTabs();if(state.tab==='scan'){setUrl(null);scan();}});});
 window.addEventListener('popstate',function(){

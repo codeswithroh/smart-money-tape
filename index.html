@@ -342,6 +342,15 @@
   .collapsed-form[open]>summary::before{content:"\25BE ";}
 
   /* ---- ticker tape ---- */
+  .botbar{display:flex;align-items:center;gap:12px;margin:12px 0 0;padding:10px 14px;border:2px solid var(--ink);border-radius:10px 6px 11px 6px / 6px 11px 6px 10px;background:linear-gradient(180deg,rgba(70,189,98,.16),rgba(70,189,98,.05));filter:url(#rough);}
+  .botbar .bb-m{flex:none;width:30px;height:30px;border-radius:8px;background:#12170f;border:1.5px solid #46bd62;color:#7dff5b;display:grid;place-items:center;font-weight:800;font-family:'Patrick Hand',cursive;}
+  .botbar .bb-txt{flex:1;font-size:13.5px;line-height:1.4;color:var(--ink-soft);}
+  .botbar .bb-txt b{color:var(--ink);}
+  .botbar a.bb-go{flex:none;font-family:'Patrick Hand',cursive;font-size:14px;text-decoration:none;color:var(--ink);border:2px solid var(--ink);border-radius:8px 5px 9px 5px;padding:5px 12px;background:var(--paper);white-space:nowrap;}
+  .botbar a.bb-go:hover{background:#46bd62;color:#08210b;border-color:#46bd62;}
+  .botbar .bb-x{flex:none;background:none;border:none;color:var(--ink-faint);font-size:18px;line-height:1;cursor:pointer;padding:2px 4px;}
+  .botbar .bb-x:hover{color:var(--ink);}
+  @media (max-width:640px){.botbar .bb-x{display:none}}
   .ticker{margin:12px 0 4px;border:2px solid var(--ink);border-radius:9px 6px 10px 6px / 6px 10px 6px 9px;background:#171821;overflow:hidden;position:relative;filter:url(#rough);}
   .ticker::after{content:"";position:absolute;top:0;bottom:0;right:0;width:44px;background:linear-gradient(90deg,transparent,#171821);pointer-events:none;}
   .ticker-track{display:flex;gap:0;white-space:nowrap;padding:6px 0;width:max-content;}
@@ -429,6 +438,13 @@
     </div>
     <div class="status"><span class="dot" id="dot"></span><span id="statusText">warming up&hellip;</span></div>
   </header>
+
+  <div class="botbar" id="botbar" hidden>
+    <span class="bb-m">M</span>
+    <span class="bb-txt"><b>New &mdash; Morty Bot on Telegram.</b> Paste any contract, get the full x-ray in your DMs: attention verdict, bundle &amp; insider checks, rug screen, flex cards. Free.</span>
+    <a class="bb-go" href="/bot.html">Meet Morty &rarr;</a>
+    <button class="bb-x" id="botbarX" aria-label="dismiss">&times;</button>
+  </div>
 
   <div class="ticker" id="ticker"><div class="ticker-track" id="tickerTrack"></div></div>
 
