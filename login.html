@@ -59,7 +59,9 @@
     "react": "https://esm.sh/react@18.3.1",
     "react-dom": "https://esm.sh/react-dom@18.3.1",
     "react-dom/client": "https://esm.sh/react-dom@18.3.1/client",
-    "react/jsx-runtime": "https://esm.sh/react@18.3.1/jsx-runtime"
+    "react/jsx-runtime": "https://esm.sh/react@18.3.1/jsx-runtime",
+    "@privy-io/react-auth": "https://esm.sh/@privy-io/react-auth@2?external=react,react-dom",
+    "@privy-io/react-auth/solana": "https://esm.sh/@privy-io/react-auth@2/solana?external=react,react-dom"
   }
 }
 </script>
@@ -67,8 +69,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { createRoot } from 'react-dom/client';
 import htm from 'https://esm.sh/htm@3.1.1';
-import { PrivyProvider, usePrivy, useWallets } from 'https://esm.sh/@privy-io/react-auth@2?external=react,react-dom';
-import { useSolanaWallets, toSolanaWalletConnectors } from 'https://esm.sh/@privy-io/react-auth@2/solana?external=react,react-dom';
+import { PrivyProvider, usePrivy, useWallets } from '@privy-io/react-auth';
+import { useSolanaWallets, toSolanaWalletConnectors } from '@privy-io/react-auth/solana';
 import { Connection, PublicKey, Transaction, TransactionInstruction, SystemProgram } from 'https://esm.sh/@solana/web3.js@1.95.8';
 
 const html = htm.bind(React.createElement);
