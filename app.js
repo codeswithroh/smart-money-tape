@@ -50,7 +50,7 @@ var state={
  tokenCache:new Map(),   // addr -> {ts,pair}
  boosts:[],trending:[],profiles:{},tinfo:new Map(),
  safety:new Map(),ohlcv:new Map(),
- research:{},holders:{},watch:new Set(),
+ research:{},holders:{},watch:new Set(),watchMeta:new Map(),_watchBusy:false,
  chartMode:'entries',rcAddr:null,rcPair:null,rcInfo:null,trades:[],_tradesPoll:0,fhSound:false,
  lastOk:0,lastErr:null,scanAt:0
 };
@@ -66,6 +66,113 @@ function saveCfg(){try{localStorage.setItem(LS_CFG,JSON.stringify({apiKey:state.
 function saveRes(){try{localStorage.setItem(LS_RES,JSON.stringify(state.research));}catch(_){}}
 function saveHold(){try{localStorage.setItem(LS_HOLD,JSON.stringify(state.holders));}catch(_){}}
 function saveWatch(){try{localStorage.setItem(LS_WATCH,JSON.stringify(Array.from(state.watch)));}catch(_){}}
+
+/* ---------- watchlist (server-backed, per account) ---------- */
+function syncWatchFromServer(){
+ return fetch('/api/watchlist',{cache:'no-store'}).then(function(r){return r.ok?r.json():null;}).then(function(j){
+  if(!j||!Array.isArray(j.items))return;
+  state.watch=new Set();state.watchMeta=new Map();
+  j.items.forEach(function(it){
+   var a=String(it.addr||'').toLowerCase();if(!a)return;
+   state.watch.add(a);state.watchMeta.set(a,{chain:it.chain||'',sym:it.sym||'',added:it.added_at});
+  });
+  saveWatch();
+ }).catch(function(){});
+}
+function watchToggle(addr,chain,sym){
+ addr=String(addr||'').toLowerCase();if(!addr||state._watchBusy)return;
+ var on=state.watch.has(addr);
+ state._watchBusy=true;
+ if(on){state.watch.delete(addr);state.watchMeta.delete(addr);}
+ else{state.watch.add(addr);state.watchMeta.set(addr,{chain:chain||'',sym:sym||'',added:Date.now()});}
+ saveWatch();refreshStars();if(state.tab==='watch')renderWatch();
+ var req=on
+  ? fetch('/api/watchlist?addr='+encodeURIComponent(addr),{method:'DELETE'})
+  : fetch('/api/watchlist',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({addr:addr,chain:chain||'',sym:sym||''})});
+ req.then(function(r){
+  if(!r.ok){ // revert
+   if(on){state.watch.add(addr);state.watchMeta.set(addr,{chain:chain||'',sym:sym||''});}
+   else{state.watch.delete(addr);state.watchMeta.delete(addr);}
+   saveWatch();refreshStars();if(state.tab==='watch')renderWatch();
+   r.json().then(function(j){toast((j&&j.error)||'could not save');}).catch(function(){toast('could not save');});
+  }else{ toast(on?'removed from watchlist':'saved to watchlist'); }
+ }).catch(function(){toast('offline — will not sync');})
+ .then(function(){state._watchBusy=false;});
+}
+function starBtn(addr,chain,sym){
+ var on=state.watch.has(String(addr||'').toLowerCase());
+ return '<span class="star'+(on?' on':'')+'" role="button" tabindex="0" data-star="'+esc(addr)+'" data-chain="'+esc(chain||'')+'" data-sym="'+esc(sym||'')+'" aria-label="'+(on?'unsave':'save')+'">'+(on?'★':'☆')+'</span>';
+}
+function refreshStars(){
+ document.querySelectorAll('.star[data-star]').forEach(function(el){
+  var on=state.watch.has(String(el.getAttribute('data-star')||'').toLowerCase());
+  el.classList.toggle('on',on);el.textContent=on?'★':'☆';
+ });
+}
+function watchClick(ev){
+ var st=ev.target.closest('[data-star]');
+ if(st){ev.preventDefault();ev.stopPropagation();watchToggle(st.getAttribute('data-star'),st.getAttribute('data-chain'),st.getAttribute('data-sym'));return true;}
+ return false;
+}
+function renderWatch(){
+ var host=q1('watchList');if(!host)return;
+ var addrs=Array.from(state.watch);
+ q1('watchCount').textContent=addrs.length?addrs.length+' saved':'';
+ if(!addrs.length){host.innerHTML='<div class="empty">No saved coins yet. Tap the &#9734; on any coin to keep it here.</div>';return;}
+ // ensure token data
+ dexTokens(addrs).then(function(){
+  var rows=addrs.map(function(a){
+   var c=state.tokenCache.get(a),pp=c&&c.pair,meta=state.watchMeta.get(a)||{};
+   if(pp){pp._a=pp._a||attn(pp);pp._tags=pp._tags||tagThemes(pp);pp._q=pp._q||pickQuality(pp);return tokenRow(pp);}
+   return '<button class="trow" data-addr="'+esc(a)+'" data-chain="'+esc(meta.chain||'')+'">'
+    +'<span></span><span class="tmain"><span class="tsym">'+starBtn(a,meta.chain,meta.sym)+'$'+esc(meta.sym||'?')+' <span class="cchip">'+esc(meta.chain||'?')+'</span></span>'
+    +'<span class="tmeta">no live data right now &mdash; tap to open the x-ray</span></span>'
+    +'<span class="traj">&mdash;</span></button>';
+  }).join('');
+  host.innerHTML=rows;
+ });
+}
+
+/* ---------- profile ---------- */
+function pfLink(u,label){
+ if(!u)return '';
+ var href=u;
+ if(/^@?[A-Za-z0-9_]{1,30}$/.test(u)){
+  if(label==='X')href='https://x.com/'+u.replace(/^@/,'');
+  else if(label==='TG')href='https://t.me/'+u.replace(/^@/,'');
+  else if(label==='GitHub')href='https://github.com/'+u.replace(/^@/,'');
+  else href='https://'+u;
+ }else if(!/^https?:\/\//i.test(u)){href='https://'+u;}
+ return '<a class="btn sm" href="'+esc(href)+'" target="_blank" rel="noopener nofollow">'+esc(label)+'</a>';
+}
+function renderPfCard(p){
+ var host=q1('pfCard');if(!host)return;
+ var s=p.socials||{};
+ var links=[pfLink(s.x,'X'),pfLink(s.telegram,'TG'),pfLink(s.discord,'Discord'),pfLink(s.website,'Website'),pfLink(s.github,'GitHub')].filter(Boolean).join('');
+ host.innerHTML='<div class="pf-card"><h3>'+esc(p.name||'Anon degen')+'</h3>'
+  +(p.bio?'<div class="pf-bio">'+esc(p.bio)+'</div>':'<div class="pf-bio" style="color:var(--ink-faint)">No bio yet.</div>')
+  +(links?'<div class="pf-links">'+links+'</div>':'')
+  +'<div class="pf-meta">'+(p.email?esc(p.email):(p.wallet?esc(p.wallet.slice(0,6)+'…'+p.wallet.slice(-4)):'account'))+' &middot; '+state.watch.size+' on watchlist</div></div>';
+}
+function loadProfileTab(){
+ q1('pfMsg').textContent='';
+ fetch('/api/profile',{cache:'no-store'}).then(function(r){return r.ok?r.json():null;}).then(function(p){
+  if(!p)return;
+  var s=p.socials||{};
+  q1('pfName').value=p.name||'';q1('pfBio').value=p.bio||'';
+  q1('pfX').value=s.x||'';q1('pfTg').value=s.telegram||'';q1('pfSite').value=s.website||'';q1('pfGh').value=s.github||'';
+  q1('profWho').textContent=p.email||(p.wallet?p.wallet.slice(0,6)+'…'+p.wallet.slice(-4):'');
+  renderPfCard(p);
+ }).catch(function(){});
+}
+function submitProfile(){
+ var body={name:q1('pfName').value,bio:q1('pfBio').value,socials:{x:q1('pfX').value,telegram:q1('pfTg').value,website:q1('pfSite').value,github:q1('pfGh').value}};
+ var msg=q1('pfMsg');msg.style.color='var(--ink-soft)';msg.textContent='saving…';
+ fetch('/api/profile',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j};});}).then(function(x){
+  if(x.ok){msg.style.color='var(--pos)';msg.textContent='saved ✓';renderPfCard({name:x.j.name,bio:x.j.bio,socials:x.j.socials,email:q1('profWho').textContent});}
+  else{msg.style.color='var(--neg)';msg.textContent=(x.j&&x.j.error)||'could not save';}
+ }).catch(function(){msg.style.color='var(--neg)';msg.textContent='could not save';});
+}
 
 /* ---------- format ---------- */
 function fUsd(n){if(n==null||isNaN(n))return '-';var a=Math.abs(n);if(a>=1e9)return '$'+(n/1e9).toFixed(2)+'B';if(a>=1e6)return '$'+(n/1e6).toFixed(2)+'M';if(a>=1e3)return '$'+(n/1e3).toFixed(1)+'K';return '$'+n.toFixed(0);}
@@ -358,7 +465,7 @@ function tokenRow(pp){
  var warn=(!q.mcOk||!q.liqOk||(state.safety.get(pp.addr)||{}).bundle)?'<span class="cchip warn">&#9888;</span>':'';
  return '<button class="trow" data-addr="'+esc(pp.addr)+'" data-chain="'+esc(pp.chain)+'">'
   +(pp.img?'<img class="ava" src="'+esc(pp.img)+'" alt="" loading="lazy" onerror="this.style.visibility=\'hidden\'">':'<span></span>')
-  +'<span class="tmain"><span class="tsym">$'+esc(pp.sym)+' <span class="cchip">'+esc(pp.chain)+'</span>'+pf+src+(pp.boosts?' <span class="cchip">boost</span>':'')+warn+'</span>'
+  +'<span class="tmain"><span class="tsym">'+starBtn(pp.addr,pp.chain,pp.sym)+'$'+esc(pp.sym)+' <span class="cchip">'+esc(pp.chain)+'</span>'+pf+src+(pp.boosts?' <span class="cchip">boost</span>':'')+warn+'</span>'
   +'<span class="tmeta">'+fUsd(pp.mc)+' mc &middot; '+fUsd(pp.vol.h24)+' 24h &middot; '+fAge(pp.ageMs)+' old &middot; '+fPct(+pp.pc.h1||0)+' 1h</span>'
   +'<span class="tags">'+tg+'</span></span>'
   +trajTag(a)+'</button>';
@@ -582,7 +689,7 @@ function renderResearch(pp,sf,watchers,tinfo){
   +(gtOk(pp.chain)?'':'<div class="rc-banner"><b>&#9888; '+esc(pp.chain)+' chain &mdash; slow data.</b> The network is congested and there\'s no fast indexer for it, so the chart and trade feed load slowly and can read a little stale. The attention score, holders, socials and project info are unaffected.</div>')
   +'<div class="body">'
   +'<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><div class="verdict '+v.cls+'">'+v.label+'</div>'
-   +'<button class="btn" data-act="savefav">'+(state.watch.has(pp.addr)?'&#9733; watching':'&#9734; watch')+'</button>'
+   +'<button class="btn" data-act="savefav">'+(state.watch.has(pp.addr)?'&#9733; on watchlist':'&#9734; watchlist')+'</button>'
    +'<button class="btn pri" data-act="flex">&#128248; flex $'+esc(pp.sym)+'</button></div>'
   +'<div style="font-size:12px;color:var(--ink-soft)">score <b>'+v.pct+'/100</b> &middot; attention '+Math.round(v.att*100)+' &middot; safety '+Math.round(v.safe*100)+' &middot; project '+proj.surface+'/4'+(v.meme?' &middot; your meme '+Math.round(v.meme*100):'')+'</div>'
   +firehosePanel()
@@ -899,7 +1006,7 @@ function rcardClick(ev){
  if(a==='addcat'){var r=researchOf(addr);r.catalysts=(r.catalysts||[]).concat([{when:'',what:''}]);setRes(addr,{catalysts:r.catalysts});rerenderRcard();}
  else if(a==='delcat'){var r2=researchOf(addr);r2.catalysts.splice(+act.getAttribute('data-i'),1);setRes(addr,{catalysts:r2.catalysts});rerenderRcard();}
  else if(a==='moredesc'){var d=act.previousElementSibling;if(d)d.classList.remove('clamp');act.remove();return;}
- else if(a==='savefav'){if(state.watch.has(addr))state.watch.delete(addr);else state.watch.add(addr);saveWatch();rerenderRcard();}
+ else if(a==='savefav'){watchToggle(addr,pp.chain,pp.sym);rerenderRcard();}
  else if(a==='flex'){flexCoin(pp);}
 }
 function rcardInput(ev){
@@ -929,7 +1036,7 @@ function renderBoard(){
   var wr=(!q.mcOk||!q.liqOk||(state.safety.get(pp.addr)||{}).bundle)?' <span class="cchip warn">&#9888;</span>':'';
   return '<button class="bc'+(i===0?' r1':'')+'" data-addr="'+esc(pp.addr)+'" data-chain="'+esc(pp.chain)+'">'
    +'<span class="rank">'+medals[i]+'</span>'
-   +'<div class="bsym">$'+esc(pp.sym)+' <span class="cchip">'+esc(pp.chain)+'</span>'+pf+wr+'</div>'
+   +'<div class="bsym">'+starBtn(pp.addr,pp.chain,pp.sym)+'$'+esc(pp.sym)+' <span class="cchip">'+esc(pp.chain)+'</span>'+pf+wr+'</div>'
    +'<div class="bmeta">'+fUsd(pp.mc)+' mc &middot; <span class="'+(ch>0?'up':ch<0?'dn':'')+'">'+fPct(ch)+' 1h</span> &middot; '+fAge(pp.ageMs)+'</div>'
    +'<div class="battn"><span class="traj-mini '+a.traj+'">'+a.traj.toUpperCase()+'</span><span class="bar"><i style="width:'+Math.round(a.score/mx*100)+'%"></i></span><b>'+a.score+'</b></div>'
    +'</button>';
@@ -1141,8 +1248,10 @@ function toast(msg){
 
 /* ---------- tabs / shell ---------- */
 function syncTabs(){
- ['scan','research'].forEach(function(t){q1('tab-'+t).hidden=state.tab!==t;});
+ ['scan','watch','research','profile'].forEach(function(t){var el=q1('tab-'+t);if(el)el.hidden=state.tab!==t;});
  document.querySelectorAll('.tabs button').forEach(function(b){b.setAttribute('aria-selected',b.getAttribute('data-tab')===state.tab?'true':'false');});
+ if(state.tab==='watch')renderWatch();
+ if(state.tab==='profile')loadProfileTab();
  if(state.tab!=='research'){stopChart();stopTrades();stopFirehose();}
 }
 function renderTicker(){
@@ -1183,12 +1292,14 @@ document.querySelectorAll('.chip-toggle[data-chain]').forEach(function(b){b.addE
 q1('apiKey').addEventListener('change',function(e){state.apiKey=e.target.value.trim();saveCfg();});
 q1('tickerTrack').addEventListener('click',function(ev){var t=ev.target.closest('[data-addr]');if(!t)return;openResearch(t.getAttribute('data-addr'),t.getAttribute('data-chain'));});
 q1('scanFilters').addEventListener('click',function(ev){var b=ev.target.closest('[data-sf]');if(!b)return;state._scanFilter=b.getAttribute('data-sf');renderScan();});
-q1('attnList').addEventListener('click',function(ev){var r=ev.target.closest('[data-addr]');if(!r)return;openResearch(r.getAttribute('data-addr'),r.getAttribute('data-chain'));});
+q1('attnList').addEventListener('click',function(ev){if(watchClick(ev))return;var r=ev.target.closest('[data-addr]');if(!r)return;openResearch(r.getAttribute('data-addr'),r.getAttribute('data-chain'));});
 q1('rcardHost').addEventListener('click',rcardClick);
 q1('rcardHost').addEventListener('input',rcardInput);
 q1('rcardHost').addEventListener('change',rcardInput);
 q1('rcardHost').addEventListener('click',function(ev){var s=ev.target.closest('#fhSound');if(!s)return;state.fhSound=!state.fhSound;saveCfg();fhCtx();s.setAttribute('aria-pressed',state.fhSound?'true':'false');s.innerHTML=state.fhSound?'&#128266;':'&#128263;';});
-q1('board').addEventListener('click',function(ev){var b=ev.target.closest('[data-addr]');if(!b)return;openResearch(b.getAttribute('data-addr'),b.getAttribute('data-chain'));});
+q1('board').addEventListener('click',function(ev){if(watchClick(ev))return;var b=ev.target.closest('[data-addr]');if(!b)return;openResearch(b.getAttribute('data-addr'),b.getAttribute('data-chain'));});
+q1('watchList').addEventListener('click',function(ev){if(watchClick(ev))return;var b=ev.target.closest('[data-addr]');if(!b)return;openResearch(b.getAttribute('data-addr'),b.getAttribute('data-chain'));});
+q1('pfSave').addEventListener('click',submitProfile);
 q1("flexBoard").addEventListener("click",flexBoard);
 q1("ideaRoll").addEventListener("click",renderIdeas);
 q1("ideaBox").addEventListener("click",function(ev){var b=ev.target.closest("[data-idea]");if(!b)return;try{navigator.clipboard.writeText(b.getAttribute("data-idea"));toast("concept copied");}catch(_){}});
@@ -1196,7 +1307,7 @@ q1('qgo').addEventListener('click',function(){doQuery(q1('q').value,'rcardHost',
 q1('q').addEventListener('keydown',function(e){if(e.key==='Enter')doQuery(q1('q').value,'rcardHost',true);});
 q1('scanGo').addEventListener('click',function(){doQuery(q1('scanQ').value,'scanQResult',false);});
 q1('scanQ').addEventListener('keydown',function(e){if(e.key==='Enter')doQuery(q1('scanQ').value,'scanQResult',false);});
-q1('scanQResult').addEventListener('click',function(ev){var r=ev.target.closest('[data-addr]');if(!r)return;openResearch(r.getAttribute('data-addr'),r.getAttribute('data-chain'));});
+q1('scanQResult').addEventListener('click',function(ev){if(watchClick(ev))return;var r=ev.target.closest('[data-addr]');if(!r)return;openResearch(r.getAttribute('data-addr'),r.getAttribute('data-chain'));});
 function doQuery(v,hostId,gotoResearch){
  v=String(v||'').trim();if(!v)return;var host=q1(hostId);
  if(/^0x[0-9a-f]{40}$/i.test(v)||/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(v)){openResearch(v.toLowerCase(),'');return;}
@@ -1217,6 +1328,8 @@ document.querySelectorAll('.chip-toggle[data-chain]').forEach(function(b){var c=
 syncTabs();
 renderTicker();
 scan().then(setStatus);
+// pull the account's watchlist (authoritative) then refresh stars / the tab
+syncWatchFromServer().then(function(){refreshStars();if(state.tab==='watch')renderWatch();});
 // deep link: ?coin=<addr>&chain=<chain> reopens that coin on load / refresh
 (function(){var q=new URLSearchParams(location.search),c=q.get('coin');
  if(c&&/^(0x[0-9a-f]{40}|[1-9A-HJ-NP-Za-km-z]{32,44})$/i.test(c))openResearch(c,q.get('chain')||'',true);

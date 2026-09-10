@@ -62,3 +62,46 @@ export async function markPaid(id, { txHash, chain }) {
   if (error) throw error;
   return data;
 }
+
+// ---- profile ----
+export async function getProfile(id) {
+  const { data, error } = await db().from(TABLE)
+    .select('display_name,bio,socials,email,wallet').eq('id', id).maybeSingle();
+  if (error) throw error;
+  return data || null;
+}
+
+export async function saveProfile(id, { name, bio, socials }) {
+  const { error } = await db().from(TABLE)
+    .update({ display_name: name || null, bio: bio || null, socials: socials || {} })
+    .eq('id', id);
+  if (error) throw error;
+}
+
+// ---- watchlist ----
+export async function watchList(accountId) {
+  const { data, error } = await db().from('watchlist')
+    .select('addr,chain,sym,added_at').eq('account_id', accountId)
+    .order('added_at', { ascending: false }).limit(300);
+  if (error) throw error;
+  return data || [];
+}
+
+export async function watchCount(accountId) {
+  const { count, error } = await db().from('watchlist')
+    .select('addr', { count: 'exact', head: true }).eq('account_id', accountId);
+  if (error) throw error;
+  return count || 0;
+}
+
+export async function watchAdd(accountId, { addr, chain, sym }) {
+  const { error } = await db().from('watchlist')
+    .upsert({ account_id: accountId, addr, chain: chain || null, sym: sym || null }, { onConflict: 'account_id,addr' });
+  if (error) throw error;
+}
+
+export async function watchRemove(accountId, addr) {
+  const { error } = await db().from('watchlist')
+    .delete().eq('account_id', accountId).eq('addr', addr);
+  if (error) throw error;
+}
