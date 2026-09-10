@@ -4,11 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Morty Bot</title>
-<meta name="description" content="Morty Bot — paste any memecoin contract in Telegram and get the full x-ray: attention verdict, buy pressure, bundle &amp; insider checks, rug screen, and a shareable flex card. Same degens, higher standards.">
-<meta property="og:title" content="Morty Bot — same degens, higher standards">
-<meta property="og:description" content="Paste a contract in Telegram, get the full x-ray. Attention verdict, bundle checks, rug screen, flex cards.">
+<meta name="description" content="Paste any memecoin contract in Telegram and Morty Bot sends back the full read: attention score, buy pressure, bundle and insider checks, rug screen, and a shareable flex card. Same degens, higher standards.">
+<meta property="og:title" content="Morty Bot">
+<meta property="og:description" content="Paste a contract in Telegram. Get the full read back in seconds.">
 <meta property="og:image" content="/bot2.jpg">
 <meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/morty.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Space+Grotesk:wght@500;700&family=Permanent+Marker&display=swap" rel="stylesheet">
@@ -31,15 +32,14 @@
       radial-gradient(700px 500px at -10% 20%, rgba(57,211,83,.07), transparent 60%);
     background-attachment:fixed;
   }
-  img{max-width:100%;display:block}
+  img{max-width:100%;height:auto;display:block}
   a{color:var(--green);text-decoration:none}
   .wrap{max-width:1000px;margin:0 auto;padding:0 20px}
 
-  /* top bar */
   header{position:sticky;top:0;z-index:20;background:rgba(10,13,10,.82);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
-  header .wrap{display:flex;align-items:center;justify-content:space-between;height:60px}
-  .brand{display:flex;align-items:center;gap:10px;font-family:"Permanent Marker",cursive;font-size:22px;color:var(--green);letter-spacing:.5px}
-  .brand .m{width:30px;height:30px;border-radius:8px;background:var(--green-deep);border:1.5px solid var(--green);display:grid;place-items:center;font-size:18px;color:var(--green)}
+  header .wrap{display:flex;align-items:center;justify-content:space-between;height:64px}
+  .brand{display:flex;align-items:center;gap:11px;font-family:"Permanent Marker",cursive;font-size:21px;color:var(--green);letter-spacing:.5px}
+  .brand img{width:34px;height:34px;border-radius:50%;border:1.5px solid var(--green);box-shadow:0 0 14px -3px rgba(125,255,91,.6)}
   .btn{display:inline-flex;align-items:center;gap:9px;font-weight:700;font-family:"Space Grotesk",Inter,sans-serif;
     background:var(--green);color:#06210a;border:none;border-radius:11px;padding:11px 18px;cursor:pointer;
     font-size:15px;line-height:1;box-shadow:0 0 0 1px rgba(125,255,91,.35), 0 10px 24px -10px rgba(125,255,91,.5);transition:transform .12s ease, box-shadow .12s ease}
@@ -48,8 +48,7 @@
   .btn.ghost:hover{box-shadow:inset 0 0 0 1.5px var(--green)}
   .btn.big{padding:16px 28px;font-size:17px;border-radius:13px}
 
-  /* hero */
-  .hero{padding:64px 0 40px}
+  .hero{padding:64px 0 44px}
   .hero .wrap{display:grid;grid-template-columns:1.05fr .95fr;gap:48px;align-items:center}
   .kicker{font-family:"Permanent Marker",cursive;color:var(--green2);font-size:15px;letter-spacing:1px;text-transform:uppercase}
   h1{font-family:"Space Grotesk",Inter,sans-serif;font-weight:700;font-size:clamp(34px,5.4vw,54px);line-height:1.05;margin:12px 0 16px;text-wrap:balance}
@@ -58,8 +57,8 @@
   .hero-cta{display:flex;gap:12px;flex-wrap:wrap;margin-top:26px}
   .hero-art{position:relative}
   .hero-art img{border-radius:18px;border:1px solid var(--line);box-shadow:var(--shadow)}
-  .tagpill{position:absolute;left:-14px;bottom:18px;background:var(--panel);border:1px solid var(--green);color:var(--green);
-    font-family:"Permanent Marker",cursive;font-size:13px;padding:6px 12px;border-radius:10px;transform:rotate(-3deg)}
+  .tagpill{position:absolute;left:-12px;bottom:20px;background:var(--panel);border:1px solid var(--green);color:var(--green);
+    font-family:"Permanent Marker",cursive;font-size:13px;padding:6px 12px;border-radius:10px;transform:rotate(-3deg);box-shadow:var(--shadow)}
 
   .strip{border-block:1px solid var(--line);background:var(--bg2)}
   .strip .wrap{display:flex;gap:34px;flex-wrap:wrap;justify-content:center;padding:16px 20px;font-family:"Space Grotesk",Inter,sans-serif;font-weight:500;color:var(--dim);font-size:14px}
@@ -68,7 +67,7 @@
   section.blk{padding:64px 0}
   .eyebrow{font-family:"Permanent Marker",cursive;color:var(--green2);font-size:14px;letter-spacing:1px;text-transform:uppercase;margin-bottom:10px}
   h2{font-family:"Space Grotesk",Inter,sans-serif;font-weight:700;font-size:clamp(26px,3.6vw,36px);margin:0 0 14px;text-wrap:balance}
-  .lead{color:var(--dim);font-size:17px;max-width:60ch}
+  .lead{color:var(--dim);font-size:17px;max-width:62ch}
 
   .row2{display:grid;grid-template-columns:1fr 1fr;gap:44px;align-items:center}
   .row2.flip{direction:rtl}.row2.flip>*{direction:ltr}
@@ -78,20 +77,26 @@
   .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 18px 16px}
   .card h3{font-family:"Space Grotesk",Inter,sans-serif;font-size:16px;margin:0 0 6px;display:flex;align-items:center;gap:8px}
   .card p{margin:0;color:var(--dim);font-size:14px}
-  .card .ic{width:26px;height:26px;border-radius:7px;background:var(--green-deep);border:1px solid var(--green);display:grid;place-items:center;font-size:14px}
+  .card .ic{width:26px;height:26px;border-radius:7px;background:var(--green-deep);border:1px solid var(--green);display:grid;place-items:center;font-size:14px;flex:none}
 
   .cmds{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}
   .cmd{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:9px 13px;font-size:14px;color:var(--dim)}
   .cmd code{font-family:"Space Grotesk",ui-monospace,monospace;color:var(--green);font-weight:700;margin-right:6px}
 
-  .flexcard{margin-top:26px;border-radius:16px;border:1px solid var(--line);box-shadow:var(--shadow);background:var(--panel)}
+  .flexcard{margin-top:26px;border-radius:16px;border:1px solid var(--line);box-shadow:var(--shadow);background:var(--panel);aspect-ratio:1200/630;width:100%}
   .cap{color:var(--faint);font-size:13px;margin-top:10px}
 
-  .cta{padding:72px 0 64px;text-align:center}
+  .steps{counter-reset:s;display:grid;gap:14px;margin-top:24px}
+  .step{display:flex;gap:14px;align-items:flex-start;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
+  .step::before{counter-increment:s;content:counter(s);flex:none;width:28px;height:28px;border-radius:8px;background:var(--green-deep);border:1px solid var(--green);color:var(--green);font-family:"Space Grotesk",sans-serif;font-weight:700;display:grid;place-items:center;font-size:14px}
+  .step b{font-family:"Space Grotesk",Inter,sans-serif}
+  .step p{margin:3px 0 0;color:var(--dim);font-size:14px}
+
+  .cta{padding:76px 0 68px;text-align:center}
   .cta .wrap{display:flex;flex-direction:column;align-items:center;gap:8px}
-  .cta img{width:230px;border-radius:16px;border:1px solid var(--line);box-shadow:var(--shadow);margin-bottom:22px}
+  .cta img{width:240px;border-radius:16px;border:1px solid var(--line);box-shadow:var(--shadow);margin-bottom:22px}
   .cta h2{font-size:clamp(28px,4.4vw,42px)}
-  .cta p{color:var(--dim);max-width:44ch;margin:6px 0 24px}
+  .cta p{color:var(--dim);max-width:46ch;margin:6px 0 24px}
 
   footer{border-top:1px solid var(--line);background:var(--bg2)}
   footer .wrap{padding:26px 20px;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;color:var(--faint);font-size:13px}
@@ -102,10 +107,11 @@
   @media (prefers-reduced-motion:reduce){.reveal{opacity:1;transform:none;transition:none}}
 
   @media (max-width:820px){
-    .hero .wrap{grid-template-columns:1fr;gap:30px}
-    .hero-art{order:-1}
+    .hero .wrap{grid-template-columns:1fr;gap:28px}
+    .hero-art{order:-1;max-width:440px}
     .row2{grid-template-columns:1fr;gap:22px}
     .row2.flip{direction:ltr}
+    .row2 img{max-width:440px}
     .feat{grid-template-columns:1fr}
     header .btn:not(.tg){display:none}
   }
@@ -114,7 +120,7 @@
 <body>
 <header>
   <div class="wrap">
-    <div class="brand"><span class="m">M</span> Morty Bot</div>
+    <div class="brand"><img src="/morty.png" alt="Morty Bot" width="34" height="34"> Morty Bot</div>
     <a class="btn tg" href="https://t.me/MortyRadarBot" target="_blank" rel="noopener">Open in Telegram &#8599;</a>
   </div>
 </header>
@@ -122,16 +128,16 @@
 <div class="hero">
   <div class="wrap">
     <div class="reveal in">
-      <div class="kicker">Same degens &middot; higher standards</div>
-      <h1>Paste a contract. Get the <span class="hl">full x-ray</span> in your DMs.</h1>
-      <p class="sub">Morty Bot reads the tape so you don't have to. Drop any memecoin CA in Telegram and it drops a card: attention verdict, buy pressure, bundle &amp; insider checks, rug screen, socials &mdash; plus a flex card built for X.</p>
+      <div class="kicker">Same degens, higher standards</div>
+      <h1>Paste a contract. Get the <span class="hl">whole picture</span> back in seconds.</h1>
+      <p class="sub">Morty Bot pulls the data a good entry actually depends on and puts a verdict on top of it. Buy pressure, bundle and insider checks, a rug screen, an attention score, and the socials. One message in, one clean read out.</p>
       <div class="hero-cta">
         <a class="btn big" href="https://t.me/MortyRadarBot" target="_blank" rel="noopener">Start Morty Bot &rarr;</a>
-        <a class="btn big ghost" href="#how">See how it works</a>
+        <a class="btn big ghost" href="#how">See what it returns</a>
       </div>
     </div>
     <div class="hero-art reveal in">
-      <img src="/bot1.jpg" alt="Morty Bot at the desk — scanning, analyzing, sending alpha" width="1000" height="1000">
+      <img src="/bot1.jpg" alt="Morty Bot at the desk: scanning, analyzing, sending alpha" width="1000" height="1000">
       <span class="tagpill">data &gt; emotions</span>
     </div>
   </div>
@@ -139,23 +145,23 @@
 
 <div class="strip">
   <div class="wrap">
-    <span><b>Free</b> in any chat</span>
-    <span><b>Keyless</b> &mdash; public data only</span>
-    <span><b>Solana + EVM</b> + Robinhood</span>
-    <span><b>Never</b> auto-trades &mdash; research only</span>
+    <span>Free in every chat</span>
+    <span>Public data only, no keys</span>
+    <span>Solana, EVM, Robinhood chain</span>
+    <span>Reads the market, never trades it</span>
   </div>
 </div>
 
 <section class="blk" id="how">
   <div class="wrap reveal">
-    <div class="eyebrow">What it does</div>
-    <h2>One CA in. A full read out.</h2>
-    <p class="lead">The same public data the pros pull &mdash; DexScreener, GeckoTerminal, RugCheck, Honeypot &mdash; folded into one card with an actual verdict on top.</p>
+    <div class="eyebrow">What comes back</div>
+    <h2>One contract in. A full read out.</h2>
+    <p class="lead">Morty stitches DexScreener, GeckoTerminal, RugCheck and Honeypot into a single card, then adds the part those tools skip: a call on whether the attention is building or already leaving.</p>
     <div class="feat">
-      <div class="card"><h3><span class="ic">&#128200;</span> Attention verdict</h3><p>RAMPING / STEADY / FADING with a 0&ndash;100 score from volume acceleration, buy skew and price slope.</p></div>
-      <div class="card"><h3><span class="ic">&#129522;</span> Bundle &amp; insider check</h3><p>Dev holding %, top-5 wallet concentration, insider supply %, holder-cluster bundle pattern, LP lock.</p></div>
-      <div class="card"><h3><span class="ic">&#128737;</span> Rug screen</h3><p>Mint / freeze authority, LP status, RugCheck danger flags on Solana; honeypot &amp; tax checks on EVM.</p></div>
-      <div class="card"><h3><span class="ic">&#128225;</span> Narrative tags + socials</h3><p>What meta it's riding, plus the X / Telegram / site links and a spinoff-coin idea for the group.</p></div>
+      <div class="card"><h3><span class="ic">&#128200;</span> Attention score</h3><p>Ramping, steady or fading, on a 0 to 100 scale built from volume acceleration, buy skew and price slope. You see where the eyeballs are heading, not just where they were.</p></div>
+      <div class="card"><h3><span class="ic">&#129522;</span> Bundle and insider check</h3><p>Dev holdings, top five wallet concentration, insider supply share, and holder clusters that move like one wallet. The traps that do not show up on the chart.</p></div>
+      <div class="card"><h3><span class="ic">&#128737;</span> Rug screen</h3><p>Mint and freeze authority, LP lock status, and RugCheck danger flags on Solana. Honeypot simulation plus buy and sell tax on EVM.</p></div>
+      <div class="card"><h3><span class="ic">&#128225;</span> Narrative and socials</h3><p>The meta it is riding, the live X and Telegram links, and a spinoff ticker idea to drop in the group when the call is done.</p></div>
     </div>
   </div>
 </section>
@@ -163,16 +169,16 @@
 <section class="blk" style="background:var(--bg2);border-block:1px solid var(--line)">
   <div class="wrap">
     <div class="row2 reveal">
-      <img src="/bot2.jpg" alt="Morty Bot — entry, data, conviction, send it" width="1000" height="1000">
+      <img src="/bot2.jpg" alt="Morty Bot checklist: entry, data, conviction, send it" width="1000" height="1000">
       <div>
-        <div class="eyebrow">The checklist</div>
+        <div class="eyebrow">The discipline</div>
         <h2>Entry. Data. Conviction. Send it.</h2>
-        <p class="lead">Every card ends with the checks no API can do for you &mdash; holder SOL balances &amp; funding times, the community page, community vs tweet/profile coin, dip-entry discipline. Distrust by default; a coin earns "tradeable".</p>
+        <p class="lead">Every card closes with the checks no API can run for you: holder balances and funding times, the community page, community token versus tweet or profile coin, and dip discipline on the entry. The default is distrust. A coin earns the word tradeable.</p>
         <div class="cmds">
-          <span class="cmd"><code>/radar</code> top attention movers now</span>
-          <span class="cmd"><code>/flex</code> shareable multiplier card</span>
-          <span class="cmd"><code>/idea</code> fresh coin concepts</span>
-          <span class="cmd"><code>/help</code> the whole cheatsheet</span>
+          <span class="cmd"><code>/radar</code> the top attention movers right now</span>
+          <span class="cmd"><code>/flex</code> a shareable multiplier card</span>
+          <span class="cmd"><code>/idea</code> fresh tickers from the hot narratives</span>
+          <span class="cmd"><code>/help</code> the full command list</span>
         </div>
       </div>
     </div>
@@ -181,28 +187,41 @@
 
 <section class="blk">
   <div class="wrap reveal">
-    <div class="eyebrow">Built to share</div>
-    <h2>Flex cards, straight to X.</h2>
-    <p class="lead">Hit <code style="color:var(--green)">/flex &lt;ca&gt; [entry mc]</code> and Morty renders a branded card &mdash; ticker, called-at market cap, multiplier to ATH &mdash; with a one-tap "Share on X" button.</p>
-    <img class="flexcard" src="/api/flexcard?ca=So11111111111111111111111111111111111111112&entry=3.8M&by=@you" alt="Example Morty Bot flex card" width="1200" height="630" loading="lazy">
-    <p class="cap">Live example rendered by the bot's own endpoint.</p>
+    <div class="eyebrow">Built to travel</div>
+    <h2>Turn a win into a post.</h2>
+    <p class="lead">Run <code style="color:var(--green)">/flex &lt;contract&gt; [entry mcap]</code> and Morty renders a branded card with the ticker, the market cap you called it at, and the multiplier to its high. A Share on X button is attached.</p>
+    <img class="flexcard" src="/api/flexcard?ca=So11111111111111111111111111111111111111112&entry=3.8M&by=@you" alt="Example flex card from Morty Bot" width="1200" height="630" loading="lazy">
+    <p class="cap">Live card, rendered by the bot on request.</p>
+  </div>
+</section>
+
+<section class="blk" style="background:var(--bg2);border-block:1px solid var(--line)">
+  <div class="wrap reveal">
+    <div class="eyebrow">Getting started</div>
+    <h2>Thirty seconds to your first read.</h2>
+    <div class="steps">
+      <div class="step"><div><b>Open Morty Bot</b><p>Tap the button below or search MortyRadarBot in Telegram, then hit Start.</p></div></div>
+      <div class="step"><div><b>Send a contract</b><p>Paste any token address in the chat. No command needed.</p></div></div>
+      <div class="step"><div><b>Read the card, run the checklist</b><p>Score, safety and socials arrive in seconds. The manual checks are listed right underneath.</p></div></div>
+      <div class="step"><div><b>Add it to your group</b><p>Drop Morty in and it cards every contract anyone pastes, automatically.</p></div></div>
+    </div>
   </div>
 </section>
 
 <section class="cta">
   <div class="wrap reveal">
-    <img src="/bot3.jpg" alt="Morty Bot to the moon" width="460" height="460">
-    <div class="eyebrow">To the moon, with a plan</div>
-    <h2>Add Morty Bot now.</h2>
-    <p>Free. Works in your DMs or drop it in the group and it auto-cards every contract anyone pastes.</p>
+    <img src="/bot3.jpg" alt="Morty Bot" width="480" height="480">
+    <div class="eyebrow">Data first, then the trade</div>
+    <h2>Add Morty Bot.</h2>
+    <p>Free, and it works the same in your DMs or in a group of five hundred.</p>
     <a class="btn big" href="https://t.me/MortyRadarBot" target="_blank" rel="noopener">Open Morty Bot in Telegram &#8599;</a>
   </div>
 </section>
 
 <footer>
   <div class="wrap">
-    <span>Not financial advice. Public data only. Memecoins are extreme risk &mdash; most go to zero.</span>
-    <span><a href="/">&larr; Attention Radar dashboard</a> &nbsp;&middot;&nbsp; <a href="https://x.com/codeswithroh" target="_blank" rel="noopener">@codeswithroh</a></span>
+    <span>Not financial advice. Public data only. Memecoins are extreme risk and most go to zero.</span>
+    <span><a href="/">Attention Radar dashboard</a> &nbsp;&middot;&nbsp; <a href="https://x.com/codeswithroh" target="_blank" rel="noopener">@codeswithroh</a></span>
   </div>
 </footer>
 
