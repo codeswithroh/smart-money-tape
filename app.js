@@ -410,7 +410,7 @@ function fetchSafety(addr,chain,urlAddr){
    danger.forEach(function(d){reasons.push(d);});
    var ok=!j.rugged&&!j.mintAuthority&&!j.freezeAuthority&&!(topPct!=null&&topPct>35)&&!(devPct!=null&&devPct>5)&&!(insiderPct!=null&&insiderPct>20)&&!bundleSuspected&&!danger.length;
    recordHolders(addr,j.totalHolders);
-   return done({ok:ok,norm:j.score_normalised,reasons:reasons,lpPct:lp,holders:j.totalHolders,renounced:!j.mintAuthority&&!j.freezeAuthority,topPct:topPct,top5Pct:top5Pct,devPct:devPct,insiderPct:insiderPct,insiders:insiderCount,bundle:bundleSuspected,src:'rugcheck'});
+   return done({ok:ok,norm:j.score_normalised,reasons:reasons,lpPct:lp,holders:j.totalHolders,renounced:!j.mintAuthority&&!j.freezeAuthority,topPct:topPct,top5Pct:top5Pct,devPct:devPct,insiderPct:insiderPct,insiders:insiderCount,bundle:bundleSuspected,creator:creator||null,creatorTokens:j.creatorTokens||null,src:'rugcheck'});
   }).catch(function(){return done({ok:null,reasons:['rug check failed'],src:'rugcheck'});});
  }
  var cid=EVM_CHAIN_ID[chain];if(!cid)return Promise.resolve(done({ok:null,reasons:['no safety source for '+chain],src:'none'}));
@@ -712,6 +712,35 @@ function compPanel(pp,sf,tags){
   +'<p style="font-size:12.5px;color:var(--ink-soft);margin-top:9px">'+c.note+'</p>'
   +(stageLine?'<p style="font-size:12.5px;color:var(--ink-soft);margin-top:6px">'+stageLine+'</p>':'')
   +'<p style="font-size:11px;color:var(--ink-faint);margin-top:8px">Matched on narrative + launch structure, not price action. '+esc(c.name)+' is a survivor &mdash; most coins in its own cohort went to zero, per the research cited above. Source: '+c.src+'.</p>'
+  +'</div>';
+}
+/* ---------- deployer history: does this creator wallet have a track record ----------
+   RugCheck's report carries creatorTokens — every other mint the same wallet deployed, with the
+   market cap it reached and when. That's a real, checkable "has this wallet done this before"
+   signal, not a guess. Market cap crossing a Pump.fun-graduation-ish $50k line is used as a rough
+   traction proxy since we don't have a rugged/not-rugged flag per historical launch. */
+function deployerPanel(sf){
+ if(!sf||sf.src!=='rugcheck'||!sf.creator)return '';
+ var toks=sf.creatorTokens||[];
+ var short=sf.creator.slice(0,4)+'&hellip;'+sf.creator.slice(-4);
+ if(!toks.length){
+  return '<div class="panel"><h3>Deployer history</h3>'
+   +'<p style="font-size:12.5px;color:var(--ink-soft)">First known launch from <span style="font-family:\'Share Tech Mono\',monospace">'+short+'</span> &mdash; no track record yet, good or bad.</p></div>';
+ }
+ var graduated=toks.filter(function(t){return (t.marketCap||0)>=50000;}).length;
+ var verdict,cls;
+ if(toks.length>=5&&graduated/toks.length<0.2){verdict='Prolific low-traction deployer &mdash; '+toks.length+' other tokens, only '+graduated+' ever cleared $50k mc. Treat this creator as a red flag.';cls='neg';}
+ else if(graduated>=2){verdict='Has landed real traction before &mdash; '+graduated+' of '+toks.length+' other launches cleared $50k mc.';cls='pos';}
+ else{verdict=toks.length+' other launch'+(toks.length>1?'es':'')+' from this wallet, mostly low-traction so far.';cls='watch';}
+ var rows=toks.slice(0,6).map(function(t){
+  var age=t.createdAt?fAge(Date.now()-Date.parse(t.createdAt)):'?';
+  var mint=String(t.mint||'');
+  return '<div class="cmp-row" style="grid-template-columns:1fr 90px 80px"><div style="font-family:\'Share Tech Mono\',monospace;font-size:11.5px">'+esc(mint.slice(0,4))+'&hellip;'+esc(mint.slice(-4))+'</div><div>'+fUsd(t.marketCap)+'</div><div>'+age+' old</div></div>';
+ }).join('');
+ return '<div class="panel"><h3>Deployer history</h3>'
+  +'<p style="font-size:12.5px;color:var(--ink-soft)"><b class="'+cls+'">'+verdict+'</b></p>'
+  +'<div class="cmp-table" style="margin-top:8px">'+rows+'</div>'
+  +'<p style="font-size:11px;color:var(--ink-faint);margin-top:8px">Deployer wallet <span style="font-family:\'Share Tech Mono\',monospace">'+short+'</span> &middot; source: RugCheck creatorTokens. Market cap is a traction proxy, not a rug confirmation &mdash; still eyeball holder behavior yourself.</p>'
   +'</div>';
 }
 function pickQuality(pp){
@@ -1017,6 +1046,7 @@ function renderResearch(pp,sf,watchers,tinfo){
   +chart
   +'<div class="panel"><h3>What the radar sees</h3>'+autoKv+safeLine+watchLine+'</div>'
   +bundlePanel(pp,sf)
+  +deployerPanel(sf)
   +researchScorePanel(pp,a,sf,hr,proj)
   +compPanel(pp,sf,tags)
   +projPanel
