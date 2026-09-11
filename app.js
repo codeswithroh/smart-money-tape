@@ -4,7 +4,7 @@ var DEX='https://api.dexscreener.com',GT='https://api.geckoterminal.com/api/v2';
 // GeckoTerminal blocks browser CORS under load -> go through our cached edge proxy
 function gtUrl(p){return '/api/gt?path='+encodeURIComponent(p);}
 var RUG='https://api.rugcheck.xyz/v1/tokens',HP='https://api.honeypot.is/v2/IsHoneypot',FOMO='https://api.fomoapi.io';
-var LS_CFG='ar-cfg-v1',LS_RES='ar-research-v1',LS_HOLD='ar-holders-v1',LS_WATCH='ar-watch-v1';
+var LS_CFG='ar-cfg-v1',LS_RES='ar-research-v1',LS_HOLD='ar-holders-v1',LS_WATCH='ar-watch-v1',LS_SCORE='ar-scores-v1';
 var EVM_CHAIN_ID={bsc:56,base:8453,ethereum:1};
 var reduceMotion=!!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 // GeckoTerminal free tier ~25 req/min and 429s without CORS headers -> throttle every GT call
@@ -50,7 +50,7 @@ var state={
  tokenCache:new Map(),   // addr -> {ts,pair}
  boosts:[],trending:[],profiles:{},tinfo:new Map(),
  safety:new Map(),ohlcv:new Map(),
- research:{},holders:{},watch:new Set(),watchMeta:new Map(),_watchBusy:false,
+ research:{},holders:{},scores:{},watch:new Set(),watchMeta:new Map(),_watchBusy:false,
  chartMode:'entries',rcAddr:null,rcPair:null,rcInfo:null,trades:[],_tradesPoll:0,fhSound:false,
  lastOk:0,lastErr:null,scanAt:0
 };
@@ -61,10 +61,12 @@ function loadAll(){
  try{state.research=JSON.parse(localStorage.getItem(LS_RES)||'{}')||{};}catch(_){state.research={};}
  try{state.holders=JSON.parse(localStorage.getItem(LS_HOLD)||'{}')||{};}catch(_){state.holders={};}
  try{var w=JSON.parse(localStorage.getItem(LS_WATCH)||'[]');state.watch=new Set(w);}catch(_){}
+ try{state.scores=JSON.parse(localStorage.getItem(LS_SCORE)||'{}')||{};}catch(_){state.scores={};}
 }
 function saveCfg(){try{localStorage.setItem(LS_CFG,JSON.stringify({apiKey:state.apiKey,chains:state.chains,tab:state.tab,chartMode:state.chartMode,fhSound:state.fhSound}));}catch(_){}}
 function saveRes(){try{localStorage.setItem(LS_RES,JSON.stringify(state.research));}catch(_){}}
 function saveHold(){try{localStorage.setItem(LS_HOLD,JSON.stringify(state.holders));}catch(_){}}
+function saveScores(){try{localStorage.setItem(LS_SCORE,JSON.stringify(state.scores));}catch(_){}}
 function saveWatch(){try{localStorage.setItem(LS_WATCH,JSON.stringify(Array.from(state.watch)));}catch(_){}}
 
 /* ---------- watchlist (server-backed, per account) ---------- */
@@ -520,8 +522,35 @@ function longTermScore(pp,a,sf,hr,proj){
   {k:'Project surface',v:P.v,note:P.note},
  ]};
 }
+/* ---------- score history: is this coin's fundamentals improving or decaying, not just a snapshot ----------
+   Same client-side pattern as holder-rate tracking: a capped, deduped local history per address.
+   Min 10-minute spacing keeps it a trend across visits, not noise from re-rendering the same scan. */
+function recordScore(addr,pct){
+ if(!addr||pct==null)return;
+ var arr=state.scores[addr]||[];
+ if(arr.length&&Date.now()-arr[arr.length-1].ts<600000)return;
+ arr.push({ts:Date.now(),v:pct});if(arr.length>60)arr=arr.slice(-60);
+ state.scores[addr]=arr;saveScores();
+}
+function scoreTrend(addr){
+ var arr=state.scores[addr]||[];if(arr.length<2)return null;
+ var first=arr[0],last=arr[arr.length-1];
+ return {from:first.v,to:last.v,delta:last.v-first.v,spanMs:last.ts-first.ts,points:arr};
+}
+function scoreTrendHtml(addr){
+ var t=scoreTrend(addr);
+ if(!t)return '<p class="rscore-age">Trend builds as you revisit this coin &mdash; only one scan recorded so far.</p>';
+ var arrow=t.delta>0?'&#9650;':t.delta<0?'&#9660;':'&#8213;';
+ var cls=t.delta>0?'pos':t.delta<0?'neg':'';
+ var mins=Math.round(t.spanMs/60000);
+ var span=mins<60?mins+'m':(mins/60).toFixed(1)+'h';
+ var bars=t.points.map(function(p){return '<i style="height:'+Math.max(8,Math.round(p.v))+'%" class="'+(p.v>=68?'pos':p.v<=28?'neg':'')+'"></i>';}).join('');
+ return '<div class="score-trend"><div class="score-trend-bars">'+bars+'</div>'
+  +'<p class="rscore-age"><span class="'+cls+'">'+arrow+' '+(t.delta>0?'+':'')+t.delta+'</span> vs '+span+' ago (was '+t.from+'/100) &mdash; tracked from your own visits to this coin.</p></div>';
+}
 function researchScorePanel(pp,a,sf,hr,proj){
  var s=longTermScore(pp,a,sf,hr,proj);
+ recordScore(pp.addr,s.pct);
  var surv=survivalStage(pp);
  var ringCol=s.cls==='neg'?'var(--neg)':s.cls==='watch'?'var(--hot)':'var(--pos)';
  var deg=(s.pct*3.6).toFixed(0);
@@ -539,6 +568,7 @@ function researchScorePanel(pp,a,sf,hr,proj){
   +'<p class="rscore-sub">Weighted from this coin&rsquo;s own holder concentration, liquidity depth, holder growth, volume authenticity and project surface &mdash; not its age.</p>'
   +ageLine+'</div></div>'
   +'<div class="rfactors">'+rows+'</div>'
+  +scoreTrendHtml(pp.addr)
   +'<p class="rscore-cite">Weights informed by published research: holder-concentration signal measured ~64% stronger than trader/volume signal (MemeTrans/MELT); Pump.fun cohort base rates from CoinGecko Research, arXiv 2607.02823 and arXiv 2512.11850. A heuristic score from public on-chain data &mdash; not financial advice.</p>'
   +'</div>';
 }
