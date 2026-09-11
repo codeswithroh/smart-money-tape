@@ -2,6 +2,9 @@
 const DEX = 'https://api.dexscreener.com';
 const RUG = 'https://api.rugcheck.xyz/v1/tokens';
 const HP = 'https://api.honeypot.is/v2/IsHoneypot';
+const GOPLUS = 'https://api.gopluslabs.io/api/v1/token_security';
+const GOPLUS_ID = { ethereum: 1, bsc: 56, base: 8453, polygon: 137, arbitrum: 42161, avalanche: 43114, optimism: 10 };
+const BURN_ADDR = '0x000000000000000000000000000000000000dead';
 const EVM_ID = { ethereum: 1, bsc: 56, base: 8453, polygon: 137, arbitrum: 42161, avalanche: 43114, optimism: 10, blast: 81457 };
 
 const THEMES = [
@@ -170,14 +173,36 @@ async function safety(addr, chain) {
   }
   const cid = EVM_ID[chain];
   if (!cid) return null;
-  const j = await jget(`${HP}?address=${addr}&chainID=${cid}`);
-  if (!j) return null;
-  const hp = j.honeypotResult && j.honeypotResult.isHoneypot;
-  const sim = j.simulationResult || {};
+  // honeypot.is alone only ever caught tax/honeypot mechanics, never holder concentration —
+  // EVM chains got zero holder-safety signal while Solana got a full RugCheck breakdown. GoPlus
+  // Security (free, no key) fills that gap: top real holder %, LP lock %, renounce, dev balance.
+  const [j, gp] = await Promise.all([
+    jget(`${HP}?address=${addr}&chainID=${cid}`),
+    GOPLUS_ID[chain] ? jget(`${GOPLUS}/${GOPLUS_ID[chain]}?contract_addresses=${addr}`) : null,
+  ]);
+  const g = gp && gp.result && gp.result[addr.toLowerCase()];
+  let topPct = null, lpPct = null, renounced = null, devPct = null, blacklisted = false;
+  if (g) {
+    const realHolders = (g.holders || []).filter((h) => String(h.address || '').toLowerCase() !== BURN_ADDR && !h.is_contract);
+    topPct = realHolders.length ? +realHolders[0].percent * 100 : null;
+    const lpSum = (g.lp_holders || []).filter((h) => h.is_locked).reduce((s, h) => s + (+h.percent || 0), 0);
+    lpPct = (g.lp_holders || []).length ? lpSum * 100 : null;
+    renounced = !g.owner_address || g.owner_address === '0x0000000000000000000000000000000000000000';
+    devPct = g.creator_percent != null ? +g.creator_percent * 100 : null;
+    blacklisted = g.is_blacklisted === '1' || g.is_honeypot === '1';
+  }
+  if (!j && !g) return null;
+  const hp = (j && j.honeypotResult && j.honeypotResult.isHoneypot) || blacklisted;
+  const sim = (j && j.simulationResult) || {};
+  const reasons = [];
+  if (hp) reasons.push('honeypot/blacklisted');
+  if (topPct != null && topPct > 25) reasons.push('top holder ' + topPct.toFixed(0) + '%');
+  if (lpPct != null && lpPct < 50) reasons.push('LP ' + lpPct.toFixed(0) + '% locked');
   return {
-    ok: !hp && !(sim.sellTax > 25) && !(sim.buyTax > 25),
-    holders: j.holderAnalysis && +j.holderAnalysis.holders,
+    ok: !hp && !(sim.sellTax > 25) && !(sim.buyTax > 25) && !(topPct != null && topPct > 35),
+    holders: j && j.holderAnalysis && +j.holderAnalysis.holders,
     sellTax: sim.sellTax, buyTax: sim.buyTax, honeypot: !!hp,
+    topPct, lpPct, renounced, devPct, reasons, src: 'goplus',
   };
 }
 
@@ -186,7 +211,7 @@ async function safety(addr, chain) {
    itself between the web app and the bot. Growth has no server-side history (that's tracked
    client-side in the browser), so it's always the neutral default here with a note saying so. */
 function fServerHolderSafety(sf) {
-  if (!sf || sf.src !== 'rugcheck') return { v: 0.5, note: sf ? 'safety data limited on this chain' : 'rug-check data unavailable' };
+  if (!sf || (sf.src !== 'rugcheck' && sf.src !== 'goplus')) return { v: 0.5, note: sf ? 'safety data limited on this chain' : 'safety data unavailable' };
   let v = 1; const notes = [];
   if (sf.topPct != null) { notes.push('top holder ' + sf.topPct.toFixed(1) + '%'); v -= Math.max(0, sf.topPct - 8) / 40; }
   if (sf.devPct != null) { notes.push('dev ' + sf.devPct.toFixed(1) + '%'); v -= Math.min(0.3, sf.devPct / 12); }
@@ -339,8 +364,11 @@ export async function tokenCard(addr, site) {
     if (best.chain === 'solana') rug = (sf.ok ? '✅ passed' : '⚠️ ' + (sf.reasons[0] || 'flags')) +
       (sf.renounced ? ' · renounced' : ' · not renounced') + (sf.lpPct != null ? ` · LP ${Math.round(sf.lpPct)}%` : '') +
       (sf.topPct != null ? ` · top ${sf.topPct.toFixed(0)}%` : '');
-    else rug = (sf.honeypot ? '⚠️ honeypot' : sf.ok ? '✅ no honeypot' : '⚠️ high tax') +
-      (sf.sellTax != null ? ` · sell tax ${Math.round(sf.sellTax)}%` : '');
+    else rug = (sf.honeypot ? '⚠️ honeypot' : sf.ok ? '✅ passed' : '⚠️ ' + ((sf.reasons && sf.reasons[0]) || 'high tax')) +
+      (sf.sellTax != null ? ` · sell tax ${Math.round(sf.sellTax)}%` : '') +
+      (sf.renounced != null ? (sf.renounced ? ' · renounced' : ' · not renounced') : '') +
+      (sf.lpPct != null ? ` · LP ${Math.round(sf.lpPct)}%` : '') +
+      (sf.topPct != null ? ` · top ${sf.topPct.toFixed(0)}%` : '');
   }
 
   const L = [];
