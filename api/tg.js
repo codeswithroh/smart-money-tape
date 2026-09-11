@@ -224,7 +224,7 @@ async function sendFlex(chatId, addr, entryMc, exitMc, by, from) {
   if (from && from.id) url += `&uid=${from.id}&un=${encodeURIComponent(from.username || from.first_name || 'anon')}`;
   const shareText =
     `$${sym} on Morty Radar 📡\n\n${url}\n\nfind the next one → ${SITE}`;
-  await tg('sendPhoto', {
+  const r = await tg('sendPhoto', {
     chat_id: chatId,
     photo: url,
     caption: `$${sym} — flex it 👇`,
@@ -235,6 +235,14 @@ async function sendFlex(chatId, addr, entryMc, exitMc, by, from) {
       ],
     },
   });
+  // Telegram fetches `photo` itself and can fail (our endpoint hiccups, a timeout, a bad param) —
+  // that comes back as a non-ok response here, not a thrown error, so it has to be checked
+  // explicitly or the caller sees nothing and the user gets no card and no explanation.
+  if (!r.ok) {
+    let desc = '';
+    try { const j = await r.json(); desc = (j && j.description) || ''; } catch (_) {}
+    await tg('sendMessage', { chat_id: chatId, text: `couldn't build that card${desc ? ' (' + desc + ')' : ''} — try again in a moment.` });
+  }
 }
 
 const CHAIN_EMOJI = { solana: '◉', ethereum: '◇', base: '◆', bsc: '◈', arbitrum: '●' };
