@@ -4,7 +4,7 @@ var DEX='https://api.dexscreener.com',GT='https://api.geckoterminal.com/api/v2';
 // GeckoTerminal blocks browser CORS under load -> go through our cached edge proxy
 function gtUrl(p){return '/api/gt?path='+encodeURIComponent(p);}
 var RUG='https://api.rugcheck.xyz/v1/tokens',HP='https://api.honeypot.is/v2/IsHoneypot',FOMO='https://api.fomoapi.io';
-var LS_CFG='ar-cfg-v1',LS_RES='ar-research-v1',LS_HOLD='ar-holders-v1',LS_WATCH='ar-watch-v1',LS_SCORE='ar-scores-v1';
+var LS_CFG='ar-cfg-v1',LS_RES='ar-research-v1',LS_HOLD='ar-holders-v1',LS_WATCH='ar-watch-v1',LS_SCORE='ar-scores-v1',LS_THESIS='ar-thesis-v1';
 var EVM_CHAIN_ID={bsc:56,base:8453,ethereum:1};
 var reduceMotion=!!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 // GeckoTerminal free tier ~25 req/min and 429s without CORS headers -> throttle every GT call
@@ -50,7 +50,7 @@ var state={
  tokenCache:new Map(),   // addr -> {ts,pair}
  boosts:[],trending:[],profiles:{},tinfo:new Map(),
  safety:new Map(),ohlcv:new Map(),
- research:{},holders:{},scores:{},watch:new Set(),watchMeta:new Map(),_watchBusy:false,
+ research:{},holders:{},scores:{},thesis:{},watch:new Set(),watchMeta:new Map(),_watchBusy:false,
  compare:[], // addrs picked for side-by-side comparison, in pick order, capped at 3 — session-only
  chartMode:'entries',rcAddr:null,rcPair:null,rcInfo:null,trades:[],_tradesPoll:0,fhSound:false,
  lastOk:0,lastErr:null,scanAt:0
@@ -63,11 +63,13 @@ function loadAll(){
  try{state.holders=JSON.parse(localStorage.getItem(LS_HOLD)||'{}')||{};}catch(_){state.holders={};}
  try{var w=JSON.parse(localStorage.getItem(LS_WATCH)||'[]');state.watch=new Set(w);}catch(_){}
  try{state.scores=JSON.parse(localStorage.getItem(LS_SCORE)||'{}')||{};}catch(_){state.scores={};}
+ try{state.thesis=JSON.parse(localStorage.getItem(LS_THESIS)||'{}')||{};}catch(_){state.thesis={};}
 }
 function saveCfg(){try{localStorage.setItem(LS_CFG,JSON.stringify({apiKey:state.apiKey,chains:state.chains,tab:state.tab,chartMode:state.chartMode,fhSound:state.fhSound}));}catch(_){}}
 function saveRes(){try{localStorage.setItem(LS_RES,JSON.stringify(state.research));}catch(_){}}
 function saveHold(){try{localStorage.setItem(LS_HOLD,JSON.stringify(state.holders));}catch(_){}}
 function saveScores(){try{localStorage.setItem(LS_SCORE,JSON.stringify(state.scores));}catch(_){}}
+function saveThesis(){try{localStorage.setItem(LS_THESIS,JSON.stringify(state.thesis));}catch(_){}}
 function saveWatch(){try{localStorage.setItem(LS_WATCH,JSON.stringify(Array.from(state.watch)));}catch(_){}}
 
 /* ---------- watchlist (server-backed, per account) ---------- */
@@ -82,12 +84,32 @@ function syncWatchFromServer(){
   saveWatch();
  }).catch(function(){});
 }
+/* ---------- watchlist thesis: why is this coin here, and has that reason held up ----------
+   Captured automatically the moment you star a coin — no form, no friction — from whatever
+   attention data is already on hand for that row. No score-fetch dependency: works from any tab. */
+function recordThesis(addr){
+ if(state.thesis[addr])return; // don't clobber an existing thesis by re-starring
+ var c=state.tokenCache.get(addr),pp=c&&c.pair;if(!pp||!pp.mc)return;
+ var a=pp._a||attn(pp);
+ state.thesis[addr]={mc:pp.mc,price:pp.priceUsd||null,at:Date.now(),traj:a.traj,attn:a.score,invalidatePct:35};
+ saveThesis();
+}
+function clearThesis(addr){if(state.thesis[addr]){delete state.thesis[addr];saveThesis();}}
+function thesisStatus(addr,pp){
+ var t=state.thesis[addr];if(!t||!t.mc||!pp||!pp.mc)return null;
+ var pct=(pp.mc/t.mc-1)*100;
+ var label,cls;
+ if(pct<=-t.invalidatePct){label='thesis invalidated';cls='neg';}
+ else if(pct>=20){label='thesis playing out';cls='pos';}
+ else{label='holding';cls='';}
+ return {pct:pct,label:label,cls:cls,at:t.at,traj:t.traj,attn:t.attn};
+}
 function watchToggle(addr,chain,sym){
  addr=String(addr||'').toLowerCase();if(!addr||state._watchBusy)return;
  var on=state.watch.has(addr);
  state._watchBusy=true;
- if(on){state.watch.delete(addr);state.watchMeta.delete(addr);}
- else{state.watch.add(addr);state.watchMeta.set(addr,{chain:chain||'',sym:sym||'',added:Date.now()});}
+ if(on){state.watch.delete(addr);state.watchMeta.delete(addr);clearThesis(addr);}
+ else{state.watch.add(addr);state.watchMeta.set(addr,{chain:chain||'',sym:sym||'',added:Date.now()});recordThesis(addr);}
  saveWatch();refreshStars();if(state.tab==='watch')renderWatch();
  var req=on
   ? fetch('/api/watchlist?addr='+encodeURIComponent(addr),{method:'DELETE'})
@@ -197,16 +219,25 @@ function renderWatch(){
   var rows=addrs.map(function(a){
    var c=state.tokenCache.get(a),pp=c&&c.pair,meta=state.watchMeta.get(a)||{};
    var sym=(pp&&pp.sym)||meta.sym||'?';
-   if(pp){pp._a=pp._a||attn(pp);pp._tags=pp._tags||tagThemes(pp);pp._q=pp._q||pickQuality(pp);
-    return tokenRow(pp).replace('</button>',cmpBtn(a,sym)+'</button>');
+   if(pp){
+    pp._a=pp._a||attn(pp);pp._tags=pp._tags||tagThemes(pp);pp._q=pp._q||pickQuality(pp);
+    recordThesis(a); // backfill: the star may have fired before this coin's data was cached
+    var btn=tokenRow(pp).replace('</button>',cmpBtn(a,sym)+'</button>');
+    return '<div class="wrow">'+btn+thesisLine(a,pp)+'</div>';
    }
-   return '<button class="trow" data-addr="'+esc(a)+'" data-chain="'+esc(meta.chain||'')+'">'
+   return '<div class="wrow"><button class="trow" data-addr="'+esc(a)+'" data-chain="'+esc(meta.chain||'')+'">'
     +'<span></span><span class="tmain"><span class="tsym">'+starBtn(a,meta.chain,meta.sym)+'$'+esc(meta.sym||'?')+' <span class="cchip">'+esc(meta.chain||'?')+'</span></span>'
     +'<span class="tmeta">no live data right now &mdash; tap to open the x-ray</span></span>'
-    +'<span class="traj">&mdash;</span>'+cmpBtn(a,sym)+'</button>';
+    +'<span class="traj">&mdash;</span>'+cmpBtn(a,sym)+'</button></div>';
   }).join('');
   host.innerHTML=rows;
  });
+}
+function thesisLine(addr,pp){
+ var t=state.thesis[addr];if(!t)return '';
+ var s=thesisStatus(addr,pp);if(!s)return '';
+ var pctStr=(s.pct>=0?'+':'')+s.pct.toFixed(0)+'%';
+ return '<div class="thesis-line">Starred at '+fUsd(t.mc)+' ('+fAgo(t.at)+' ago, '+esc((t.traj||'').toLowerCase())+') &middot; now <b class="'+s.cls+'">'+pctStr+'</b> &middot; <b class="'+s.cls+'">'+esc(s.label)+'</b></div>';
 }
 
 /* ---------- profile + account menu ---------- */
