@@ -791,10 +791,14 @@ function pickQuality(pp){
 function scan(){
  return Promise.all([fetchBoosts(),fetchTrending(),fetchProfiles()]).then(function(){
   var addrs=state.boosts.map(function(b){return b.addr;}).concat(state.trending.map(function(t){return t.addr;})).filter(Boolean);
-  return dexTokens(addrs).then(function(){renderScan();});
- });
+  return dexTokens(addrs);
+ }).then(function(){
+  // screen every candidate BEFORE it ever renders — a coin that fails a real check never
+  // gets a chance to look attractive first. Capped batch so this stays quick on a big pool.
+  return screenPool(rawPool());
+ }).then(function(){renderScan();});
 }
-function attentionPool(){
+function rawPool(){
  var seen={},pool=[],srcOf={};
  state.boosts.forEach(function(b){srcOf[b.addr]='boost';});
  state.trending.forEach(function(t){if(!srcOf[t.addr])srcOf[t.addr]=t.src==='new_pools'?'new':'trending';});
@@ -806,10 +810,36 @@ function attentionPool(){
   var b=state.boosts.filter(function(x){return x.addr===addr;})[0];if(b&&!pp.desc)pp.desc=b.desc;
   pp._src=srcOf[addr];seen[addr]=1;pool.push(pp);
  });
+ return pool;
+}
+// pre-fetch a real rug/safety check for every candidate that doesn't already have a fresh one,
+// so the hard-exclusion filter in attentionPool() has real data to work with before first paint.
+function screenPool(pool){
+ var need=pool.filter(function(pp){var c=state.safety.get(pp.addr);return !c||Date.now()-c.ts>300000;}).slice(0,40);
+ if(!need.length)return Promise.resolve(pool);
+ return Promise.all(need.map(function(pp){return fetchSafety(pp.addr,pp.chain).catch(function(){return null;});})).then(function(){return pool;});
+}
+// a coin that actively FAILS a real check never gets shown by default — not de-ranked, excluded.
+// sf===undefined (not screened yet, or no safety source exists for that chain) still passes:
+// we can't penalize a coin for a check we were never able to run.
+function failsSafety(pp){
+ var sf=state.safety.get(pp.addr);
+ if(!sf)return false;
+ if(sf.ok===false)return true;
+ if(sf.honeypot===true)return true;
+ if(sf.bundle===true)return true;
+ if(sf.renounced===false&&sf.devPct!=null&&sf.devPct>15)return true;
+ return false;
+}
+function attentionPool(){
+ state._screenedOut=0;
+ var pool=rawPool().filter(function(pp){
+  if(failsSafety(pp)){state._screenedOut++;return false;}
+  return true;
+ });
  pool.forEach(function(pp){
   pp._a=attn(pp);pp._tags=tagThemes(pp);pp._q=pickQuality(pp);
   pp._rank=pp._a.score+(pp._q.pumpfun?8:0)-((pp._q.notes.indexOf('non-Pump launchpad')>=0)?6:0);
-  var sf=state.safety.get(pp.addr);if(sf&&sf.bundle)pp._rank-=25;
  });
  pool.sort(function(a,b){return b._rank-a._rank;});
  return pool;
@@ -824,6 +854,11 @@ function renderScan(){
  chips.push(['fresh','Fresh <24h ('+pool.filter(function(p){return p.ageMs!=null&&p.ageMs<864e5;}).length+')']);
  THEMES.forEach(function(t){if(present[t.k])chips.push([t.k,t.name+' ('+present[t.k]+')']);});
  var cur=state._scanFilter||'all';
+ var note=q1('screenNote');
+ if(note){
+  if(state._screenedOut>0){note.hidden=false;note.style.display='';note.innerHTML='&#128737; screened out <b>'+state._screenedOut+'</b> coin'+(state._screenedOut>1?'s':'')+' that failed a real rug/safety check before showing you this list &mdash; honeypot, bundle pattern, or unrenounced with heavy dev holdings.';}
+  else{note.hidden=true;note.style.display='none';}
+ }
  q1('scanFilters').innerHTML=chips.map(function(c){return '<button class="chip-toggle" data-sf="'+c[0]+'" aria-pressed="'+(cur===c[0])+'">'+esc(c[1])+'</button>';}).join('');
  var shown=pool.filter(function(pp){
   if(cur==='all')return true;if(cur==='boost')return pp.boosts;if(cur==='fresh')return pp.ageMs!=null&&pp.ageMs<864e5;
