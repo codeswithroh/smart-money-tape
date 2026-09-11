@@ -564,6 +564,9 @@ function fetchSafety(addr,chain,urlAddr){
    danger.forEach(function(d){reasons.push(d);});
    var ok=!j.rugged&&!j.mintAuthority&&!j.freezeAuthority&&!(topPct!=null&&topPct>35)&&!(devPct!=null&&devPct>5)&&!(insiderPct!=null&&insiderPct>20)&&!bundleSuspected&&!danger.length;
    recordHolders(addr,j.totalHolders);
+   // feed the shared, cross-user deployer reputation ledger — today's screening becomes
+   // tomorrow's protection for anyone else who runs across the same deployer wallet
+   if(!ok&&creator)reportDeployerFlag(creator,chain,reasons[0]||'failed safety screen');
    return done({ok:ok,norm:j.score_normalised,reasons:reasons,lpPct:lp,holders:j.totalHolders,renounced:!j.mintAuthority&&!j.freezeAuthority,topPct:topPct,top5Pct:top5Pct,devPct:devPct,insiderPct:insiderPct,insiders:insiderCount,bundle:bundleSuspected,creator:creator||null,creatorTokens:j.creatorTokens||null,src:'rugcheck'});
   }).catch(function(){return done({ok:null,reasons:['rug check failed'],src:'rugcheck'});});
  }
@@ -661,6 +664,81 @@ function trajTag(a){return '<span class="traj '+a.traj+'">'+a.traj.toUpperCase()
 /* ---------- pick-quality gates (why a coin is worth your attention) ---------- */
 var MIN_MC=7000,MIN_LIQ=5000;
 function pumpFun(pp){return pp.chain==='solana'&&/pump$/i.test(pp.addrRaw||pp.addr||'');}
+/* ---------- deployer reputation ledger (server-backed, shared across every user) ----------
+   Every hard-excluded deployer wallet from anyone's screening feeds one shared Supabase table
+   (api/intel.js -> deployer_flags), so a wallet flagged from someone else's session an hour ago
+   already shows up here. Fire-and-forget on write; a real lookup on every x-ray open. */
+function reportDeployerFlag(addr,chain,reason){
+ try{fetch('/api/intel?kind=deployer_flag',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({addr:addr,chain:chain||'',reason:reason})}).catch(function(){});}catch(_){}
+}
+function deployerRepPanel(sf){
+ if(!sf||!sf.creator)return Promise.resolve('');
+ return fetch('/api/intel?kind=deployer&addr='+encodeURIComponent(sf.creator)).then(function(r){return r.ok?r.json():null;}).then(function(j){
+  var f=j&&j.flag;
+  if(!f||!f.flag_count)return '';
+  return '<div class="panel"><h3>&#9888; Deployer reputation (shared history)</h3>'
+   +'<p style="font-size:12.5px;color:var(--ink-soft)">This deployer wallet has been flagged <b class="neg">'+f.flag_count+' time'+(f.flag_count>1?'s':'')+'</b> across everyone&rsquo;s screenings on this tool, not just this coin: '+esc((f.reasons||[]).join(', ')||'failed safety screen')+'. First seen '+fAgo(Date.parse(f.first_flagged_at))+' ago.</p>'
+   +'</div>';
+ }).catch(function(){return '';});
+}
+/* ---------- narrative half-life corpus (server-backed, grows across every coin x-rayed) ----------
+   Every x-ray open silently logs {theme, age, attention score} to a shared table. Once enough
+   samples exist for a theme, buckets them by age and shows where THIS coin sits on the curve —
+   descriptive placement against past pattern, never a forecast. Thin at first; grows on its own. */
+var PULSE_BUCKETS=[0,1,3,7,14,30];
+function reportPulse(theme,pp,a){
+ if(!theme||pp.ageMs==null)return;
+ try{fetch('/api/intel?kind=pulse',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({theme:theme,addr:pp.addr,chain:pp.chain,sym:pp.sym,ageDays:pp.ageMs/864e5,attnScore:a.score,mc:pp.mc||null})}).catch(function(){});}catch(_){}
+}
+function narrativePulsePanel(theme,pp,a){
+ if(!theme)return Promise.resolve('');
+ return fetch('/api/intel?kind=pulse&theme='+encodeURIComponent(theme)).then(function(r){return r.ok?r.json():null;}).then(function(j){
+  var rows=(j&&j.rows)||[];
+  if(rows.length<15)return '<div class="panel"><h3>Narrative half-life</h3><p style="font-size:12.5px;color:var(--ink-soft)">Only '+rows.length+' logged sample'+(rows.length===1?'':'s')+' for this narrative so far &mdash; this builds up across every coin anyone x-rays. Check back as more data comes in.</p></div>';
+  var buckets=PULSE_BUCKETS.map(function(d,i){
+   var hi=PULSE_BUCKETS[i+1]!=null?PULSE_BUCKETS[i+1]:Infinity;
+   var vals=rows.filter(function(r){return r.age_days>=d&&r.age_days<hi&&r.attn_score!=null;}).map(function(r){return r.attn_score;}).sort(function(a2,b2){return a2-b2;});
+   var med=vals.length?vals[Math.floor(vals.length/2)]:null;
+   return {d:d,med:med,n:vals.length};
+  });
+  var curDays=pp.ageMs/864e5;
+  var curBucketIdx=0;for(var i=0;i<PULSE_BUCKETS.length;i++)if(curDays>=PULSE_BUCKETS[i])curBucketIdx=i;
+  var mx=Math.max.apply(null,buckets.map(function(b){return b.med||0;}))||1;
+  var bars=buckets.map(function(b,i){
+   var h=b.med!=null?Math.max(4,Math.round(b.med/mx*60)):2;
+   return '<div class="hlbar'+(i===curBucketIdx?' cur':'')+'"><i style="height:'+h+'px"></i><span>'+(b.d===0?'launch':b.d+'d+')+'</span></div>';
+  }).join('');
+  return '<div class="panel"><h3>Narrative half-life</h3>'
+   +'<p style="font-size:12.5px;color:var(--ink-soft)">Median attention score by age, across '+rows.length+' logged coins in this narrative &mdash; not this coin&rsquo;s own history, the category&rsquo;s. This coin is '+curDays.toFixed(1)+' day'+(curDays>=2||curDays<1?'s':'')+' in (highlighted bucket). Descriptive pattern, not a forecast.</p>'
+   +'<div class="hlbars">'+bars+'</div>'
+   +'</div>';
+ }).catch(function(){return '';});
+}
+/* ---------- cross-coin wallet sightings (server-backed) ----------
+   Every x-ray logs its visible early-buyer wallets (already pulled for the live trade tape, no
+   new fetch) to a shared table, then checks whether any of THIS coin's wallets have shown up
+   early on other tracked launches before — a documented pattern, stated as fact, never a signal. */
+function reportWalletSightings(pp,wals){
+ if(!wals||!wals.length)return;
+ try{fetch('/api/intel?kind=sightings',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({addr:pp.addr,chain:pp.chain,sym:pp.sym,mc:pp.mc||null,wals:wals})}).catch(function(){});}catch(_){}
+}
+function walletSightingsPanel(pp,wals){
+ if(!wals||!wals.length)return Promise.resolve('');
+ return fetch('/api/intel?kind=sightings&wals='+encodeURIComponent(wals.join(','))+'&addr='+encodeURIComponent(pp.addr)).then(function(r){return r.ok?r.json():null;}).then(function(j){
+  var s=(j&&j.sightings)||[];
+  if(!s.length)return '';
+  var byWal={};s.forEach(function(x){(byWal[x.wal]=byWal[x.wal]||[]).push(x);});
+  var wallets=Object.keys(byWal).sort(function(a,b){return byWal[b].length-byWal[a].length;}).slice(0,5);
+  var rows=wallets.map(function(w){
+   var hits=byWal[w],syms=hits.slice(0,4).map(function(h){return '$'+esc(h.sym||'?');}).join(', ');
+   return '<div class="wtrow"><span>'+esc(walShort(w))+'</span><span style="color:var(--ink-faint)">early on '+hits.length+' other tracked coin'+(hits.length>1?'s':'')+': '+syms+'</span></div>';
+  }).join('');
+  return '<div class="panel"><h3>Cross-coin wallet sightings</h3>'
+   +'<p style="font-size:12.5px;color:var(--ink-soft)">'+wallets.length+' of this coin&rsquo;s early buyer'+(wallets.length>1?'s':'')+' also bought early on other coins tracked by this tool. Fact, not a signal &mdash; being early elsewhere isn&rsquo;t good or bad on its own.</p>'
+   +'<div class="wtrows">'+rows+'</div>'
+   +'</div>';
+ }).catch(function(){return '';});
+}
 /* ---------- bonding-curve graduation radar ----------
    Pump.fun-style tokens trade on an internal bonding curve until they cross a market-cap
    threshold (commonly documented around $69k), at which point liquidity migrates to a real AMM
@@ -1365,10 +1443,12 @@ function renderResearch(pp,sf,watchers,tinfo){
   +'<div class="panel"><h3>What the radar sees</h3>'+autoKv+safeLine+watchLine+'</div>'
   +bundlePanel(pp,sf)
   +deployerPanel(sf)
+  +'<div id="deployerRepPanel"></div>'
   +researchScorePanel(pp,a,sf,hr,proj)
   +exitLiquidityPanel(pp)
   +graduationPanel(pp)
   +'<div id="cohortPanel"></div>'
+  +'<div id="pulsePanel"></div>'
   +compPanel(pp,sf,tags)
   +projPanel
   +checklistPanel(pp,proj)
@@ -1379,9 +1459,14 @@ function renderResearch(pp,sf,watchers,tinfo){
  startFirehose();
  renderTrades();
  var rc=document.querySelector('canvas.radar-cv');if(rc)drawRadar(rc,state._radarAxes||rax);
- // async, never blocks the rest of the card — and guarded against a stale write if the user
- // has already navigated to a different coin by the time this search resolves.
+ // async, never blocks the rest of the card — and each guarded against a stale write if the
+ // user has already navigated to a different coin by the time its fetch resolves.
  cohortPanel(pp).then(function(html){if(state.rcAddr===pp.addr){var el=q1('cohortPanel');if(el)el.innerHTML=html;}});
+ deployerRepPanel(sf).then(function(html){if(state.rcAddr===pp.addr){var el=q1('deployerRepPanel');if(el)el.innerHTML=html;}});
+ if(tags[0]){
+  reportPulse(tags[0],pp,a); // fire-and-forget: this x-ray becomes a data point for everyone's future curve
+  narrativePulsePanel(tags[0],pp,a).then(function(html){if(state.rcAddr===pp.addr){var el=q1('pulsePanel');if(el)el.innerHTML=html;}});
+ }
 }
 function projectPanel(pp,proj){
  var lines=[];
@@ -1562,7 +1647,8 @@ function feedFirehose(fresh){
 function tradesPanel(){
  return '<div class="trades"><h3><span class="pulse"></span>The tape &middot; <span id="tradeRate" style="color:#8a8a76">&hellip;</span></h3>'
   +'<div class="tfeed" id="tradesFeed"><div style="padding:14px;color:#6b7180;font-size:12px">waiting for prints&hellip;</div></div></div>'
-  +'<div id="washPanel">'+washTradingPanel()+'</div>';
+  +'<div id="washPanel">'+washTradingPanel()+'</div>'
+  +'<div id="sightingsPanel"></div>';
 }
 /* ---------- wash-trading fingerprint ----------
    Reads real wallet-level buy/sell attribution off the live trade tape (t.wal, from
@@ -1650,10 +1736,20 @@ function pumpTrades(){
   renderTrades(reduceMotion?[]:freshIds.slice(0,8));
   if(firstFill)feedFirehose();
   else feedFirehose(freshTrades.sort(function(a,b){return a.ts-b.ts;}));
+  // once a real sample of the tape has loaded, log its wallets to the shared sightings table
+  // and check whether any have shown up early elsewhere — once per coin, not every poll tick.
+  if(!state._sightingsSent&&state.trades.length>=8){
+   state._sightingsSent=true;
+   var wals=Array.from(new Set(state.trades.map(function(t){return t.wal;}).filter(Boolean))).slice(0,40);
+   if(wals.length){
+    reportWalletSightings(pp,wals);
+    walletSightingsPanel(pp,wals).then(function(html){if(state.rcAddr===pp.addr){var el=q1('sightingsPanel');if(el)el.innerHTML=html;}});
+   }
+  }
  });
 }
 function startTrades(){
- clearInterval(state._tradesPoll);state.trades=[];_pumpN=0;
+ clearInterval(state._tradesPoll);state.trades=[];_pumpN=0;state._sightingsSent=false;
  var pp=state.rcPair;
  if(pp&&!gtOk(pp.chain)){
   var f=q1('tradesFeed');if(f)f.innerHTML='<div style="padding:14px;color:#6b7180;font-size:12px">The streaming trade feed isn\'t available on '+esc(pp.chain)+' (no GeckoTerminal index). The DexScreener chart above shows this pair\'s live candles &amp; trades. Everything else on this card is live.</div>';

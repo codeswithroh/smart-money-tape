@@ -255,6 +255,14 @@
   .chrows{display:flex;flex-direction:column;gap:4px;margin-top:6px;}
   .chrow{display:grid;grid-template-columns:28px 1fr auto auto auto;gap:8px;align-items:center;font-size:12.5px;padding:4px 2px;border-bottom:1px dashed var(--rule);}
   .chrow.me{background:var(--note);border-radius:5px;font-weight:700;}
+
+  /* narrative half-life bar chart */
+  .hlbars{display:flex;align-items:flex-end;gap:10px;height:76px;margin-top:10px;padding-top:4px;}
+  .hlbar{display:flex;flex-direction:column;align-items:center;gap:4px;flex:1;justify-content:flex-end;height:100%;}
+  .hlbar i{display:block;width:100%;max-width:26px;border-radius:3px 3px 0 0;background:var(--ink-soft);}
+  .hlbar.cur i{background:var(--accent);}
+  .hlbar span{font-size:10px;color:var(--ink-faint);text-transform:uppercase;white-space:nowrap;}
+  .hlbar.cur span{color:var(--accent);font-weight:700;}
   .formrow{display:flex;flex-direction:column;gap:5px;margin-bottom:11px;}
   .formrow label{font-size:12px;text-transform:uppercase;letter-spacing:.03em;color:var(--ink-faint);}
   .seg{display:inline-flex;border:2px solid var(--ink);border-radius:9px 5px 10px 5px;overflow:hidden;flex-wrap:wrap;}

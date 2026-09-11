@@ -105,3 +105,58 @@ export async function watchRemove(accountId, addr) {
     .delete().eq('account_id', accountId).eq('addr', addr);
   if (error) throw error;
 }
+
+// ---- deployer reputation ledger (shared across every user of the tool, not one browser) ----
+export async function deployerFlag(addr, chain, reason) {
+  const { data: existing, error: selErr } = await db().from('deployer_flags')
+    .select('reasons,flag_count').eq('addr', addr).maybeSingle();
+  if (selErr) throw selErr;
+  if (existing) {
+    const reasons = Array.from(new Set([...(existing.reasons || []), reason]));
+    const { error } = await db().from('deployer_flags')
+      .update({ reasons, last_flagged_at: new Date().toISOString(), flag_count: (existing.flag_count || 0) + 1 })
+      .eq('addr', addr);
+    if (error) throw error;
+  } else {
+    const { error } = await db().from('deployer_flags')
+      .insert({ addr, chain: chain || null, reasons: [reason] });
+    if (error) throw error;
+  }
+}
+
+export async function deployerLookup(addr) {
+  const { data, error } = await db().from('deployer_flags').select('*').eq('addr', addr).maybeSingle();
+  if (error) throw error;
+  return data || null;
+}
+
+// ---- narrative half-life corpus ----
+export async function pulseLog({ theme, addr, chain, sym, ageDays, attnScore, mc }) {
+  const { error } = await db().from('narrative_pulse')
+    .insert({ theme, addr, chain: chain || null, sym: sym || null, age_days: ageDays, attn_score: attnScore, mc: mc || null });
+  if (error) throw error;
+}
+
+export async function pulseCurve(theme) {
+  const { data, error } = await db().from('narrative_pulse')
+    .select('age_days,attn_score').eq('theme', theme).not('age_days', 'is', null).limit(3000);
+  if (error) throw error;
+  return data || [];
+}
+
+// ---- cross-coin wallet sightings ----
+export async function walletSightingsAdd(rows) {
+  if (!rows || !rows.length) return;
+  const { error } = await db().from('wallet_sightings')
+    .upsert(rows, { onConflict: 'wal,addr', ignoreDuplicates: true });
+  if (error) throw error;
+}
+
+export async function walletSightingsFor(wals, excludeAddr) {
+  if (!wals || !wals.length) return [];
+  const { data, error } = await db().from('wallet_sightings')
+    .select('wal,addr,chain,sym,ts').in('wal', wals).neq('addr', excludeAddr)
+    .order('ts', { ascending: false }).limit(200);
+  if (error) throw error;
+  return data || [];
+}
