@@ -149,11 +149,11 @@ export async function flexImage(o) {
     div({ fontSize: 22, fontWeight: 700, letterSpacing: 1.5, color: FAINT, textTransform: 'uppercase' }, hasExit ? 'closed' : hasEntry ? 'open' : 'snapshot'),
   ]);
 
-  // a plain content-sized flex row (no fixed width / space-between) so it wraps naturally
-  // within the safe left column instead of stretching under the chart on the right
-  const metaRow = div({ alignItems: 'baseline', flexWrap: 'wrap', marginTop: 18, maxWidth: 460 }, [
-    div({ fontSize: 21, fontWeight: 700, color: META, letterSpacing: 0.3, marginRight: 16 }, metaBits.join('   ·   ')),
-    pct != null ? div({ fontSize: 26, fontWeight: 800, color: stat }, (pct >= 0 ? '+' : '') + pct.toFixed(1) + '%') : null,
+  // stacked rows, not a wrapping flex row — guarantees the %% stat can never float off to
+  // an unrelated position regardless of how long the meta text is or whether it wraps
+  const metaRow = col({ marginTop: 18, maxWidth: 460 }, [
+    div({ fontSize: 21, fontWeight: 700, color: META, letterSpacing: 0.3 }, metaBits.join('   ·   ')),
+    pct != null ? div({ fontSize: 26, fontWeight: 800, color: stat, marginTop: 6 }, (pct >= 0 ? '+' : '') + pct.toFixed(1) + '%') : null,
   ].filter(Boolean));
 
   const content = col({ position: 'absolute', left: 64, bottom: 60, maxWidth: 460 }, [
