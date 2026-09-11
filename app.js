@@ -542,6 +542,74 @@ function researchScorePanel(pp,a,sf,hr,proj){
   +'<p class="rscore-cite">Weights informed by published research: holder-concentration signal measured ~64% stronger than trader/volume signal (MemeTrans/MELT); Pump.fun cohort base rates from CoinGecko Research, arXiv 2607.02823 and arXiv 2512.11850. A heuristic score from public on-chain data &mdash; not financial advice.</p>'
   +'</div>';
 }
+
+/* ---------- narrative comps: how does THIS coin's story/structure rhyme with a real mega-runner ----------
+   Every figure below is a real, sourced milestone for that coin (launch date, ATH market cap, days
+   launch-to-ATH). Matching is on narrative tag + launch mechanism + chain family, not price action —
+   this is "closest archetype," never a price prediction. These five are the tiny survivor population;
+   the panel says so explicitly so it never reads as "this will do what X did." */
+var REFERENCE_COMPS=[
+ {key:'pepe',name:'PEPE',theme:'frog',chainFam:'evm',fairLaunch:true,launched:'Apr 2023',athMc:1.6e9,daysToAth:21,
+  note:'stealth fair launch &mdash; no presale, LP burnt, contract renounced. Became the template pump.fun-style fair launches copy.',
+  src:'CoinGecko / CoinMarketCap'},
+ {key:'wif',name:'dogwifhat (WIF)',theme:'dog',chainFam:'solana',fairLaunch:true,launched:'Nov 2023',athMc:2.2e9,daysToAth:132,
+  note:'pure narrative, no utility &mdash; a literal photo of a dog in a hat. ATH hit on a Binance listing announcement.',
+  src:'CoinMarketCap Academy'},
+ {key:'bonk',name:'BONK',theme:'dog',chainFam:'solana',fairLaunch:true,launched:'Dec 2022',athMc:4.06e9,daysToAth:700,
+  note:'50% of supply airdropped free to the Solana community &mdash; distribution did the work marketing usually does.',
+  src:'CoinMarketCap / Decrypt'},
+ {key:'shib',name:'Shiba Inu (SHIB)',theme:'dog',chainFam:'evm',fairLaunch:false,launched:'Aug 2020',athMc:42.25e9,daysToAth:453,
+  note:'built a real ecosystem (ShibaSwap) around the meme before its 2021 peak &mdash; added utility after launch, not before.',
+  src:'CoinMarketCap'},
+ {key:'doge',name:'Dogecoin (DOGE)',theme:'dog',chainFam:'own-chain',fairLaunch:true,launched:'Dec 2013',athMc:88e9,daysToAth:2711,
+  note:'took nearly 8 years and an Elon-driven mania to peak &mdash; proof a meme with staying power is measured in years, not weeks.',
+  src:'CoinMarketCap'},
+];
+function fairLaunchLikely(sf){
+ if(!sf||sf.src!=='rugcheck')return null;
+ return sf.renounced===true&&(sf.devPct==null||sf.devPct<3)&&(sf.topPct==null||sf.topPct<15)&&!sf.bundle;
+}
+function chainFamily(chain){
+ if(chain==='solana')return 'solana';
+ if(chain==='ethereum'||chain==='base'||chain==='bsc'||chain==='arbitrum'||chain==='polygon')return 'evm';
+ return 'other';
+}
+function bestComp(tags,pp,sf){
+ var fl=fairLaunchLikely(sf),fam=chainFamily(pp.chain);
+ var scored=REFERENCE_COMPS.map(function(c){
+  var s=0;
+  if(tags.indexOf(c.theme)>=0)s+=0.55;
+  if(fam===c.chainFam)s+=0.25;
+  if(fl!=null&&fl===c.fairLaunch)s+=0.20;
+  return {c:c,s:s};
+ });
+ scored.sort(function(x,y){return y.s-x.s;});
+ return scored[0].s>=0.5?scored[0]:null;
+}
+function compPanel(pp,sf,tags){
+ var m=bestComp(tags,pp,sf);
+ if(!m){
+  return '<div class="panel"><h3>Narrative comp</h3>'
+   +'<p style="font-size:12.5px;color:var(--ink-soft)">No strong match against the reference set below. Dog and frog metas dominate the mega-runners on record &mdash; a coin outside those narratives needs its own catalyst; it doesn&rsquo;t inherit one from a legend.</p>'
+   +'<p style="font-size:11px;color:var(--ink-faint);margin-top:6px">Reference set: PEPE, WIF, BONK, SHIB, DOGE &mdash; sourced milestones, not a prediction model.</p></div>';
+ }
+ var c=m.c;
+ var ageDays=pp.ageMs!=null?pp.ageMs/864e5:null;
+ var stageLine=ageDays!=null
+  ?'This coin is <b>'+fAge(pp.ageMs)+'</b> in. '+esc(c.name)+' took <b>'+c.daysToAth+' days</b> from launch to its '+fUsd(c.athMc)+' peak.'
+  :'';
+ return '<div class="panel"><h3>Narrative comp</h3>'
+  +'<div class="kv">'
+  +kv('closest archetype',esc(c.name))
+  +kv('shared traits',(tags.indexOf(c.theme)>=0?esc(c.theme)+' narrative':'')+((fairLaunchLikely(sf)===c.fairLaunch)?' &middot; '+(c.fairLaunch?'fair launch':'insider-allocated launch'):'')+(chainFamily(pp.chain)===c.chainFam?' &middot; '+esc(c.chainFam):''))
+  +kv(esc(c.name)+' launched',esc(c.launched))
+  +kv(esc(c.name)+' ATH mc',fUsd(c.athMc)+' ('+c.daysToAth+'d from launch)')
+  +'</div>'
+  +'<p style="font-size:12.5px;color:var(--ink-soft);margin-top:9px">'+c.note+'</p>'
+  +(stageLine?'<p style="font-size:12.5px;color:var(--ink-soft);margin-top:6px">'+stageLine+'</p>':'')
+  +'<p style="font-size:11px;color:var(--ink-faint);margin-top:8px">Matched on narrative + launch structure, not price action. '+esc(c.name)+' is a survivor &mdash; most coins in its own cohort went to zero, per the research cited above. Source: '+c.src+'.</p>'
+  +'</div>';
+}
 function pickQuality(pp){
  var notes=[],ageMin=pp.ageMs!=null?pp.ageMs/60000:null,pf=pumpFun(pp);
  var mcOk=!pp.mc||pp.mc>=MIN_MC,liqOk=!pp.liq||pp.liq>=MIN_LIQ;
@@ -846,6 +914,7 @@ function renderResearch(pp,sf,watchers,tinfo){
   +'<div class="panel"><h3>What the radar sees</h3>'+autoKv+safeLine+watchLine+'</div>'
   +bundlePanel(pp,sf)
   +researchScorePanel(pp,a,sf,hr,proj)
+  +compPanel(pp,sf,tags)
   +projPanel
   +checklistPanel(pp,proj)
   +tradesPanel()
