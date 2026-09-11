@@ -75,12 +75,15 @@ export default async function handler(req) {
   // skip peakMc entirely when it isn't even shown (only the open-position view uses it), and cap
   // the avatar chain (3 sequential Telegram API round-trips) instead of letting a slow one stall
   // the whole card — a missing avatar is a cosmetic loss, a timed-out card is a support ticket.
+  // race the real Telegram avatar against the DiceBear fallback instead of trying one then the
+  // other — worst case is now one ~1.8s wait total, not up to 4s of stacked sequential timeouts
   const timeout = (p, ms) => Promise.race([p, new Promise((res) => setTimeout(() => res(null), ms))]);
-  const [pk, tgAvatar] = await Promise.all([
+  const [pk, tgAvatar, dbAvatar] = await Promise.all([
     hasExit ? null : peakMc(rc.best),
-    timeout(tgAvatarDataUri(uid), 2500),
+    timeout(tgAvatarDataUri(uid), 1800),
+    timeout(dicebearDataUri(un), 1800),
   ]);
-  const avatar = tgAvatar || await timeout(dicebearDataUri(un), 1500);
+  const avatar = tgAvatar || dbAvatar;
 
   const png = await flexImage({
     sym: rc.best.sym,
