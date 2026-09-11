@@ -42,64 +42,6 @@ function fUsd(n) {
   return '$' + Math.round(n);
 }
 
-// closest index in a chronological price series to a target price (used to place the
-// entry/exit markers on the sparkline from a called market cap, not an exact timestamp)
-function nearestIdx(series, target) {
-  if (!series.length || target == null) return null;
-  let bi = 0, bd = Infinity;
-  for (let i = 0; i < series.length; i++) {
-    const d = Math.abs(series[i] - target);
-    if (d < bd) { bd = d; bi = i; }
-  }
-  return bi;
-}
-
-// the sparkline doubles as this card's atmosphere — rendered big, faint and off to one side,
-// the way a moody photo would sit behind a stat card, but it's the coin's own real price history
-function sparklineSvg(series, entryPx, exitPx, w, h, lineColor) {
-  if (!series || series.length < 2) return null;
-  let lo = Math.min.apply(null, series), hi = Math.max.apply(null, series);
-  if (hi <= lo) hi = lo + 1;
-  const n = series.length;
-  const MARK_R = 9;
-  const x = (i) => Math.min(w - MARK_R, Math.max(MARK_R, (i / (n - 1)) * w));
-  const y = (v) => h - ((v - lo) / (hi - lo)) * (h - 20) - 10;
-  let d = '';
-  series.forEach((v, i) => { d += (i ? 'L' : 'M') + x(i).toFixed(1) + ',' + y(v).toFixed(1) + ' '; });
-  const areaD = d + `L${w},${h} L0,${h} Z`;
-
-  const entryI = nearestIdx(series, entryPx);
-  let exitI = n - 1;
-  if (exitPx != null) {
-    const from = entryI != null ? entryI : 0;
-    const tail = series.slice(from);
-    exitI = from + nearestIdx(tail, exitPx);
-    if (exitI === entryI) exitI = n - 1;
-  }
-
-  const children = [
-    { type: 'path', props: { d: areaD, fill: 'url(#sparkfill)' } },
-    { type: 'path', props: { d, fill: 'none', stroke: lineColor, strokeWidth: 4, strokeLinejoin: 'round', strokeLinecap: 'round', opacity: 0.85 } },
-  ];
-  if (entryI != null) {
-    children.push({ type: 'circle', props: { cx: x(entryI), cy: y(series[entryI]), r: 8, fill: BG_BOT, stroke: FAINT, strokeWidth: 3 } });
-  }
-  if (exitI != null && exitI !== entryI) {
-    children.push({ type: 'circle', props: { cx: x(exitI), cy: y(series[exitI]), r: 8, fill: lineColor, stroke: BG_BOT, strokeWidth: 3 } });
-  }
-  children.unshift({
-    type: 'defs', props: { children: [{
-      type: 'linearGradient', props: {
-        id: 'sparkfill', x1: '0', y1: '0', x2: '0', y2: '1', children: [
-          { type: 'stop', props: { offset: '0%', stopColor: lineColor, stopOpacity: 0.28 } },
-          { type: 'stop', props: { offset: '100%', stopColor: lineColor, stopOpacity: 0 } },
-        ],
-      },
-    }] },
-  });
-  return { type: 'svg', props: { width: w, height: h, viewBox: `0 0 ${w} ${h}`, children } };
-}
-
 function ringIcon(color) {
   return {
     type: 'svg', props: {
@@ -112,7 +54,7 @@ function ringIcon(color) {
   };
 }
 
-// o: { sym, chain, entryMc, exitMc, nowMc, peakMc, by, ago, avatar, series }
+// o: { sym, chain, entryMc, exitMc, nowMc, peakMc, by, ago, avatar }
 export async function flexImage(o) {
   const A = await assets();
   const hasEntry = o.entryMc != null;
@@ -123,14 +65,6 @@ export async function flexImage(o) {
   const up = delta == null || delta >= 0;
   const stat = up ? POS : NEG;
 
-  // entry/exit price implied from the called mc, using the live price:mc ratio (not the last
-  // candle's close, which can lag the live quote enough to skew the ratio and misplace both markers)
-  let entryPx = null, exitPx = null;
-  if (o.series && o.series.length && o.nowMc && o.nowPrice) {
-    const ratio = o.nowPrice / o.nowMc;
-    if (o.entryMc) entryPx = o.entryMc * ratio;
-    if (o.exitMc) exitPx = o.exitMc * ratio;
-  }
   const bigNum = hasEntry
     ? (delta >= 0 ? '+' : '−') + fUsd(Math.abs(delta))
     : (o.nowMc ? 'MC ' + fUsd(o.nowMc) : '$' + (o.sym || '???'));

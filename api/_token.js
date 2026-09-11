@@ -147,11 +147,26 @@ async function safety(addr, chain) {
     if (!j) return null;
     const risks = j.risks || [];
     const danger = risks.filter((x) => String(x.level || '').toLowerCase() === 'danger').map((x) => x.name);
-    const top = (j.topHolders || []).filter((h) => !h.insider && h.pct != null);
+    const allH = (j.topHolders || []).filter((h) => h.pct != null);
+    const top = allH.filter((h) => !h.insider);
     const topPct = top.length ? top[0].pct : null;
     const lp = j.lpLockedPct != null ? j.lpLockedPct : (j.markets && j.markets[0] && j.markets[0].lp && j.markets[0].lp.lpLockedPct);
+    // same holder-analysis depth as the dashboard's client-side rug check, so the bot's score
+    // and the web x-ray's score agree on the same coin
+    const nonLp = top.filter((h) => h.pct < 40);
+    const creator = j.creator || (j.fileMeta && j.fileMeta.creator) || '';
+    const devH = creator ? allH.filter((h) => String(h.address || h.owner || '') === String(creator))[0] : null;
+    const devPct = devH ? devH.pct : (j.creatorBalancePct != null ? j.creatorBalancePct : null);
+    let insiderPct = allH.filter((h) => h.insider).reduce((s, h) => s + (+h.pct || 0), 0);
+    insiderPct = insiderPct || null;
+    const cl = nonLp.slice(0, 10).filter((h) => h.pct >= 0.25 && h.pct <= 5).map((h) => h.pct);
+    let bundle = false;
+    if (cl.length >= 4) { const mn = Math.min(...cl), mx = Math.max(...cl); if (mx - mn <= 0.6) bundle = true; }
     const ok = !j.rugged && !j.mintAuthority && !j.freezeAuthority && !(topPct != null && topPct > 35) && !danger.length;
-    return { ok, holders: j.totalHolders, renounced: !j.mintAuthority && !j.freezeAuthority, lpPct: lp, topPct, reasons: danger };
+    return {
+      ok, holders: j.totalHolders, renounced: !j.mintAuthority && !j.freezeAuthority, lpPct: lp, topPct, reasons: danger,
+      devPct, insiderPct, bundle, creator: creator || null, creatorTokens: j.creatorTokens || null, src: 'rugcheck',
+    };
   }
   const cid = EVM_ID[chain];
   if (!cid) return null;

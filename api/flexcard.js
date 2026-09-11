@@ -1,4 +1,4 @@
-import { resolveCoin, peakMc, priceSeries } from './_token.js';
+import { resolveCoin, peakMc } from './_token.js';
 import { flexImage } from './_flex.js';
 
 export const config = { runtime: 'edge' };
@@ -69,12 +69,18 @@ export default async function handler(req) {
   if (!rc) return new Response('no pair', { status: 404 });
 
   const nowMc = rc.best.mc;
-  const [pk, series, tgAvatar] = await Promise.all([
-    peakMc(rc.best),
-    priceSeries(rc.best, 200).catch(() => []),
-    tgAvatarDataUri(uid),
+  const hasExit = entryMc != null && exitMc != null;
+  // Telegram fetches this URL itself and gives up after a few seconds — every extra network hop
+  // here is a way for that fetch to time out and fail completely silently on the user's end, so:
+  // skip peakMc entirely when it isn't even shown (only the open-position view uses it), and cap
+  // the avatar chain (3 sequential Telegram API round-trips) instead of letting a slow one stall
+  // the whole card — a missing avatar is a cosmetic loss, a timed-out card is a support ticket.
+  const timeout = (p, ms) => Promise.race([p, new Promise((res) => setTimeout(() => res(null), ms))]);
+  const [pk, tgAvatar] = await Promise.all([
+    hasExit ? null : peakMc(rc.best),
+    timeout(tgAvatarDataUri(uid), 2500),
   ]);
-  const avatar = tgAvatar || await dicebearDataUri(un);
+  const avatar = tgAvatar || await timeout(dicebearDataUri(un), 1500);
 
   const png = await flexImage({
     sym: rc.best.sym,
@@ -85,13 +91,13 @@ export default async function handler(req) {
     nowPrice: rc.best.price,
     peakMc: pk && pk > (entryMc || nowMc) ? pk : (entryMc ? Math.max(pk || 0, nowMc) : null),
     by,
-    series,
     avatar,
   });
 
   return new Response(png, {
     headers: {
       'content-type': 'image/png',
+      'content-length': String(png.byteLength),
       'cache-control': 'public, s-maxage=60, stale-while-revalidate=300',
       'access-control-allow-origin': '*',
     },
