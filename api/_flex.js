@@ -156,9 +156,13 @@ export async function flexImage(o) {
     pct != null ? div({ fontSize: 26, fontWeight: 800, color: stat, marginTop: 6 }, (pct >= 0 ? '+' : '') + pct.toFixed(1) + '%') : null,
   ].filter(Boolean));
 
+  // size the big number to its own string length so it never wraps inside the 460px column —
+  // a wrapped "+$X" onto two lines was overlapping the meta text below it
+  const bigSize = bigNum.length <= 6 ? 104 : bigNum.length <= 8 ? 82 : bigNum.length <= 10 ? 66 : 52;
+
   const content = col({ position: 'absolute', left: 64, bottom: 60, maxWidth: 460 }, [
     topRow,
-    div({ fontSize: 100, fontWeight: 800, lineHeight: 1, color: hasEntry ? stat : INK, marginTop: 14 }, bigNum),
+    div({ fontSize: bigSize, fontWeight: 800, lineHeight: 1, whiteSpace: 'nowrap', color: hasEntry ? stat : INK, marginTop: 14 }, bigNum),
     metaRow,
   ]);
 
