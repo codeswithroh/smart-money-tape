@@ -1,4 +1,4 @@
-import { tokenCard, pickAddr, resolveCoin, resolveTicker, topMovers } from './_token.js';
+import { tokenCard, pickAddr, resolveCoin, resolveTicker, topMovers, researchScore, scoreText } from './_token.js';
 import { kvReady, newId, alertsAll, alertPut, alertDel } from './_kv.js';
 
 export const config = { runtime: 'edge' };
@@ -21,6 +21,7 @@ const HELP = [
   '/flex &lt;ca&gt; &lt;entry mc&gt; [exit mc] — shareable card with your entry/exit on the chart + your pic (e.g. <code>/flex So111… 3.8M 40M</code>) 📸',
   '/setalert &lt;ca&gt; &lt;mc&gt; — ping me when it hits that market cap (e.g. <code>/setalert So111… 5M</code>) 🔔',
   '/alerts — your active alerts',
+  '/score &lt;ca&gt; — the long-term research score breakdown (holder safety, liquidity, growth, volume, project surface) 📊',
   '/idea — fresh coin concepts riding the hot narratives 💡',
   '/help — this menu 📖',
   '',
@@ -38,6 +39,7 @@ const START = [
   '• <code>/radar</code> — top attention movers right now ⚡',
   '• <code>/setalert &lt;ca&gt; &lt;mc&gt;</code> — ping you when it hits a market cap 🔔',
   '• <code>/flex &lt;ca&gt; &lt;entry mc&gt; [exit mc]</code> — chart card with your entry/exit + your pic, built for X 📸',
+  '• <code>/score &lt;ca&gt;</code> — long-term research score breakdown 📊',
   '• <code>/idea</code> — fresh coin concepts riding the hot narratives 💡',
   '• paste a CA — instant full x-ray 🔬',
   '• <code>/help</code> — the whole cheatsheet 📖',
@@ -402,6 +404,19 @@ export default async function handler(req) {
   }
   if (/^\/idea\b/i.test(text)) {
     await tg('sendMessage', { chat_id: chatId, text: '💡 spinoff ideas:\n\n• <b>' + [idea(), idea(), idea()].join('</b>\n• <b>') + '</b>', parse_mode: 'HTML' });
+    return new Response('ok');
+  }
+  if (/^\/(score|analyst)\b/i.test(text)) {
+    const addr = pickAddr(text);
+    if (!addr) { await tg('sendMessage', { chat_id: chatId, text: 'usage: /score &lt;contract&gt;\ne.g. /score So111…', parse_mode: 'HTML' }); return new Response('ok'); }
+    try {
+      const s = await researchScore(addr);
+      if (!s) { await tg('sendMessage', { chat_id: chatId, text: "couldn't find a pair for that address.", ...reply }); return new Response('ok'); }
+      await tg('sendMessage', {
+        chat_id: chatId, text: scoreText(s), parse_mode: 'HTML',
+        reply_markup: { inline_keyboard: [[{ text: '🔬 Full x-ray', url: `${SITE}/?coin=${encodeURIComponent(addr)}` }]] },
+      });
+    } catch (_) { await tg('sendMessage', { chat_id: chatId, text: "couldn't score that one — try again in a moment.", ...reply }); }
     return new Response('ok');
   }
   if (/^\/flex\b/i.test(text)) {

@@ -19,6 +19,7 @@ const COMMANDS = [
   { command: 'setalert', description: '🔔 Alert me at a market cap — /setalert <ca> <mc>' },
   { command: 'alerts', description: '🔔 Your active market-cap alerts' },
   { command: 'flex', description: '📸 Shareable multiplier card — /flex <ca> [entry mc]' },
+  { command: 'score', description: '📊 Long-term research score breakdown — /score <ca>' },
   { command: 'idea', description: '💡 Fresh coin concepts riding the hot narratives' },
   { command: 'help', description: '📖 What I can do' },
   { command: 'start', description: '👋 Show my welcome message' },

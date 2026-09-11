@@ -181,6 +181,91 @@ async function safety(addr, chain) {
   };
 }
 
+/* ---------- long-term research score (server-side, for the /score Telegram command) ----------
+   Same five factors and weights as the dashboard's X-ray panel, so a coin never disagrees with
+   itself between the web app and the bot. Growth has no server-side history (that's tracked
+   client-side in the browser), so it's always the neutral default here with a note saying so. */
+function fServerHolderSafety(sf) {
+  if (!sf || sf.src !== 'rugcheck') return { v: 0.5, note: sf ? 'safety data limited on this chain' : 'rug-check data unavailable' };
+  let v = 1; const notes = [];
+  if (sf.topPct != null) { notes.push('top holder ' + sf.topPct.toFixed(1) + '%'); v -= Math.max(0, sf.topPct - 8) / 40; }
+  if (sf.devPct != null) { notes.push('dev ' + sf.devPct.toFixed(1) + '%'); v -= Math.min(0.3, sf.devPct / 12); }
+  if (sf.insiderPct != null) { notes.push('insiders ' + sf.insiderPct.toFixed(0) + '%'); v -= Math.min(0.3, sf.insiderPct / 70); }
+  if (sf.bundle) { notes.push('bundle pattern'); v -= 0.35; }
+  if (sf.renounced === false) { notes.push('not renounced'); v -= 0.15; }
+  if (sf.lpPct != null && sf.lpPct < 50) { notes.push('LP ' + Math.round(sf.lpPct) + '% locked'); v -= 0.15; }
+  if (sf.ok === false) v = Math.min(v, 0.15);
+  return { v: Math.max(0, Math.min(1, v)), note: notes.length ? notes.join(' · ') : 'no rug-check flags' };
+}
+function fServerLiquidity(best) {
+  if (!best.liq || !best.mc) return { v: 0.3, note: 'liquidity/mc unavailable' };
+  const ratio = best.liq / best.mc; let v = Math.min(1, ratio / 0.12);
+  if (best.liq < 5000) v = Math.min(v, 0.15);
+  return { v, note: fUsd(best.liq) + ' liq · ' + (ratio * 100).toFixed(1) + '% of mc' };
+}
+function fServerVolume(best, a) {
+  let v = 1; const notes = [];
+  const skewDist = Math.abs(a.skew1 - 0.5);
+  if (skewDist > 0.35) { v -= 0.3; notes.push('lopsided buy/sell'); }
+  const vmc = best.mc ? (best.vol.h24 || 0) / best.mc : 0;
+  if (vmc > 6) { v -= 0.35; notes.push('vol/mc ' + vmc.toFixed(1) + 'x — wash-trade risk'); }
+  else if (vmc < 0.02) { v -= 0.2; notes.push('vol/mc thin — low real interest'); }
+  else notes.push('vol/mc ' + vmc.toFixed(2) + 'x');
+  return { v: Math.max(0, Math.min(1, v)), note: notes.join(' · ') };
+}
+function fServerProject(best) {
+  const hasX = best.socials.some((s) => s.type === 'twitter' || s.type === 'x');
+  const hasTg = best.socials.some((s) => s.type === 'telegram');
+  const hasSite = (best.sites && best.sites.length > 0) || !!best.siteUrl;
+  const n = [hasX, hasTg, hasSite].filter(Boolean).length;
+  return { v: n / 3, note: n + '/3 surface (x/telegram/site)' };
+}
+export async function researchScore(addr) {
+  const rc = await resolveCoin(addr);
+  if (!rc) return null;
+  const best = rc.best, a = rc.a;
+  const sf = await safety(best.addr, best.chain);
+  const H = fServerHolderSafety(sf), L = fServerLiquidity(best);
+  const G = { v: 0.35, note: 'not tracked in Telegram — open the x-ray for holder-growth history' };
+  const V = fServerVolume(best, a), P = fServerProject(best);
+  const pct = Math.round(100 * (0.32 * H.v + 0.20 * L.v + 0.18 * G.v + 0.15 * V.v + 0.15 * P.v));
+  let label, cls;
+  if (pct >= 68) { label = 'BUILT TO LAST'; cls = 'pos'; }
+  else if (pct >= 48) { label = 'HAS SOME LEGS'; cls = ''; }
+  else if (pct >= 28) { label = 'SPECULATIVE'; cls = 'watch'; }
+  else { label = 'HIGH RUG RISK'; cls = 'neg'; }
+  return {
+    pct, label, cls, best, tags: rc.tags,
+    factors: [
+      { k: 'Holder safety', ...H },
+      { k: 'Liquidity depth', ...L },
+      { k: 'Organic growth', ...G },
+      { k: 'Volume authenticity', ...V },
+      { k: 'Project surface', ...P },
+    ],
+  };
+}
+function bar(pct) {
+  const filled = Math.round(Math.max(0, Math.min(100, pct)) / 5);
+  return '█'.repeat(filled) + '░'.repeat(20 - filled);
+}
+export function scoreText(s) {
+  const L = [];
+  L.push(`<b>$${esc(s.best.sym)}</b> · long-term research score`);
+  L.push('━━━━━━━━━━━━━━');
+  L.push(`<b>${s.pct}/100 — ${esc(s.label)}</b>`);
+  L.push('Weighted from holder safety, liquidity, growth, volume authenticity, project surface — not age.');
+  L.push('');
+  s.factors.forEach((f) => {
+    const pct = Math.round(f.v * 100);
+    L.push(`<code>${bar(pct)}</code> ${pct}  ${esc(f.k)}`);
+    L.push(`   <i>${f.note}</i>`);
+  });
+  L.push('━━━━━━━━━━━━━━');
+  L.push('Same weighting as the dashboard’s X-ray panel. A heuristic score from public on-chain data — not financial advice.');
+  return L.join('\n');
+}
+
 // tiny spinoff-idea generator
 const PRE = ['turbo', 'mega', 'based', 'giga', 'hyper', 'micro'];
 const SUF = ['inu', 'pepe', 'fi', 'ai', '69', 'coin', 'max', 'god'];
