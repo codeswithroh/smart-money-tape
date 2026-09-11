@@ -81,6 +81,11 @@
   .skcard .skline{margin-bottom:10px;}
   .skcard .skbig{height:34px;width:46%;}
   .skcard .skchart{height:160px;border-radius:8px;margin:14px 0;}
+  .skbc{border:2px solid var(--ink);border-radius:13px 7px 12px 8px / 7px 13px 8px 12px;background:var(--card);padding:11px 13px;box-shadow:2px 3px 0 rgba(44,53,80,.13);opacity:.85;}
+  .skbc:nth-child(odd){transform:rotate(-.3deg);} .skbc:nth-child(even){transform:rotate(.3deg);}
+  .skbc .skline:nth-child(1){width:60%;height:18px;margin-bottom:8px;}
+  .skbc .skline:nth-child(2){width:85%;margin-bottom:9px;}
+  .skbc .skline:nth-child(3){width:100%;height:8px;}
 
   /* THEME CARDS */
   .themes{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-top:8px;}
@@ -481,7 +486,7 @@
   <section id="tab-scan">
     <div class="shead"><h2><span class="sweep"></span>Hot right now</h2><span class="hint"><button class="btn sm" id="flexBoard">&#128248; flex the board</button></span></div>
     <p class="lead">Top coins by attention momentum, this minute. Not advice &mdash; just where the eyeballs are.</p>
-    <div class="board" id="board"><div class="empty">reading the tape&hellip;</div></div>
+    <div class="board" id="board"><div class="skbc"><span class="skline"></span><span class="skline"></span><span class="skline"></span></div><div class="skbc"><span class="skline"></span><span class="skline"></span><span class="skline"></span></div><div class="skbc"><span class="skline"></span><span class="skline"></span><span class="skline"></span></div></div>
 
     <div class="shead"><h2>Mint an idea</h2><span class="hint"><button class="btn sm" id="ideaRoll">&#127922; reroll</button></span></div>
     <p class="lead">Narratives that are hot on-chain right now, turned into fresh coin concepts &mdash; name, ticker, one-liner. A toy. Do your own homework before you deploy anything.</p>
@@ -497,7 +502,7 @@
     <div class="shead"><h2>Everything moving</h2><span class="hint" id="scanHint">boosts + trending + new &middot; ~90s</span></div>
     <p class="lead" id="screenNote" style="display:none"></p>
     <div class="controls" id="scanFilters"></div>
-    <div class="rows" id="attnList"><div class="empty">loading&hellip;</div></div>
+    <div class="rows" id="attnList"><div class="skrow"><span class="skava"></span><span class="skcol"><span class="skline"></span><span class="skline"></span></span><span class="skline sktraj"></span></div><div class="skrow"><span class="skava"></span><span class="skcol"><span class="skline"></span><span class="skline"></span></span><span class="skline sktraj"></span></div><div class="skrow"><span class="skava"></span><span class="skcol"><span class="skline"></span><span class="skline"></span></span><span class="skline sktraj"></span></div></div>
   </section>
 
   <!-- WATCHLIST -->

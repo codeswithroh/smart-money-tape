@@ -1485,10 +1485,15 @@ function rerenderRcard(){clearTimeout(_rerenderT);_rerenderT=setTimeout(function
 },60);}
 
 /* ---------- HOT BOARD ---------- */
+function skelBoard(n){
+ var card='<div class="skbc"><span class="skline"></span><span class="skline"></span><span class="skline"></span></div>';
+ var out='';for(var i=0;i<n;i++)out+=card;
+ return out;
+}
 function renderBoard(){
  var el=q1('board');if(!el)return;
  var pool=(state._pool||[]).filter(function(pp){return pp._a;});
- if(!pool.length){el.innerHTML='<div class="empty">reading the tape&hellip;</div>';return;}
+ if(!pool.length){el.innerHTML=skelBoard(6);return;}
  var top=pool.slice(0,6);
  var medals=['🥇','🥈','🥉','4','5','6'];
  var mx=Math.max.apply(null,top.map(function(p){return p._a.score;}))||1;
@@ -1805,6 +1810,7 @@ if(loadScanCache()&&rawPool().length){
  if(cn)cn.insertAdjacentHTML('afterend','<div class="cachenote" id="cacheNote">showing cached data &mdash; refreshing live&hellip;</div>');
 } else {
  q1('attnList').innerHTML=skelRows(6);
+ q1('board').innerHTML=skelBoard(6);
 }
 scan().then(function(){var cn=q1('cacheNote');if(cn)cn.remove();}).then(setStatus);
 // pull the account (avatar/menu) + watchlist (authoritative)
