@@ -54,7 +54,8 @@ function sparklineSvg(series, entryPx, exitPx) {
   let lo = Math.min.apply(null, series), hi = Math.max.apply(null, series);
   if (hi <= lo) hi = lo + 1;
   const n = series.length;
-  const x = (i) => (i / (n - 1)) * CHART_W;
+  const MARK_R = 11;
+  const x = (i) => Math.min(CHART_W - MARK_R, Math.max(MARK_R, (i / (n - 1)) * CHART_W));
   const y = (v) => CHART_H - ((v - lo) / (hi - lo)) * (CHART_H - 24) - 12;
   let d = '';
   series.forEach((v, i) => { d += (i ? 'L' : 'M') + x(i).toFixed(1) + ',' + y(v).toFixed(1) + ' '; });
