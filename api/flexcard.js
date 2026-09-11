@@ -44,10 +44,16 @@ async function tgAvatarDataUri(uid) {
   } catch (_) { return null; }
 }
 
-function dicebearUrl(seed) {
-  // .png, not .svg — the og-image renderer (satori) can't rasterize a remote SVG <img>, only bitmaps
-  return 'https://api.dicebear.com/9.x/identicon/png?seed=' + encodeURIComponent(seed || 'anon') +
-    '&backgroundColor=eadfc4,f4ecd9,fdf3cf&backgroundType=solid&radius=50&size=120';
+// fetch + base64-embed rather than hand satori a remote URL: the og-image renderer's own
+// remote-image fetch is unreliable inside this edge runtime, but a data: URI always renders.
+async function dicebearDataUri(seed) {
+  try {
+    const url = 'https://api.dicebear.com/9.x/identicon/png?seed=' + encodeURIComponent(seed || 'anon') +
+      '&backgroundColor=eadfc4,f4ecd9,fdf3cf&backgroundType=solid&radius=50&size=120';
+    const buf = await fetch(url).then((r) => (r.ok ? r.arrayBuffer() : null));
+    if (!buf) return null;
+    return 'data:image/png;base64,' + toB64(buf);
+  } catch (_) { return null; }
 }
 
 export default async function handler(req) {
@@ -63,11 +69,12 @@ export default async function handler(req) {
   if (!rc) return new Response('no pair', { status: 404 });
 
   const nowMc = rc.best.mc;
-  const [pk, series, avatar] = await Promise.all([
+  const [pk, series, tgAvatar] = await Promise.all([
     peakMc(rc.best),
     priceSeries(rc.best, 200).catch(() => []),
     tgAvatarDataUri(uid),
   ]);
+  const avatar = tgAvatar || await dicebearDataUri(un);
 
   const png = await flexImage({
     sym: rc.best.sym,
@@ -78,7 +85,7 @@ export default async function handler(req) {
     peakMc: pk && pk > (entryMc || nowMc) ? pk : (entryMc ? Math.max(pk || 0, nowMc) : null),
     by,
     series,
-    avatar: avatar || dicebearUrl(un),
+    avatar,
   });
 
   return new Response(png, {

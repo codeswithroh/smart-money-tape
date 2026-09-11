@@ -61,7 +61,17 @@ function sparklineSvg(series, entryPx, exitPx) {
   const areaD = d + `L${CHART_W},${CHART_H} L0,${CHART_H} Z`;
 
   const entryI = nearestIdx(series, entryPx);
-  const exitI = exitPx != null ? nearestIdx(series, exitPx) : n - 1;
+  // an exit always reads as "forward in time" from the entry, so search only the back half of
+  // the chart for it; if that still collapses onto the same candle as entry (e.g. a called mc
+  // far outside what this chart window covers), pin it to the most recent candle instead of
+  // stacking two markers on one point.
+  let exitI = n - 1;
+  if (exitPx != null) {
+    const from = entryI != null ? entryI : 0;
+    const tail = series.slice(from);
+    exitI = from + nearestIdx(tail, exitPx);
+    if (exitI === entryI) exitI = n - 1;
+  }
   const up = exitPx != null && entryPx != null ? exitPx >= entryPx : true;
   const lineColor = up ? '#7CFF5B' : '#ff5c4d';
 
