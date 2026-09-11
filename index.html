@@ -242,6 +242,19 @@
   .jrow{display:grid;grid-template-columns:60px 50px 55px 1fr auto;gap:8px;align-items:center;font-size:12px;padding:4px 2px;border-bottom:1px dashed var(--rule);}
   .jrow .pos{color:var(--pos);font-weight:700;} .jrow .neg{color:var(--neg);font-weight:700;}
   .exposure{border-color:var(--hot);background:linear-gradient(180deg,var(--note),var(--card));margin-bottom:10px;}
+
+  /* wash-trading fingerprint */
+  .wtrows{display:flex;flex-direction:column;gap:4px;}
+  .wtrow{display:flex;justify-content:space-between;gap:10px;font-family:"Share Tech Mono",monospace;font-size:12px;padding:3px 0;border-bottom:1px dashed var(--rule);}
+
+  /* bonding-curve graduation radar */
+  .grad-bar{height:11px;border:1.5px solid var(--ink);border-radius:6px 3px 6px 3px;overflow:hidden;margin-top:8px;background:var(--paper-2);}
+  .grad-bar>i{display:block;height:100%;background:var(--pos);} .grad-bar>i.watch{background:var(--hot);} .grad-bar>i.neg{background:var(--ink-faint);}
+
+  /* copycat cohort ranking */
+  .chrows{display:flex;flex-direction:column;gap:4px;margin-top:6px;}
+  .chrow{display:grid;grid-template-columns:28px 1fr auto auto auto;gap:8px;align-items:center;font-size:12.5px;padding:4px 2px;border-bottom:1px dashed var(--rule);}
+  .chrow.me{background:var(--note);border-radius:5px;font-weight:700;}
   .formrow{display:flex;flex-direction:column;gap:5px;margin-bottom:11px;}
   .formrow label{font-size:12px;text-transform:uppercase;letter-spacing:.03em;color:var(--ink-faint);}
   .seg{display:inline-flex;border:2px solid var(--ink);border-radius:9px 5px 10px 5px;overflow:hidden;flex-wrap:wrap;}

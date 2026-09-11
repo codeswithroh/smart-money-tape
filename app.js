@@ -661,6 +661,67 @@ function trajTag(a){return '<span class="traj '+a.traj+'">'+a.traj.toUpperCase()
 /* ---------- pick-quality gates (why a coin is worth your attention) ---------- */
 var MIN_MC=7000,MIN_LIQ=5000;
 function pumpFun(pp){return pp.chain==='solana'&&/pump$/i.test(pp.addrRaw||pp.addr||'');}
+/* ---------- bonding-curve graduation radar ----------
+   Pump.fun-style tokens trade on an internal bonding curve until they cross a market-cap
+   threshold (commonly documented around $69k), at which point liquidity migrates to a real AMM
+   pool (Raydium/PumpSwap) — a genuine structural discontinuity, not a smooth continuation.
+   This tool has no direct read on the bonding-curve program's own reserve state (that needs a
+   Solana RPC call this stack doesn't make) — it only has DexScreener's market cap, so the
+   progress bar below is an honest approximation, explicitly labeled as one. */
+var GRAD_THRESHOLD_USD=69000;
+function graduationPanel(pp){
+ if(!(pp.chain==='solana'&&pumpFun(pp)))return '';
+ var mc=pp.mc||0;
+ if(mc>=GRAD_THRESHOLD_USD*1.15){
+  return '<div class="panel"><h3>Bonding-curve graduation</h3><p style="font-size:12.5px;color:var(--ink-soft)">Already well past the commonly-cited ~'+fUsd(GRAD_THRESHOLD_USD)+' Pump.fun graduation mark &mdash; this is very likely trading on a real AMM pool now, not the bonding curve itself.</p></div>';
+ }
+ var pct=Math.max(1,Math.min(100,Math.round(mc/GRAD_THRESHOLD_USD*100)));
+ var remaining=Math.max(0,GRAD_THRESHOLD_USD-mc);
+ var cls=pct>=85?'watch':pct<25?'neg':'';
+ return '<div class="panel"><h3>Bonding-curve graduation</h3>'
+  +'<p style="font-size:12.5px;color:var(--ink-soft)">Approaching the market cap where Pump.fun bonding-curve launches historically migrate to a real AMM pool. At that migration, liquidity resets into a brand-new pool &mdash; a real structural break in depth (and often price), not a smooth continuation of the curve.</p>'
+  +'<div class="grad-bar"><i class="'+cls+'" style="width:'+pct+'%"></i></div>'
+  +'<p style="font-size:12px;color:var(--ink-soft);margin-top:6px">'+fUsd(mc)+' of ~'+fUsd(GRAD_THRESHOLD_USD)+' ('+pct+'%) &mdash; roughly '+fUsd(remaining)+' of market-cap growth left at this rate of approximation.</p>'
+  +'<p style="font-size:11px;color:var(--ink-faint);margin-top:8px">Approximate: reads DexScreener&rsquo;s market cap, not the bonding-curve program&rsquo;s own on-chain reserve state, and the real threshold has varied historically. Directional, not exact — and not a timing signal.</p>'
+  +'</div>';
+}
+/* ---------- copycat cohort ranking ----------
+   Clusters live DexScreener search results by shared name/ticker keywords to answer "of every
+   coin riding this exact meme right now, where does THIS one rank" — in a copycat wave, at most
+   one usually survives, so the cohort-relative rank matters more than any single coin's own
+   numbers. Fetched async (a live search), never blocks the rest of the x-ray render. */
+function coreNameTokens(s){
+ return String(s||'').toLowerCase().replace(/[^a-z0-9 ]/g,' ').split(/\s+/)
+  .filter(function(w){return w.length>=3&&!/^(coin|token|the|inu|sol|eth|bsc|base|pump|meme|coins|tokens|official|new|v2)$/.test(w);});
+}
+function cohortPanel(pp){
+ var toks=coreNameTokens(pp.name||pp.sym);
+ if(!toks.length)return Promise.resolve('');
+ return dexSearch(toks[0]).then(function(pairs){
+  var self=pp.addr;
+  var cohort=pairs.filter(function(x){
+   if(!chainOk(x.chain))return false;
+   if(x.addr===self)return true;
+   var xt=coreNameTokens(x.name||x.sym);
+   return toks.some(function(t){return xt.indexOf(t)>=0;});
+  });
+  var byAddr={};cohort.forEach(function(x){if(!byAddr[x.addr]||(x.liq||0)>(byAddr[x.addr].liq||0))byAddr[x.addr]=x;});
+  if(!byAddr[self])byAddr[self]=pp; // guarantee self is present even if the search paginated it out
+  var arr=Object.keys(byAddr).map(function(k){return byAddr[k];});
+  if(arr.length<2)return ''; // no real cohort — don't force a comparison that isn't there
+  arr.sort(function(a,b){return (b.liq||0)-(a.liq||0);});
+  var rank=arr.map(function(x){return x.addr;}).indexOf(self)+1;
+  var rows=arr.slice(0,6).map(function(x,i){
+   var isSelf=x.addr===self;
+   return '<div class="chrow'+(isSelf?' me':'')+'"><span>#'+(i+1)+'</span><span>$'+esc(x.sym)+(isSelf?' <i>(this one)</i>':'')+'</span><span class="cchip">'+esc(x.chain)+'</span><span style="color:var(--ink-faint)">'+fUsd(x.liq)+' liq</span><span style="color:var(--ink-faint)">'+fAge(x.ageMs)+' old</span></div>';
+  }).join('');
+  return '<div class="panel"><h3>Copycat cohort</h3>'
+   +'<p style="font-size:12.5px;color:var(--ink-soft)">'+arr.length+' live coin'+(arr.length>1?'s':'')+' share a name keyword with $'+esc(pp.sym)+' right now. In a copycat wave at most one usually survives &mdash; by liquidity, this one ranks <b>#'+rank+' of '+arr.length+'</b> in its own cohort.</p>'
+   +'<div class="chrows">'+rows+'</div>'
+   +'<p style="font-size:11px;color:var(--ink-faint);margin-top:8px">Matched on shared name keywords via a live DexScreener search, not a verified relationship &mdash; some matches may be coincidental, and a real original can still rank low right after a fresh copy launches.</p>'
+   +'</div>';
+ }).catch(function(){return '';});
+}
 
 /* ---------- survival curve (pattern-in-the-chaos: base-rate death odds by age) ----------
    Sourced from published launch-cohort studies, not a prediction model:
@@ -1306,6 +1367,8 @@ function renderResearch(pp,sf,watchers,tinfo){
   +deployerPanel(sf)
   +researchScorePanel(pp,a,sf,hr,proj)
   +exitLiquidityPanel(pp)
+  +graduationPanel(pp)
+  +'<div id="cohortPanel"></div>'
   +compPanel(pp,sf,tags)
   +projPanel
   +checklistPanel(pp,proj)
@@ -1316,6 +1379,9 @@ function renderResearch(pp,sf,watchers,tinfo){
  startFirehose();
  renderTrades();
  var rc=document.querySelector('canvas.radar-cv');if(rc)drawRadar(rc,state._radarAxes||rax);
+ // async, never blocks the rest of the card — and guarded against a stale write if the user
+ // has already navigated to a different coin by the time this search resolves.
+ cohortPanel(pp).then(function(html){if(state.rcAddr===pp.addr){var el=q1('cohortPanel');if(el)el.innerHTML=html;}});
 }
 function projectPanel(pp,proj){
  var lines=[];
@@ -1495,7 +1561,61 @@ function feedFirehose(fresh){
 }
 function tradesPanel(){
  return '<div class="trades"><h3><span class="pulse"></span>The tape &middot; <span id="tradeRate" style="color:#8a8a76">&hellip;</span></h3>'
-  +'<div class="tfeed" id="tradesFeed"><div style="padding:14px;color:#6b7180;font-size:12px">waiting for prints&hellip;</div></div></div>';
+  +'<div class="tfeed" id="tradesFeed"><div style="padding:14px;color:#6b7180;font-size:12px">waiting for prints&hellip;</div></div></div>'
+  +'<div id="washPanel">'+washTradingPanel()+'</div>';
+}
+/* ---------- wash-trading fingerprint ----------
+   Reads real wallet-level buy/sell attribution off the live trade tape (t.wal, from
+   GeckoTerminal's tx_from_address — already fetched for the tape, no new data source) instead
+   of stopping at an aggregate volume number. Three concrete patterns, not a vibe score:
+   self-trade loops (a wallet both buying and selling repeatedly in the same window), scripted
+   cadence (near-identical time gaps between one wallet's trades), and volume concentrated in
+   a tiny wallet set. Refreshes every trade-poll tick since the tape is what feeds it. */
+function washTradingSignals(){
+ var trades=state.trades||[];
+ if(trades.length<8)return null;
+ var byWal={};
+ trades.forEach(function(t){if(!t.wal)return;(byWal[t.wal]=byWal[t.wal]||[]).push(t);});
+ var wallets=Object.keys(byWal);
+ if(!wallets.length)return null;
+ var selfLoop=[];
+ wallets.forEach(function(w){
+  var ts=byWal[w],buys=ts.filter(function(t){return t.buy;}).length,sells=ts.length-buys;
+  if(buys>=2&&sells>=2)selfLoop.push({wal:w,buys:buys,sells:sells,n:ts.length});
+ });
+ selfLoop.sort(function(a,b){return b.n-a.n;});
+ var cadence=[];
+ wallets.forEach(function(w){
+  var ts=byWal[w].slice().sort(function(a,b){return a.ts-b.ts;});
+  if(ts.length<3)return;
+  var deltas=[];for(var i=1;i<ts.length;i++)deltas.push(ts[i].ts-ts[i-1].ts);
+  var mean=deltas.reduce(function(s,d){return s+d;},0)/deltas.length;
+  if(mean<=0)return;
+  var variance=deltas.reduce(function(s,d){return s+(d-mean)*(d-mean);},0)/deltas.length;
+  var cv=Math.sqrt(variance)/mean;
+  if(cv<0.18)cadence.push({wal:w,n:ts.length,cv:cv});
+ });
+ cadence.sort(function(a,b){return b.n-a.n;});
+ var byCount=wallets.slice().sort(function(a,b){return byWal[b].length-byWal[a].length;});
+ var top3=byCount.slice(0,3);
+ var topShare=top3.reduce(function(s,w){return s+byWal[w].length;},0)/trades.length;
+ return {sample:trades.length,uniqueWallets:wallets.length,selfLoop:selfLoop,cadence:cadence,topShare:topShare};
+}
+function washTradingPanel(){
+ var s=washTradingSignals();
+ if(!s)return '<div class="panel"><h3>Wash-trading fingerprint</h3><p style="font-size:12.5px;color:var(--ink-soft)">Not enough of the live trade tape has loaded yet to fingerprint anything &mdash; check back once the tape above has more prints.</p></div>';
+ var flags=[];
+ if(s.selfLoop.length)flags.push(s.selfLoop.length+' wallet'+(s.selfLoop.length>1?'s':'')+' bought <b>and</b> sold repeatedly in this sample (self-trade loop pattern)');
+ if(s.cadence.length)flags.push(s.cadence.length+' wallet'+(s.cadence.length>1?'s':'')+' trading at near-identical time intervals (scripted-cadence pattern)');
+ if(s.topShare>=0.5)flags.push('top 3 wallets account for '+Math.round(s.topShare*100)+'% of trades in this sample &mdash; volume concentrated in very few hands');
+ var verdict=flags.length?'<b class="neg">Wash-trading pattern signals present in this sample.</b>':'<b class="pos">No wash-trading pattern flagged in this sample.</b>';
+ var walRows=s.selfLoop.slice(0,4).map(function(w){return '<div class="wtrow"><span>'+esc(walShort(w.wal))+'</span><span style="color:var(--ink-faint)">'+w.buys+' buys / '+w.sells+' sells</span></div>';}).join('');
+ return '<div class="panel"><h3>Wash-trading fingerprint</h3>'
+  +'<p style="font-size:12.5px;color:var(--ink-soft)">Reads wallet-level buy/sell attribution straight off the live trade tape ('+s.sample+' recent trades, '+s.uniqueWallets+' unique wallets) &mdash; not the aggregate volume number. '+verdict+'</p>'
+  +(flags.length?'<ul style="font-size:12px;color:var(--ink-soft);margin:6px 0 0;padding-left:18px">'+flags.map(function(f){return '<li>'+f+'</li>';}).join('')+'</ul>':'')
+  +(walRows?'<div class="wtrows" style="margin-top:8px">'+walRows+'</div>':'')
+  +'<p style="font-size:11px;color:var(--ink-faint);margin-top:8px">Heuristic on a limited live sample &mdash; a clean read here is not proof of clean volume, and a flagged wallet alone is not proof of manipulation. Cross-check with the manual checklist above.</p>'
+  +'</div>';
 }
 function walShort(w){return w?w.slice(0,4)+'…'+w.slice(-3):'?';}
 function renderTrades(fresh){
@@ -1510,6 +1630,7 @@ function renderTrades(fresh){
    +'<span class="px">'+fPrice(t.px)+'</span><span class="wal">'+esc(walShort(t.wal))+' &middot; '+fAgo(t.ts)+'</span></div>';
  }).join('');
  if(rt){var recent=tr.filter(function(t){return Date.now()-t.ts<300000;});var b=recent.filter(function(t){return t.buy;}).length;rt.textContent=recent.length+' in 5m &middot; '+Math.round(recent.length?b/recent.length*100:50)+'% buys';}
+ var wp=q1('washPanel');if(wp)wp.innerHTML=washTradingPanel();
 }
 var _pumpN=0;
 function pumpTrades(){
