@@ -9,10 +9,11 @@ function toB64(buf) {
 }
 async function assets() {
   if (ASSETS) return ASSETS;
-  const [b7, b8, mb] = await Promise.all([
+  const [b7, b8, mb, bg] = await Promise.all([
     fetch(new URL('./Inter-700.woff', import.meta.url)).then((r) => r.arrayBuffer()),
     fetch(new URL('./Inter-800.woff', import.meta.url)).then((r) => r.arrayBuffer()),
     fetch(new URL('./morty-sm.png', import.meta.url)).then((r) => r.arrayBuffer()).catch(() => null),
+    fetch(new URL('./flex-bg.jpg', import.meta.url)).then((r) => r.arrayBuffer()).catch(() => null),
   ]);
   ASSETS = {
     fonts: [
@@ -20,6 +21,7 @@ async function assets() {
       { name: 'Inter', data: b8, weight: 800, style: 'normal' },
     ],
     morty: mb ? 'data:image/png;base64,' + toB64(mb) : null,
+    bg: bg ? 'data:image/jpeg;base64,' + toB64(bg) : null,
   };
   return ASSETS;
 }
@@ -129,9 +131,6 @@ export async function flexImage(o) {
     if (o.entryMc) entryPx = o.entryMc * ratio;
     if (o.exitMc) exitPx = o.exitMc * ratio;
   }
-  const CW = 660, CH = 460;
-  const chart = sparklineSvg(o.series, entryPx, exitPx, CW, CH, stat);
-
   const bigNum = hasEntry
     ? (delta >= 0 ? '+' : '−') + fUsd(Math.abs(delta))
     : (o.nowMc ? 'MC ' + fUsd(o.nowMc) : '$' + (o.sym || '???'));
@@ -167,8 +166,11 @@ export async function flexImage(o) {
   ]);
 
   const kids = [
-    // chart as atmosphere, right side, faded
-    chart ? div({ position: 'absolute', top: (630 - CH) / 2 - 20, right: -30, opacity: 0.9 }, [chart]) : null,
+    // a soft left-side scrim over the photo so the stat block stays legible against any sky tone
+    A.bg ? div({
+      position: 'absolute', inset: 0,
+      background: 'linear-gradient(90deg, rgba(3,6,12,.72) 0%, rgba(3,6,12,.45) 38%, rgba(3,6,12,0) 62%)',
+    }, []) : null,
     // top-right brand mark
     div({ position: 'absolute', top: 40, right: 48, alignItems: 'center', gap: 10 }, [
       o.avatar
@@ -184,7 +186,10 @@ export async function flexImage(o) {
   const el = div(
     {
       width: 1200, height: 630, position: 'relative',
-      background: `linear-gradient(165deg, ${BG_TOP} 0%, ${BG_BOT} 75%)`,
+      background: A.bg ? undefined : `linear-gradient(165deg, ${BG_TOP} 0%, ${BG_BOT} 75%)`,
+      backgroundImage: A.bg ? `url(${A.bg})` : undefined,
+      backgroundSize: '1200px 630px',
+      backgroundColor: BG_BOT,
       color: INK, fontFamily: 'Inter',
     },
     kids,
