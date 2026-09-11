@@ -82,6 +82,7 @@ export default async function handler(req) {
     entryMc: entryMc || null,
     exitMc: exitMc || null,
     nowMc,
+    nowPrice: rc.best.price,
     peakMc: pk && pk > (entryMc || nowMc) ? pk : (entryMc ? Math.max(pk || 0, nowMc) : null),
     by,
     series,

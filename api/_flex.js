@@ -113,11 +113,11 @@ export async function flexImage(o) {
     div({ fontSize: 26, fontWeight: 700, letterSpacing: 2, color: '#8a93a6' }, 'MORTY RADAR  ·  @MortyRadarBot'),
   ]);
 
-  // entry/exit price implied from the called mc, using now-mc:now-price as the conversion ratio
+  // entry/exit price implied from the called mc, using the live price:mc ratio (not the last
+  // candle's close, which can lag the live quote enough to skew the ratio and misplace both markers)
   let entryPx = null, exitPx = null;
-  if (o.series && o.series.length && o.nowMc) {
-    const lastPx = o.series[o.series.length - 1];
-    const ratio = lastPx / o.nowMc;
+  if (o.series && o.series.length && o.nowMc && o.nowPrice) {
+    const ratio = o.nowPrice / o.nowMc;
     if (o.entryMc) entryPx = o.entryMc * ratio;
     if (o.exitMc) exitPx = o.exitMc * ratio;
   }
