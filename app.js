@@ -237,8 +237,10 @@ function renderWatch(){
  var addrs=Array.from(state.watch);
  q1('watchCount').textContent=addrs.length?addrs.length+' saved':'';
  if(!addrs.length){host.innerHTML='<div class="empty">No saved coins yet. Tap the &#9734; on any coin to keep it here.</div>';return;}
- // ensure token data
- dexTokens(addrs).then(function(){
+ host.innerHTML=skelRows(Math.min(addrs.length,6));
+ // ensure token data — nextPaint() guarantees the skeleton above is actually seen even when
+ // every address is already warm in tokenCache and this resolves within the same tick.
+ Promise.all([dexTokens(addrs),nextPaint()]).then(function(){
   var rows=addrs.map(function(a){
    var c=state.tokenCache.get(a),pp=c&&c.pair,meta=state.watchMeta.get(a)||{};
    var sym=(pp&&pp.sym)||meta.sym||'?';
@@ -902,11 +904,16 @@ function renderScan(){
  q1('attnList').innerHTML=shown.length?shown.slice(0,40).map(function(pp){return tokenRow(pp);}).join(''):'<div class="empty">nothing here right now &mdash; try another filter or widen chains</div>';
  renderTicker();renderBoard();renderIdeas();
 }
-function skelRows(n){
- var row='<div class="skrow"><span class="skava"></span><span class="skcol"><span class="skline"></span><span class="skline"></span></span><span class="skline sktraj"></span></div>';
- var out='';for(var i=0;i<n;i++)out+=row;
- return out;
-}
+// shadcn's Skeleton primitive (a muted block, animate-pulse) composed into this app's own
+// row/card shapes — same idea as <Skeleton className="h-4 w-1/2" />, just vanilla markup since
+// there's no component runtime here.
+var SKEL_ROW='<div class="skrow"><span class="skel ava"></span><span class="skcol"><span class="skel"></span><span class="skel"></span></span><span class="skel traj"></span></div>';
+function skelRows(n){var out='';for(var i=0;i<n;i++)out+=SKEL_ROW;return out;}
+// guarantees at least one real paint has happened before the caller moves on — without this,
+// a promise chain that resolves from an already-warm cache (same coin re-opened, watchlist
+// re-rendering right after a scan) can run entirely as microtasks with no paint in between,
+// so a skeleton set right before it never actually reaches the screen.
+function nextPaint(){return new Promise(function(resolve){requestAnimationFrame(function(){requestAnimationFrame(resolve);});});}
 function tokenRow(pp){
  var a=pp._a||attn(pp),tags=pp._tags||tagThemes(pp);
  var tg=tags.length?tags.map(function(k){var t=THEMES.filter(function(x){return x.k===k;})[0];return '<span class="tag">'+esc(t?t.name:k)+'</span>';}).join('')
@@ -938,7 +945,12 @@ function openResearch(addr,chain,fromUrl){
  q1('rcardHost').innerHTML=skelCard();
  var c=state.tokenCache.get(addr);
  var p0=(c&&c.pair)?Promise.resolve(c.pair):dexTokens([addr]).then(function(){var c2=state.tokenCache.get(addr);return c2&&c2.pair;});
- p0.then(function(pp){
+ // when addr is already fully cached (re-opening a coin, coming from the board/watchlist),
+ // every promise below resolves on the same microtask tick with no real network wait in
+ // between — nextPaint() forces one real frame so the skeleton we just set is actually seen
+ // instead of being overwritten before the browser ever draws it.
+ Promise.all([p0,nextPaint()]).then(function(r){
+  var pp=r[0];
   if(!pp){q1('rcardHost').innerHTML='<div class="empty">No DexScreener data for that address on the selected chains.</div>';return;}
   state.rcPair=pp;
   var raw=pp.addrRaw||addr;
@@ -952,8 +964,8 @@ function openResearch(addr,chain,fromUrl){
  });
 }
 function skelCard(){
- return '<div class="skcard"><span class="skline skbig"></span><span class="skline" style="width:70%"></span>'
-  +'<span class="skline skchart"></span><span class="skline" style="width:90%"></span><span class="skline" style="width:60%"></span></div>';
+ return '<div class="skcard"><span class="skel big"></span><span class="skel" style="width:70%"></span>'
+  +'<span class="skel chart"></span><span class="skel" style="width:90%"></span><span class="skel" style="width:60%"></span></div>';
 }
 function primeThemePeers(pp){
  var tags=tagThemes(pp);if(!tags.length)return Promise.resolve();
@@ -1485,11 +1497,8 @@ function rerenderRcard(){clearTimeout(_rerenderT);_rerenderT=setTimeout(function
 },60);}
 
 /* ---------- HOT BOARD ---------- */
-function skelBoard(n){
- var card='<div class="skbc"><span class="skline"></span><span class="skline"></span><span class="skline"></span></div>';
- var out='';for(var i=0;i<n;i++)out+=card;
- return out;
-}
+var SKEL_BC='<div class="skbc"><span class="skel"></span><span class="skel"></span><span class="skel"></span></div>';
+function skelBoard(n){var out='';for(var i=0;i<n;i++)out+=SKEL_BC;return out;}
 function renderBoard(){
  var el=q1('board');if(!el)return;
  var pool=(state._pool||[]).filter(function(pp){return pp._a;});
