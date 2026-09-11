@@ -96,6 +96,17 @@
   .star{border:none;background:none;cursor:pointer;font-size:15px;line-height:1;color:var(--pencil);padding:0;margin-right:2px;flex:none;transition:transform .1s;}
   .star:hover{color:var(--hot);transform:scale(1.15);}
   .star.on{color:var(--hot);}
+  .cmp{border:none;background:none;cursor:pointer;font-size:14px;line-height:1;color:var(--ink-faint);padding:0 0 0 6px;flex:none;transition:transform .1s;}
+  .cmp:hover{color:var(--accent);transform:scale(1.15);} .cmp.on{color:var(--pos);}
+  .cmp-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:10px 0;}
+  .cmp-chip{display:inline-flex;align-items:center;gap:5px;font-family:"Share Tech Mono",monospace;font-size:12.5px;border:1.5px solid var(--ink);border-radius:6px 4px 6px 4px;padding:2px 6px;margin-right:6px;background:var(--card);}
+  .cmp-chip b{cursor:pointer;color:var(--ink-faint);font-weight:400;} .cmp-chip b:hover{color:var(--neg);}
+  .cmp-table{display:flex;flex-direction:column;gap:3px;overflow-x:auto;}
+  .cmp-row{display:grid;gap:8px;align-items:center;padding:4px 0;}
+  .cmp-row.cmp-head div{font-size:11px;text-transform:uppercase;letter-spacing:.02em;color:var(--ink-faint);}
+  .cmp-row div:first-child{font-size:12.5px;color:var(--ink-soft);}
+  .cmp-cell{font-family:"Share Tech Mono",monospace;text-align:center;padding:4px 2px;border-radius:5px 3px 5px 3px;background:rgba(44,53,80,.06);}
+  .cmp-cell.pos{color:var(--pos);background:var(--pos-wash);} .cmp-cell.neg{color:var(--neg);background:var(--neg-wash);}
   .pf-card{border:2px solid var(--ink);border-radius:14px 8px 15px 7px / 8px 15px 7px 14px;background:var(--card);padding:16px 18px;box-shadow:3px 3px 0 rgba(44,53,80,.14);}
   .pf-card h3{font-family:"Caveat",cursive;font-size:24px;margin:0 0 2px;}
   .pf-card .pf-bio{font-size:13.5px;color:var(--ink-soft);white-space:pre-wrap;margin:6px 0 10px;line-height:1.5;}
@@ -471,7 +482,13 @@
   <!-- WATCHLIST -->
   <section id="tab-watch" hidden>
     <div class="shead"><h2>Your watchlist</h2><span class="hint" id="watchCount"></span></div>
-    <p class="lead">Every coin you starred, in one place, with live numbers. Tap a card to open the x-ray, tap the &#9733; to drop it.</p>
+    <p class="lead">Every coin you starred, in one place, with live numbers. Tap a card to open the x-ray, tap the &#9733; to drop it, tap &#8644; to pick it for a side-by-side compare (up to 3).</p>
+    <div class="cmp-bar" id="cmpBar" hidden>
+      <span id="cmpChips"></span>
+      <button class="btn pri sm" id="cmpGo" disabled>Compare</button>
+      <button class="btn sm" id="cmpClear">clear</button>
+    </div>
+    <div id="cmpPanel"></div>
     <div class="rows" id="watchList"><div class="empty">loading your saved coins&hellip;</div></div>
   </section>
 

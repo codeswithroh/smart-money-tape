@@ -51,6 +51,7 @@ var state={
  boosts:[],trending:[],profiles:{},tinfo:new Map(),
  safety:new Map(),ohlcv:new Map(),
  research:{},holders:{},scores:{},watch:new Set(),watchMeta:new Map(),_watchBusy:false,
+ compare:[], // addrs picked for side-by-side comparison, in pick order, capped at 3 — session-only
  chartMode:'entries',rcAddr:null,rcPair:null,rcInfo:null,trades:[],_tradesPoll:0,fhSound:false,
  lastOk:0,lastErr:null,scanAt:0
 };
@@ -114,7 +115,77 @@ function refreshStars(){
 function watchClick(ev){
  var st=ev.target.closest('[data-star]');
  if(st){ev.preventDefault();ev.stopPropagation();watchToggle(st.getAttribute('data-star'),st.getAttribute('data-chain'),st.getAttribute('data-sym'));return true;}
+ var cm=ev.target.closest('[data-cmp]');
+ if(cm){ev.preventDefault();ev.stopPropagation();compareToggle(cm.getAttribute('data-cmp'),cm.getAttribute('data-sym'));return true;}
  return false;
+}
+
+/* ---------- side-by-side comparison (watchlist) ---------- */
+function cmpBtn(addr,sym){
+ addr=String(addr||'').toLowerCase();
+ var on=state.compare.indexOf(addr)>=0;
+ return '<span class="cmp'+(on?' on':'')+'" role="button" tabindex="0" data-cmp="'+esc(addr)+'" data-sym="'+esc(sym||'')+'" aria-label="'+(on?'remove from comparison':'add to comparison')+'" title="compare">'+(on?'&#10004;':'&#8644;')+'</span>';
+}
+function compareToggle(addr,sym){
+ addr=String(addr||'').toLowerCase();
+ var i=state.compare.indexOf(addr);
+ if(i>=0){state.compare.splice(i,1);}
+ else{
+  if(state.compare.length>=3)state.compare.shift(); // evict the oldest pick so 3 stays the working set
+  state.compare.push(addr);state._compareSym=state._compareSym||{};state._compareSym[addr]=sym||'?';
+ }
+ document.querySelectorAll('.cmp[data-cmp]').forEach(function(el){
+  var on=state.compare.indexOf(String(el.getAttribute('data-cmp')||'').toLowerCase())>=0;
+  el.classList.toggle('on',on);el.innerHTML=on?'&#10004;':'&#8644;';
+ });
+ renderCmpBar();
+}
+function renderCmpBar(){
+ var bar=q1('cmpBar');if(!bar)return;
+ if(!state.compare.length){bar.hidden=true;q1('cmpPanel').innerHTML='';return;}
+ bar.hidden=false;
+ var chips=state.compare.map(function(a){
+  var sym=(state._compareSym&&state._compareSym[a])||'?';
+  return '<span class="cmp-chip">$'+esc(sym)+' <b data-cmpx="'+esc(a)+'" role="button">&times;</b></span>';
+ }).join('');
+ q1('cmpChips').innerHTML=chips;
+ q1('cmpGo').disabled=state.compare.length<2;
+ q1('cmpGo').textContent='Compare '+state.compare.length+(state.compare.length===1?' coin (pick 1 more)':' coins');
+}
+function runCompare(){
+ var addrs=state.compare.slice();
+ if(addrs.length<2)return;
+ var panel=q1('cmpPanel');panel.innerHTML='<div class="empty">comparing&hellip;</div>';
+ dexTokens(addrs).then(function(){
+  var coins=addrs.map(function(a){
+   var c=state.tokenCache.get(a),pp=c&&c.pair;
+   return {addr:a,pp:pp,sym:(pp&&pp.sym)||(state._compareSym&&state._compareSym[a])||'?'};
+  }).filter(function(x){return x.pp;});
+  if(coins.length<2){panel.innerHTML='<div class="empty">Not enough live data on the picked coins right now &mdash; try again in a moment.</div>';return;}
+  return Promise.all(coins.map(function(x){return fetchSafety(x.pp.addr,x.pp.chain);})).then(function(sfs){
+   var rows=coins.map(function(x,i){
+    var pp=x.pp,a=attn(pp),sf=sfs[i],hr=holderRate(pp.addr),proj=buildProject(pp,state.tinfo.get(pp.addr));
+    var s=longTermScore(pp,a,sf,hr,proj);
+    return {sym:x.sym,chain:pp.chain,s:s};
+   });
+   renderCmpTable(rows);
+  });
+ }).catch(function(){panel.innerHTML='<div class="empty">couldn&rsquo;t load comparison data &mdash; try again.</div>';});
+}
+function renderCmpTable(rows){
+ var panel=q1('cmpPanel');if(!panel)return;
+ var n=rows.length,cols='150px repeat('+n+',1fr)';
+ var factorKeys=rows[0].s.factors.map(function(f){return f.k;});
+ var head='<div class="cmp-row cmp-head" style="grid-template-columns:'+cols+'"><div></div>'
+  +rows.map(function(r){return '<div>$'+esc(r.sym)+' <span class="cchip">'+esc(r.chain)+'</span></div>';}).join('')+'</div>';
+ var scoreRow='<div class="cmp-row" style="grid-template-columns:'+cols+'"><div><b>Overall score</b></div>'
+  +rows.map(function(r){var cls=r.s.pct>=68?'pos':r.s.pct<=28?'neg':'';return '<div class="cmp-cell '+cls+'"><b>'+r.s.pct+'</b></div>';}).join('')+'</div>';
+ var factorRows=factorKeys.map(function(k,fi){
+  return '<div class="cmp-row" style="grid-template-columns:'+cols+'"><div>'+esc(k)+'</div>'
+   +rows.map(function(r){var v=Math.round(r.s.factors[fi].v*100),cls=v>=65?'pos':v<=35?'neg':'';return '<div class="cmp-cell '+cls+'">'+v+'</div>';}).join('')+'</div>';
+ }).join('');
+ panel.innerHTML='<div class="panel"><h3>Side-by-side</h3><div class="cmp-table">'+head+scoreRow+factorRows+'</div>'
+  +'<p class="rscore-cite">Same weighting as the Long-term research score panel on each coin&rsquo;s own x-ray. Refetches live each time you compare.</p></div>';
 }
 function renderWatch(){
  var host=q1('watchList');if(!host)return;
@@ -125,11 +196,14 @@ function renderWatch(){
  dexTokens(addrs).then(function(){
   var rows=addrs.map(function(a){
    var c=state.tokenCache.get(a),pp=c&&c.pair,meta=state.watchMeta.get(a)||{};
-   if(pp){pp._a=pp._a||attn(pp);pp._tags=pp._tags||tagThemes(pp);pp._q=pp._q||pickQuality(pp);return tokenRow(pp);}
+   var sym=(pp&&pp.sym)||meta.sym||'?';
+   if(pp){pp._a=pp._a||attn(pp);pp._tags=pp._tags||tagThemes(pp);pp._q=pp._q||pickQuality(pp);
+    return tokenRow(pp).replace('</button>',cmpBtn(a,sym)+'</button>');
+   }
    return '<button class="trow" data-addr="'+esc(a)+'" data-chain="'+esc(meta.chain||'')+'">'
     +'<span></span><span class="tmain"><span class="tsym">'+starBtn(a,meta.chain,meta.sym)+'$'+esc(meta.sym||'?')+' <span class="cchip">'+esc(meta.chain||'?')+'</span></span>'
     +'<span class="tmeta">no live data right now &mdash; tap to open the x-ray</span></span>'
-    +'<span class="traj">&mdash;</span></button>';
+    +'<span class="traj">&mdash;</span>'+cmpBtn(a,sym)+'</button>';
   }).join('');
   host.innerHTML=rows;
  });
@@ -1551,6 +1625,9 @@ q1('rcardHost').addEventListener('change',rcardInput);
 q1('rcardHost').addEventListener('click',function(ev){var s=ev.target.closest('#fhSound');if(!s)return;state.fhSound=!state.fhSound;saveCfg();fhCtx();s.setAttribute('aria-pressed',state.fhSound?'true':'false');s.innerHTML=state.fhSound?'&#128266;':'&#128263;';});
 q1('board').addEventListener('click',function(ev){if(watchClick(ev))return;var b=ev.target.closest('[data-addr]');if(!b)return;openResearch(b.getAttribute('data-addr'),b.getAttribute('data-chain'));});
 q1('watchList').addEventListener('click',function(ev){if(watchClick(ev))return;var b=ev.target.closest('[data-addr]');if(!b)return;openResearch(b.getAttribute('data-addr'),b.getAttribute('data-chain'));});
+if(q1('cmpGo'))q1('cmpGo').addEventListener('click',runCompare);
+if(q1('cmpClear'))q1('cmpClear').addEventListener('click',function(){state.compare=[];document.querySelectorAll('.cmp.on').forEach(function(el){el.classList.remove('on');el.innerHTML='&#8644;';});renderCmpBar();});
+if(q1('cmpChips'))q1('cmpChips').addEventListener('click',function(ev){var x=ev.target.closest('[data-cmpx]');if(!x)return;compareToggle(x.getAttribute('data-cmpx'));});
 q1('pfSave').addEventListener('click',submitProfile);
 q1("flexBoard").addEventListener("click",flexBoard);
 q1("ideaRoll").addEventListener("click",renderIdeas);
