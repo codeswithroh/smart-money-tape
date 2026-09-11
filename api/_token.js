@@ -70,6 +70,18 @@ export async function peakMc(best) {
   return best.mc * (hi / best.price);
 }
 
+// closing-price series since pool creation, oldest -> newest, for a flex-card sparkline
+export async function priceSeries(best, n) {
+  const net = GT_NET[best.chain];
+  if (!net || !best.pairAddr) return [];
+  const path = `/networks/${net}/pools/${best.pairAddr}/ohlcv/minute?aggregate=15&limit=${n || 200}&currency=usd`;
+  const j = await jget(GT_PROXY + encodeURIComponent(path));
+  const rows = (j && j.data && j.data.attributes && j.data.attributes.ohlcv_list) || [];
+  if (!rows.length) return [];
+  // GeckoTerminal returns newest-first; flip to chronological
+  return rows.slice().reverse().map((r) => +r[4] || 0).filter((c) => c > 0);
+}
+
 // top attention movers right now (for /radar)
 export async function topMovers() {
   const paths = [

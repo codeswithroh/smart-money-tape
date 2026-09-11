@@ -16,7 +16,7 @@ const HELP = [
   '',
   '<b>Commands</b>',
   '/radar — top attention movers right now ⚡',
-  '/flex &lt;ca&gt; [entry mc] — shareable multiplier card (e.g. <code>/flex So111… 3.8M</code>) 📸',
+  '/flex &lt;ca&gt; &lt;entry mc&gt; [exit mc] — shareable card with your entry/exit on the chart + your pic (e.g. <code>/flex So111… 3.8M 40M</code>) 📸',
   '/setalert &lt;ca&gt; &lt;mc&gt; — ping me when it hits that market cap (e.g. <code>/setalert So111… 5M</code>) 🔔',
   '/alerts — your active alerts',
   '/idea — fresh coin concepts riding the hot narratives 💡',
@@ -35,7 +35,7 @@ const START = [
   '🔥 <b>What I do</b>',
   '• <code>/radar</code> — top attention movers right now ⚡',
   '• <code>/setalert &lt;ca&gt; &lt;mc&gt;</code> — ping you when it hits a market cap 🔔',
-  '• <code>/flex &lt;ca&gt; [entry mc]</code> — shareable multiplier card built for X 📸',
+  '• <code>/flex &lt;ca&gt; &lt;entry mc&gt; [exit mc]</code> — chart card with your entry/exit + your pic, built for X 📸',
   '• <code>/idea</code> — fresh coin concepts riding the hot narratives 💡',
   '• paste a CA — instant full x-ray 🔬',
   '• <code>/help</code> — the whole cheatsheet 📖',
@@ -212,12 +212,14 @@ async function refreshCard(cq) {
   }
 }
 
-async function sendFlex(chatId, addr, entryMc, by) {
+async function sendFlex(chatId, addr, entryMc, exitMc, by, from) {
   const rc = await resolveCoin(addr);
   const sym = rc ? rc.best.sym : '???';
   let url = `${SITE}/api/flexcard?ca=${encodeURIComponent(addr)}`;
   if (entryMc) url += `&entry=${entryMc}`;
+  if (exitMc) url += `&exit=${exitMc}`;
   if (by) url += `&by=${encodeURIComponent(by)}`;
+  if (from && from.id) url += `&uid=${from.id}&un=${encodeURIComponent(from.username || from.first_name || 'anon')}`;
   const shareText =
     `$${sym} on Morty Radar 📡\n\n${url}\n\nfind the next one → ${SITE}`;
   await tg('sendPhoto', {
@@ -281,7 +283,7 @@ export default async function handler(req) {
     try {
       if (data.startsWith('fx:')) {
         await tg('answerCallbackQuery', { callback_query_id: cq.id, text: 'building your flex card…' });
-        await sendFlex(cid, data.slice(3), null, '@' + (cq.from.username || cq.from.first_name || 'anon'));
+        await sendFlex(cid, data.slice(3), null, null, '@' + (cq.from.username || cq.from.first_name || 'anon'), cq.from);
       } else if (data.startsWith('rf:')) {
         await tg('answerCallbackQuery', { callback_query_id: cq.id, text: 'refreshed ♻️' });
         await refreshCard(cq);
@@ -365,9 +367,11 @@ export default async function handler(req) {
   if (/^\/flex\b/i.test(text)) {
     const parts = text.split(/\s+/).slice(1);
     const addr = pickAddr(parts.join(' '));
-    if (!addr) { await tg('sendMessage', { chat_id: chatId, text: 'usage: /flex &lt;contract&gt; [entry mcap]\ne.g. /flex So111… 3.8M', parse_mode: 'HTML' }); return new Response('ok'); }
-    const entry = parseMc(parts.find((p) => p !== addr && /[\d.]/.test(p)));
-    try { await sendFlex(chatId, addr, entry, '@' + (msg.from && (msg.from.username || msg.from.first_name) || 'anon')); }
+    if (!addr) { await tg('sendMessage', { chat_id: chatId, text: 'usage: /flex &lt;contract&gt; &lt;entry mcap&gt; [exit mcap]\ne.g. /flex So111… 3.8M 40M', parse_mode: 'HTML' }); return new Response('ok'); }
+    const nums = parts.filter((p) => p !== addr && /[\d.]/.test(p)).map(parseMc).filter((n) => n != null);
+    const entry = nums[0] || null;
+    const exit = nums[1] || null;
+    try { await sendFlex(chatId, addr, entry, exit, '@' + (msg.from && (msg.from.username || msg.from.first_name) || 'anon'), msg.from); }
     catch (_) { await tg('sendMessage', { chat_id: chatId, text: "couldn't build that card.", ...reply }); }
     return new Response('ok');
   }
