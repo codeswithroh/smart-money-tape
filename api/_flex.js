@@ -183,13 +183,13 @@ export async function flexImage(o) {
     div({ position: 'absolute', right: 48, bottom: 40, fontSize: 15, fontWeight: 700, color: FAINT }, 'meme-attention-radar.vercel.app  ·  not financial advice'),
   ].filter(Boolean);
 
+  const bgStyle = A.bg
+    ? { backgroundImage: `url(${A.bg})`, backgroundSize: '1200px 630px', backgroundColor: BG_BOT }
+    : { background: `linear-gradient(165deg, ${BG_TOP} 0%, ${BG_BOT} 75%)` };
   const el = div(
     {
       width: 1200, height: 630, position: 'relative',
-      background: A.bg ? undefined : `linear-gradient(165deg, ${BG_TOP} 0%, ${BG_BOT} 75%)`,
-      backgroundImage: A.bg ? `url(${A.bg})` : undefined,
-      backgroundSize: '1200px 630px',
-      backgroundColor: BG_BOT,
+      ...bgStyle,
       color: INK, fontFamily: 'Inter',
     },
     kids,
