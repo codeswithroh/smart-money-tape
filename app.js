@@ -457,20 +457,89 @@ function survivalStage(pp){
  var sourced=pp.chain==='solana'&&pumpFun(pp);
  return {days:days,survivePct:row.survivePct,note:row.note,frac:frac,sourced:sourced,bucketDays:row.days};
 }
-function survivalPanel(pp){
- var s=survivalStage(pp);
- if(!s)return '';
- var zones=['#a5301c','#a5301c','#c9762c','#c9762c','#2f7c4d','#2f7c4d'];
- var stops=SURVIVAL_CURVE.map(function(r,i){return {pct:i/(SURVIVAL_CURVE.length-1)*100,col:zones[i]};});
- var grad='linear-gradient(90deg,'+stops.map(function(z){return z.col+' '+z.pct.toFixed(0)+'%';}).join(',')+')';
- var headline=s.sourced
-  ?'<b>'+fAge(pp.ageMs)+' old.</b> Roughly <b>'+s.survivePct+'%</b> of Pump.fun launches are still trading at this age or older &mdash; '+s.note+'.'
-  :'<b>'+fAge(pp.ageMs)+' old.</b> Age-based die-off is a Pump.fun-specific stat; treat this chain\'s curve as directional only, not sourced to that number.';
- return '<div class="panel"><h3>Survival odds</h3>'
-  +'<div class="surv-gauge"><div class="surv-track" style="background:'+grad+'"><i class="surv-mark" style="left:'+Math.round(s.frac*100)+'%"></i></div>'
-  +'<div class="surv-labels"><span>launch</span><span>1d</span><span>3d</span><span>1wk</span><span>2wk</span><span>90d+</span></div></div>'
-  +'<p style="font-size:12.5px;color:var(--ink-soft);margin-top:8px">'+headline+'</p>'
-  +'<p style="font-size:11px;color:var(--ink-faint);margin-top:5px">Base rate from cohort studies of 800k&ndash;18.6M Pump.fun launches (CoinGecko Research; arXiv 2607.02823; arXiv 2512.11850) &mdash; describes what already happened to that population, not what this coin will do.</p>'
+/* ---------- long-term research score: THIS coin's own signals, not the cohort's age -----------
+   Five weighted factors, each grounded in a specific published finding:
+   - Holder safety (32%): concentration/bundle/renounce/LP. MemeTrans + MELT research measured the
+     holder-concentration signal ~64% stronger than the trader/volume signal on a risk-adjusted
+     basis, so it carries the single biggest weight here.
+   - Liquidity depth (20%): thin liquidity vs mc is what lets a small wallet move price violently
+     and makes an exit hard; a Pump.fun-graduated pool with healthy liq/mc is a different animal
+     from a curve that barely cleared the bonding threshold.
+   - Organic holder growth (18%): steady accumulation over an hour beats a single volume spike.
+   - Volume authenticity (15%): balanced buy/sell flow and a sane vol/mc ratio; the 98.6%
+     pump-or-rug figure from Pump.fun cohort studies is disproportionately the lopsided, wash-y
+     side of that ratio.
+   - Project surface (15%): a real description + socials + catalysts is the closest public proxy
+     for "something exists here besides the chart." */
+function fHolderSafety(sf){
+ if(!sf)return {v:0.5,note:'rug-check data unavailable'};
+ var v=1,notes=[];
+ if(sf.topPct!=null){notes.push('top holder '+sf.topPct.toFixed(1)+'%');v-=Math.max(0,sf.topPct-8)/40;}
+ if(sf.devPct!=null){notes.push('dev '+sf.devPct.toFixed(1)+'%');v-=Math.min(0.3,sf.devPct/12);}
+ if(sf.insiderPct!=null){notes.push('insiders '+sf.insiderPct.toFixed(0)+'%');v-=Math.min(0.3,sf.insiderPct/70);}
+ if(sf.bundle){notes.push('bundle pattern');v-=0.35;}
+ if(sf.renounced===false){notes.push('not renounced');v-=0.15;}
+ if(sf.lpPct!=null&&sf.lpPct<50){notes.push('LP '+Math.round(sf.lpPct)+'% locked');v-=0.15;}
+ if(sf.ok===false)v=Math.min(v,0.15);
+ return {v:Math.max(0,Math.min(1,v)),note:notes.length?notes.join(' &middot; '):'no rug-check flags'};
+}
+function fLiquidity(pp){
+ if(!pp.liq||!pp.mc)return {v:0.3,note:'liquidity/mc unavailable'};
+ var ratio=pp.liq/pp.mc,v=Math.min(1,ratio/0.12);
+ if(pp.liq<5000)v=Math.min(v,0.15);
+ return {v:v,note:fUsd(pp.liq)+' liq &middot; '+(ratio*100).toFixed(1)+'% of mc'};
+}
+function fGrowth(hr){
+ if(hr&&hr.perHr!=null)return {v:Math.max(0,Math.min(1,(hr.perHr+10)/60)),note:(hr.perHr>=0?'+':'')+Math.round(hr.perHr)+' holders/hr'};
+ return {v:0.35,note:'holder trend still tracking'};
+}
+function fVolume(pp,a){
+ var v=1,notes=[];
+ var skewDist=Math.abs(a.skew1-0.5);
+ if(skewDist>0.35){v-=0.3;notes.push('lopsided buy/sell');}
+ var vmc=pp.mc?(pp.vol.h24||0)/pp.mc:0;
+ if(vmc>6){v-=0.35;notes.push('vol/mc '+vmc.toFixed(1)+'x &mdash; wash-trade risk');}
+ else if(vmc<0.02){v-=0.2;notes.push('vol/mc thin &mdash; low real interest');}
+ else notes.push('vol/mc '+vmc.toFixed(2)+'x');
+ return {v:Math.max(0,Math.min(1,v)),note:notes.join(' &middot; ')};
+}
+function fProject(proj){return {v:(proj.surface||0)/4,note:proj.surface+'/4 surface (desc/site/socials/cats)'};}
+function longTermScore(pp,a,sf,hr,proj){
+ var H=fHolderSafety(sf),L=fLiquidity(pp),G=fGrowth(hr),V=fVolume(pp,a),P=fProject(proj);
+ var pct=Math.round(100*(0.32*H.v+0.20*L.v+0.18*G.v+0.15*V.v+0.15*P.v));
+ var label,cls;
+ if(pct>=68){label='BUILT TO LAST';cls='pos';}
+ else if(pct>=48){label='HAS SOME LEGS';cls='';}
+ else if(pct>=28){label='SPECULATIVE';cls='watch';}
+ else{label='HIGH RUG RISK';cls='neg';}
+ return {pct:pct,label:label,cls:cls,factors:[
+  {k:'Holder safety',v:H.v,note:H.note},
+  {k:'Liquidity depth',v:L.v,note:L.note},
+  {k:'Organic growth',v:G.v,note:G.note},
+  {k:'Volume authenticity',v:V.v,note:V.note},
+  {k:'Project surface',v:P.v,note:P.note},
+ ]};
+}
+function researchScorePanel(pp,a,sf,hr,proj){
+ var s=longTermScore(pp,a,sf,hr,proj);
+ var surv=survivalStage(pp);
+ var ringCol=s.cls==='neg'?'var(--neg)':s.cls==='watch'?'var(--hot)':'var(--pos)';
+ var deg=(s.pct*3.6).toFixed(0);
+ var ring='conic-gradient('+ringCol+' 0deg '+deg+'deg,rgba(44,53,80,.14) '+deg+'deg 360deg)';
+ var rows=s.factors.map(function(f){
+  var pct=Math.round(f.v*100),cls=pct>=65?'pos':pct<=35?'neg':'';
+  return '<div class="rfrow"><div class="rfhead"><span>'+esc(f.k)+'</span><b class="'+cls+'">'+pct+'</b></div>'
+   +'<div class="rfbar"><i class="'+cls+'" style="width:'+pct+'%"></i></div>'
+   +'<p class="rfnote">'+f.note+'</p></div>';
+ }).join('');
+ var ageLine=surv?('<p class="rscore-age">'+fAge(pp.ageMs)+' old'+(surv.sourced?' &mdash; '+surv.survivePct+'% of Pump.fun launches are still trading at this age or older (context, not part of the score).':'.')+'</p>'):'';
+ return '<div class="panel rscore"><h3>Long-term research score</h3>'
+  +'<div class="rscore-top"><div class="score-ring" style="background:'+ring+'"><div class="score-ring-inner"><b>'+s.pct+'</b><span>/100</span></div></div>'
+  +'<div class="rscore-verdict"><div class="rscore-label '+s.cls+'">'+s.label+'</div>'
+  +'<p class="rscore-sub">Weighted from this coin&rsquo;s own holder concentration, liquidity depth, holder growth, volume authenticity and project surface &mdash; not its age.</p>'
+  +ageLine+'</div></div>'
+  +'<div class="rfactors">'+rows+'</div>'
+  +'<p class="rscore-cite">Weights informed by published research: holder-concentration signal measured ~64% stronger than trader/volume signal (MemeTrans/MELT); Pump.fun cohort base rates from CoinGecko Research, arXiv 2607.02823 and arXiv 2512.11850. A heuristic score from public on-chain data &mdash; not financial advice.</p>'
   +'</div>';
 }
 function pickQuality(pp){
@@ -776,7 +845,7 @@ function renderResearch(pp,sf,watchers,tinfo){
   +chart
   +'<div class="panel"><h3>What the radar sees</h3>'+autoKv+safeLine+watchLine+'</div>'
   +bundlePanel(pp,sf)
-  +survivalPanel(pp)
+  +researchScorePanel(pp,a,sf,hr,proj)
   +projPanel
   +checklistPanel(pp,proj)
   +tradesPanel()
