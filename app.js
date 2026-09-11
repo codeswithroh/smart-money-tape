@@ -4,7 +4,8 @@ var DEX='https://api.dexscreener.com',GT='https://api.geckoterminal.com/api/v2';
 // GeckoTerminal blocks browser CORS under load -> go through our cached edge proxy
 function gtUrl(p){return '/api/gt?path='+encodeURIComponent(p);}
 var RUG='https://api.rugcheck.xyz/v1/tokens',HP='https://api.honeypot.is/v2/IsHoneypot',FOMO='https://api.fomoapi.io';
-var LS_CFG='ar-cfg-v1',LS_RES='ar-research-v1',LS_HOLD='ar-holders-v1',LS_WATCH='ar-watch-v1',LS_SCORE='ar-scores-v1',LS_THESIS='ar-thesis-v1';
+var LS_CFG='ar-cfg-v1',LS_RES='ar-research-v1',LS_HOLD='ar-holders-v1',LS_WATCH='ar-watch-v1',LS_SCORE='ar-scores-v1',LS_THESIS='ar-thesis-v1',LS_POOL='ar-poolcache-v2';
+var POOL_CACHE_MAX_AGE=20*60*1000; // stale cache older than this is skipped for instant-paint, straight to skeleton
 var EVM_CHAIN_ID={bsc:56,base:8453,ethereum:1};
 var reduceMotion=!!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 // GeckoTerminal free tier ~25 req/min and 429s without CORS headers -> throttle every GT call
@@ -71,6 +72,28 @@ function saveHold(){try{localStorage.setItem(LS_HOLD,JSON.stringify(state.holder
 function saveScores(){try{localStorage.setItem(LS_SCORE,JSON.stringify(state.scores));}catch(_){}}
 function saveThesis(){try{localStorage.setItem(LS_THESIS,JSON.stringify(state.thesis));}catch(_){}}
 function saveWatch(){try{localStorage.setItem(LS_WATCH,JSON.stringify(Array.from(state.watch)));}catch(_){}}
+// disk cache of the last live scan, purely for a fast FIRST PAINT on reload — it is never treated
+// as ground truth: attentionPool()'s hard-exclusion safety filter runs on it exactly like live data,
+// and the very next scan() call (kicked off right after this paints) overwrites it with fresh data.
+function saveScanCache(){
+ try{
+  localStorage.setItem(LS_POOL,JSON.stringify({
+   ts:Date.now(),boosts:state.boosts,trending:state.trending,profiles:state.profiles,
+   tokens:Array.from(state.tokenCache.entries()).slice(-200),
+   safety:Array.from(state.safety.entries()).slice(-200)
+  }));
+ }catch(_){}
+}
+function loadScanCache(){
+ try{
+  var c=JSON.parse(localStorage.getItem(LS_POOL)||'null');
+  if(!c||!c.ts||Date.now()-c.ts>POOL_CACHE_MAX_AGE)return false;
+  state.boosts=c.boosts||[];state.trending=c.trending||[];state.profiles=c.profiles||{};
+  (c.tokens||[]).forEach(function(kv){state.tokenCache.set(kv[0],kv[1]);});
+  (c.safety||[]).forEach(function(kv){state.safety.set(kv[0],kv[1]);});
+  return true;
+ }catch(_){return false;}
+}
 
 /* ---------- watchlist (server-backed, per account) ---------- */
 function syncWatchFromServer(){
@@ -808,7 +831,7 @@ function scan(){
   // screen every candidate BEFORE it ever renders — a coin that fails a real check never
   // gets a chance to look attractive first. Capped batch so this stays quick on a big pool.
   return screenPool(rawPool());
- }).then(function(){renderScan();});
+ }).then(function(){renderScan();saveScanCache();});
 }
 function rawPool(){
  var seen={},pool=[],srcOf={};
@@ -879,6 +902,11 @@ function renderScan(){
  q1('attnList').innerHTML=shown.length?shown.slice(0,40).map(function(pp){return tokenRow(pp);}).join(''):'<div class="empty">nothing here right now &mdash; try another filter or widen chains</div>';
  renderTicker();renderBoard();renderIdeas();
 }
+function skelRows(n){
+ var row='<div class="skrow"><span class="skava"></span><span class="skcol"><span class="skline"></span><span class="skline"></span></span><span class="skline sktraj"></span></div>';
+ var out='';for(var i=0;i<n;i++)out+=row;
+ return out;
+}
 function tokenRow(pp){
  var a=pp._a||attn(pp),tags=pp._tags||tagThemes(pp);
  var tg=tags.length?tags.map(function(k){var t=THEMES.filter(function(x){return x.k===k;})[0];return '<span class="tag">'+esc(t?t.name:k)+'</span>';}).join('')
@@ -907,7 +935,7 @@ function openResearch(addr,chain,fromUrl){
  addr=String(addr||'').toLowerCase();
  state.rcAddr=addr;state.tab='research';syncTabs();saveCfg();
  if(!fromUrl)setUrl(addr,chain);
- q1('rcardHost').innerHTML='<div class="empty">pulling data&hellip;</div>';
+ q1('rcardHost').innerHTML=skelCard();
  var c=state.tokenCache.get(addr);
  var p0=(c&&c.pair)?Promise.resolve(c.pair):dexTokens([addr]).then(function(){var c2=state.tokenCache.get(addr);return c2&&c2.pair;});
  p0.then(function(pp){
@@ -922,6 +950,10 @@ function openResearch(addr,chain,fromUrl){
    fetchTokenInfo(addr,pp.chain,raw)
   ]).then(function(r){state.rcInfo=r[4];renderResearch(pp,r[0],r[2],r[4]);startTrades();});
  });
+}
+function skelCard(){
+ return '<div class="skcard"><span class="skline skbig"></span><span class="skline" style="width:70%"></span>'
+  +'<span class="skline skchart"></span><span class="skline" style="width:90%"></span><span class="skline" style="width:60%"></span></div>';
 }
 function primeThemePeers(pp){
  var tags=tagThemes(pp);if(!tags.length)return Promise.resolve();
@@ -1764,7 +1796,17 @@ document.querySelectorAll('.chip-toggle[data-chain]').forEach(function(b){var c=
 syncTabs();
 renderTicker();
 renderAccount();
-scan().then(setStatus);
+// instant first paint: hydrate the last live scan from disk and render it immediately (same
+// hard-exclusion safety filter runs on it as on live data), then kick off the real scan() right
+// behind it — when that resolves it re-renders with fresh data and overwrites the cache note.
+if(loadScanCache()&&rawPool().length){
+ renderScan();
+ var cn=q1('screenNote');
+ if(cn)cn.insertAdjacentHTML('afterend','<div class="cachenote" id="cacheNote">showing cached data &mdash; refreshing live&hellip;</div>');
+} else {
+ q1('attnList').innerHTML=skelRows(6);
+}
+scan().then(function(){var cn=q1('cacheNote');if(cn)cn.remove();}).then(setStatus);
 // pull the account (avatar/menu) + watchlist (authoritative)
 loadAccount();
 syncWatchFromServer().then(function(){refreshStars();if(state.tab==='watch')renderWatch();});
