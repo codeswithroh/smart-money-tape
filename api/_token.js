@@ -253,7 +253,10 @@ export async function researchScore(addr) {
   const H = fServerHolderSafety(sf), L = fServerLiquidity(best);
   const G = { v: 0.35, note: 'not tracked in Telegram — open the x-ray for holder-growth history' };
   const V = fServerVolume(best, a), P = fServerProject(best);
-  const pct = Math.round(100 * (0.32 * H.v + 0.20 * L.v + 0.18 * G.v + 0.15 * V.v + 0.15 * P.v));
+  let pct = Math.round(100 * (0.32 * H.v + 0.20 * L.v + 0.18 * G.v + 0.15 * V.v + 0.15 * P.v));
+  // next to no liquidity means the position can't be exited, period — no other factor gets to
+  // outvote that into looking "fine"
+  if (best.liq != null && best.liq < 500) pct = Math.min(pct, 20);
   let label, cls;
   if (pct >= 68) { label = 'BUILT TO LAST'; cls = 'pos'; }
   else if (pct >= 48) { label = 'HAS SOME LEGS'; cls = ''; }

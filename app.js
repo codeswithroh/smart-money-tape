@@ -580,6 +580,14 @@ function survivalStage(pp){
      for "something exists here besides the chart." */
 function fHolderSafety(sf){
  if(!sf)return {v:0.5,note:'rug-check data unavailable'};
+ // a fetch failure/rate-limit/not-yet-indexed coin gets constructed client-side as a same-shaped
+ // sf object with every field null and ok:null (see fetchSafety's 'no rug data' branches) — that
+ // is NOT the same thing as "checked, no flags found", and must never be scored as clean. Real
+ // case that shipped this bug: a coin with 80% single-wallet concentration scored ~50-70/100
+ // because RugCheck's fetch had failed and the empty placeholder read as a perfect holder-safety
+ // factor (32% of the total score) instead of "unknown".
+ var hasData=sf.topPct!=null||sf.devPct!=null||sf.insiderPct!=null||sf.bundle||sf.renounced!=null||sf.lpPct!=null||sf.ok===true||sf.ok===false;
+ if(!hasData)return {v:0.5,note:(sf.reasons&&sf.reasons[0])||'safety check unavailable — verify manually'};
  var v=1,notes=[];
  if(sf.topPct!=null){notes.push('top holder '+sf.topPct.toFixed(1)+'%');v-=Math.max(0,sf.topPct-8)/40;}
  if(sf.devPct!=null){notes.push('dev '+sf.devPct.toFixed(1)+'%');v-=Math.min(0.3,sf.devPct/12);}
@@ -614,6 +622,10 @@ function fProject(proj){return {v:(proj.surface||0)/4,note:proj.surface+'/4 surf
 function longTermScore(pp,a,sf,hr,proj){
  var H=fHolderSafety(sf),L=fLiquidity(pp),G=fGrowth(hr),V=fVolume(pp,a),P=fProject(proj);
  var pct=Math.round(100*(0.32*H.v+0.20*L.v+0.18*G.v+0.15*V.v+0.15*P.v));
+ // a pool with next to no liquidity can't be exited, full stop — no combination of the other
+ // four factors is allowed to read that as anything but high risk (real case: a coin with $0.08
+ // of liquidity scored 34-70 before this, purely from the non-liquidity factors landing fine)
+ if(pp.liq!=null&&pp.liq<500)pct=Math.min(pct,20);
  var label,cls;
  if(pct>=68){label='BUILT TO LAST';cls='pos';}
  else if(pct>=48){label='HAS SOME LEGS';cls='';}
