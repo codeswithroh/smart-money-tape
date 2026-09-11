@@ -183,6 +183,30 @@ function spinoff(tags) {
   return `${name} $${tk}`;
 }
 
+// resolve a bare ticker ($CATE) to real candidate coins. Memecoin tickers are squatted constantly
+// (fake pools cloning a popular symbol, sometimes with spoofed liquidity numbers), so this ranks by
+// real trading volume rather than liquidity alone and returns several candidates instead of
+// silently picking one — the caller decides whether the top hit is dominant enough to auto-open.
+export async function resolveTicker(sym) {
+  const clean = String(sym || '').replace(/^\$/, '').trim();
+  if (!clean || clean.length > 20) return [];
+  const j = await jget(`${DEX}/latest/dex/search?q=${encodeURIComponent(clean)}`);
+  const pairs = (j && j.pairs) || [];
+  const matches = pairs
+    .filter((p) => String((p.baseToken && p.baseToken.symbol) || '').toLowerCase() === clean.toLowerCase())
+    .map(parsePair)
+    .filter((p) => p.addr && p.liq > 200); // drop dust/empty pools
+  const byAddr = {};
+  for (const p of matches) { if (!byAddr[p.addr] || p.liq > byAddr[p.addr].liq) byAddr[p.addr] = p; }
+  // volume alone rewards wash-traded ticker-squat pools (real cases seen: $9k liquidity showing
+  // $500k+ "volume"), so cap each candidate's effective score at a multiple of its own liquidity —
+  // a coin can't out-rank a properly-liquid one just by faking trades against a thin pool.
+  return Object.values(byAddr)
+    .map((p) => { p.rank = Math.min(p.vol.h24 || 0, p.liq * 10) || p.liq; return p; })
+    .sort((a, b) => b.rank - a.rank)
+    .slice(0, 5);
+}
+
 export async function resolveCoin(addr) {
   let j = await jget(`${DEX}/latest/dex/tokens/${encodeURIComponent(addr)}`);
   let pairs = (j && j.pairs) || [];

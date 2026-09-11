@@ -1,4 +1,4 @@
-import { tokenCard, pickAddr, resolveCoin, topMovers } from './_token.js';
+import { tokenCard, pickAddr, resolveCoin, resolveTicker, topMovers } from './_token.js';
 import { kvReady, newId, alertsAll, alertPut, alertDel } from './_kv.js';
 
 export const config = { runtime: 'edge' };
@@ -13,6 +13,8 @@ const BOT_USER = 'MortyRadarBot';
 const HELP = [
   '<b>Morty Radar</b> — paste a contract in any chat and I drop a card:',
   'price · mc · liq · holders · buy pressure · <b>attention verdict (RAMPING/FADING + score)</b> · narrative tags · rug check · socials.',
+  '',
+  'Don&rsquo;t have the contract? Paste a bare ticker like <code>$CATE</code> and I&rsquo;ll find it &mdash; if the symbol is squatted by more than one coin I&rsquo;ll ask which one you mean instead of guessing.',
   '',
   '<b>Commands</b>',
   '/radar — top attention movers right now ⚡',
@@ -235,6 +237,33 @@ async function sendFlex(chatId, addr, entryMc, exitMc, by, from) {
   });
 }
 
+const CHAIN_EMOJI = { solana: '◉', ethereum: '◇', base: '◆', bsc: '◈', arbitrum: '●' };
+// $TICKER -> real coin. Memecoin symbols get squatted constantly (fake pools cloning a popular
+// ticker, sometimes with spoofed liquidity), so this never silently guesses when it's ambiguous —
+// it auto-opens only when one candidate's volume clearly dominates, otherwise it asks.
+async function sendTickerMatch(chatId, sym, reply) {
+  const candidates = await resolveTicker(sym);
+  if (!candidates.length) {
+    await tg('sendMessage', { chat_id: chatId, text: `no coin found for $${sym.toUpperCase()} — paste the contract address instead.`, ...reply });
+    return;
+  }
+  const top = candidates[0], second = candidates[1];
+  const dominant = candidates.length === 1 || top.rank > (second ? second.rank : 0) * 5;
+  if (dominant) {
+    await sendCard(chatId, top.addr, reply);
+    return;
+  }
+  const rows = candidates.map((c) => ([{
+    text: `${CHAIN_EMOJI[c.chain] || '○'} $${c.sym} · ${c.chain} · ${fUsd(c.mc)} mc · ${fUsd(c.vol.h24)} 24h`,
+    callback_data: `tk:${c.addr}`,
+  }]));
+  await tg('sendMessage', {
+    chat_id: chatId,
+    text: `Found ${candidates.length} coins trading as <b>$${esc(sym.toUpperCase())}</b> — same ticker gets reused/squatted a lot, so pick the one you mean:`,
+    parse_mode: 'HTML',
+    reply_markup: { inline_keyboard: rows },
+  });
+}
 async function sendRadar(chatId) {
   let movers;
   try { movers = await topMovers(); } catch (_) { movers = []; }
@@ -287,6 +316,9 @@ export default async function handler(req) {
       } else if (data.startsWith('rf:')) {
         await tg('answerCallbackQuery', { callback_query_id: cq.id, text: 'refreshed ♻️' });
         await refreshCard(cq);
+      } else if (data.startsWith('tk:')) {
+        await tg('answerCallbackQuery', { callback_query_id: cq.id });
+        await sendCard(cid, data.slice(3), {});
       } else if (data === 'x') {
         await tg('answerCallbackQuery', { callback_query_id: cq.id });
         if (cq.message) await tg('deleteMessage', { chat_id: cq.message.chat.id, message_id: cq.message.message_id });
@@ -377,11 +409,17 @@ export default async function handler(req) {
   }
 
   const addr = pickAddr(text);
-  if (!addr) return new Response('ok');
-  try {
-    await sendCard(chatId, addr, reply);
-  } catch (e) {
-    await tg('sendMessage', { chat_id: chatId, text: "couldn't pull that one — bad address or no pair.", ...reply });
+  if (addr) {
+    try { await sendCard(chatId, addr, reply); }
+    catch (e) { await tg('sendMessage', { chat_id: chatId, text: "couldn't pull that one — bad address or no pair.", ...reply }); }
+    return new Response('ok');
+  }
+
+  // a bare $TICKER (nothing else in the message) — resolve it to a real coin, same as pasting a CA
+  const tickerM = text.trim().match(/^\$([A-Za-z0-9_]{1,20})$/);
+  if (tickerM) {
+    try { await sendTickerMatch(chatId, tickerM[1], reply); }
+    catch (_) { await tg('sendMessage', { chat_id: chatId, text: "couldn't look that ticker up — try pasting the contract address instead.", ...reply }); }
   }
   return new Response('ok');
 }
