@@ -216,14 +216,13 @@ async function refreshCard(cq) {
   }
 }
 
-async function sendFlex(chatId, addr, entryMc, exitMc, by, from) {
+async function sendFlex(chatId, addr, entryMc, exitMc, by) {
   const rc = await resolveCoin(addr);
   const sym = rc ? rc.best.sym : '???';
   let url = `${SITE}/api/flexcard?ca=${encodeURIComponent(addr)}`;
   if (entryMc) url += `&entry=${entryMc}`;
   if (exitMc) url += `&exit=${exitMc}`;
   if (by) url += `&by=${encodeURIComponent(by)}`;
-  if (from && from.id) url += `&uid=${from.id}&un=${encodeURIComponent(from.username || from.first_name || 'anon')}`;
   const shareText =
     `$${sym} on Morty Radar 📡\n\n${url}\n\nfind the next one → ${SITE}`;
   const r = await tg('sendPhoto', {
@@ -322,7 +321,7 @@ export default async function handler(req) {
     try {
       if (data.startsWith('fx:')) {
         await tg('answerCallbackQuery', { callback_query_id: cq.id, text: 'building your flex card…' });
-        await sendFlex(cid, data.slice(3), null, null, '@' + (cq.from.username || cq.from.first_name || 'anon'), cq.from);
+        await sendFlex(cid, data.slice(3), null, null, '@' + (cq.from.username || cq.from.first_name || 'anon'));
       } else if (data.startsWith('rf:')) {
         await tg('answerCallbackQuery', { callback_query_id: cq.id, text: 'refreshed ♻️' });
         await refreshCard(cq);
@@ -426,7 +425,7 @@ export default async function handler(req) {
     const nums = parts.filter((p) => p !== addr && /[\d.]/.test(p)).map(parseMc).filter((n) => n != null);
     const entry = nums[0] || null;
     const exit = nums[1] || null;
-    try { await sendFlex(chatId, addr, entry, exit, '@' + (msg.from && (msg.from.username || msg.from.first_name) || 'anon'), msg.from); }
+    try { await sendFlex(chatId, addr, entry, exit, '@' + (msg.from && (msg.from.username || msg.from.first_name) || 'anon')); }
     catch (_) { await tg('sendMessage', { chat_id: chatId, text: "couldn't build that card.", ...reply }); }
     return new Response('ok');
   }

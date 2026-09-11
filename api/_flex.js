@@ -54,7 +54,7 @@ function ringIcon(color) {
   };
 }
 
-// o: { sym, chain, entryMc, exitMc, nowMc, peakMc, by, ago, avatar }
+// o: { sym, chain, entryMc, exitMc, nowMc, nowPrice, peakMc, by, ago } — no avatar/photo by design
 export async function flexImage(o) {
   const A = await assets();
   const hasEntry = o.entryMc != null;
@@ -105,11 +105,9 @@ export async function flexImage(o) {
       position: 'absolute', inset: 0,
       background: 'linear-gradient(90deg, rgba(3,6,12,.72) 0%, rgba(3,6,12,.45) 38%, rgba(3,6,12,0) 62%)',
     }, []) : null,
-    // top-right brand mark
+    // top-right brand mark — no avatar/photo on the card by design
     div({ position: 'absolute', top: 40, right: 48, alignItems: 'center', gap: 10 }, [
-      o.avatar
-        ? { type: 'img', props: { src: o.avatar, width: 40, height: 40, style: { borderRadius: 20, objectFit: 'cover', border: '2px solid ' + FAINT } } }
-        : div({ width: 14, height: 14, borderRadius: 7, background: stat }, []),
+      div({ width: 14, height: 14, borderRadius: 7, background: stat }, []),
       div({ fontSize: 20, fontWeight: 700, letterSpacing: 2, color: FAINT, textTransform: 'uppercase' }, 'Morty Radar'),
     ]),
     content,
