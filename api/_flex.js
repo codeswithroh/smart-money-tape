@@ -27,6 +27,10 @@ async function assets() {
 const div = (style, children) => ({ type: 'div', props: { style: { display: 'flex', ...style }, children } });
 const col = (style, children) => div({ flexDirection: 'column', ...style }, children);
 
+// palette — dark, moody, cool-toned (not the loud neon-green/red pump-card look)
+const BG_TOP = '#0c1420', BG_BOT = '#05070d';
+const POS = '#8fe6c8', NEG = '#ff9d8a', INK = '#eaf2ff', FAINT = '#6d7c98', META = '#9db0c9';
+
 function fUsd(n) {
   if (n == null || isNaN(n)) return '?';
   const a = Math.abs(n);
@@ -48,24 +52,21 @@ function nearestIdx(series, target) {
   return bi;
 }
 
-const CHART_W = 1080, CHART_H = 220;
-function sparklineSvg(series, entryPx, exitPx) {
+// the sparkline doubles as this card's atmosphere — rendered big, faint and off to one side,
+// the way a moody photo would sit behind a stat card, but it's the coin's own real price history
+function sparklineSvg(series, entryPx, exitPx, w, h, lineColor) {
   if (!series || series.length < 2) return null;
   let lo = Math.min.apply(null, series), hi = Math.max.apply(null, series);
   if (hi <= lo) hi = lo + 1;
   const n = series.length;
-  const MARK_R = 11;
-  const x = (i) => Math.min(CHART_W - MARK_R, Math.max(MARK_R, (i / (n - 1)) * CHART_W));
-  const y = (v) => CHART_H - ((v - lo) / (hi - lo)) * (CHART_H - 24) - 12;
+  const MARK_R = 9;
+  const x = (i) => Math.min(w - MARK_R, Math.max(MARK_R, (i / (n - 1)) * w));
+  const y = (v) => h - ((v - lo) / (hi - lo)) * (h - 20) - 10;
   let d = '';
   series.forEach((v, i) => { d += (i ? 'L' : 'M') + x(i).toFixed(1) + ',' + y(v).toFixed(1) + ' '; });
-  const areaD = d + `L${CHART_W},${CHART_H} L0,${CHART_H} Z`;
+  const areaD = d + `L${w},${h} L0,${h} Z`;
 
   const entryI = nearestIdx(series, entryPx);
-  // an exit always reads as "forward in time" from the entry, so search only the back half of
-  // the chart for it; if that still collapses onto the same candle as entry (e.g. a called mc
-  // far outside what this chart window covers), pin it to the most recent candle instead of
-  // stacking two markers on one point.
   let exitI = n - 1;
   if (exitPx != null) {
     const from = entryI != null ? entryI : 0;
@@ -73,46 +74,52 @@ function sparklineSvg(series, entryPx, exitPx) {
     exitI = from + nearestIdx(tail, exitPx);
     if (exitI === entryI) exitI = n - 1;
   }
-  const up = exitPx != null && entryPx != null ? exitPx >= entryPx : true;
-  const lineColor = up ? '#7CFF5B' : '#ff5c4d';
 
   const children = [
     { type: 'path', props: { d: areaD, fill: 'url(#sparkfill)' } },
-    { type: 'path', props: { d, fill: 'none', stroke: lineColor, strokeWidth: 5, strokeLinejoin: 'round', strokeLinecap: 'round' } },
+    { type: 'path', props: { d, fill: 'none', stroke: lineColor, strokeWidth: 4, strokeLinejoin: 'round', strokeLinecap: 'round', opacity: 0.85 } },
   ];
   if (entryI != null) {
-    children.push({ type: 'circle', props: { cx: x(entryI), cy: y(series[entryI]), r: 11, fill: '#0a0c11', stroke: '#8a93a6', strokeWidth: 4 } });
+    children.push({ type: 'circle', props: { cx: x(entryI), cy: y(series[entryI]), r: 8, fill: BG_BOT, stroke: FAINT, strokeWidth: 3 } });
   }
   if (exitI != null && exitI !== entryI) {
-    children.push({ type: 'circle', props: { cx: x(exitI), cy: y(series[exitI]), r: 11, fill: lineColor, stroke: '#0a0c11', strokeWidth: 4 } });
+    children.push({ type: 'circle', props: { cx: x(exitI), cy: y(series[exitI]), r: 8, fill: lineColor, stroke: BG_BOT, strokeWidth: 3 } });
   }
   children.unshift({
     type: 'defs', props: { children: [{
       type: 'linearGradient', props: {
         id: 'sparkfill', x1: '0', y1: '0', x2: '0', y2: '1', children: [
-          { type: 'stop', props: { offset: '0%', stopColor: lineColor, stopOpacity: 0.35 } },
+          { type: 'stop', props: { offset: '0%', stopColor: lineColor, stopOpacity: 0.28 } },
           { type: 'stop', props: { offset: '100%', stopColor: lineColor, stopOpacity: 0 } },
         ],
       },
     }] },
   });
-  return { type: 'svg', props: { width: CHART_W, height: CHART_H, viewBox: `0 0 ${CHART_W} ${CHART_H}`, children } };
+  return { type: 'svg', props: { width: w, height: h, viewBox: `0 0 ${w} ${h}`, children } };
+}
+
+function ringIcon(color) {
+  return {
+    type: 'svg', props: {
+      width: 26, height: 26, viewBox: '0 0 24 24', children: [
+        { type: 'circle', props: { cx: 12, cy: 12, r: 9.5, stroke: color, strokeWidth: 2, fill: 'none' } },
+        { type: 'line', props: { x1: 12, y1: 12, x2: 12, y2: 6, stroke: color, strokeWidth: 2, strokeLinecap: 'round' } },
+        { type: 'line', props: { x1: 12, y1: 12, x2: 16.5, y2: 12, stroke: color, strokeWidth: 2, strokeLinecap: 'round' } },
+      ],
+    },
+  };
 }
 
 // o: { sym, chain, entryMc, exitMc, nowMc, peakMc, by, ago, avatar, series }
 export async function flexImage(o) {
   const A = await assets();
-  const hasExit = o.entryMc != null && o.exitMc != null;
-  const mult = hasExit ? o.exitMc / o.entryMc
-    : (o.entryMc && o.peakMc ? o.peakMc / o.entryMc : (o.nowMc && o.entryMc ? o.nowMc / o.entryMc : 1));
-  const multStr = (mult >= 100 ? Math.round(mult) : mult.toFixed(mult >= 10 ? 1 : 2)) + 'x';
-  const green = mult >= 1;
-  const accent = green ? '#7CFF5B' : '#ff5c4d';
-
-  const header = div({ alignItems: 'center' }, [
-    div({ width: 22, height: 22, borderRadius: 11, background: accent, marginRight: 14 }, []),
-    div({ fontSize: 26, fontWeight: 700, letterSpacing: 2, color: '#8a93a6' }, 'MORTY RADAR  ·  @MortyRadarBot'),
-  ]);
+  const hasEntry = o.entryMc != null;
+  const hasExit = hasEntry && o.exitMc != null;
+  const compareMc = hasExit ? o.exitMc : o.nowMc;
+  const delta = hasEntry && compareMc != null ? compareMc - o.entryMc : null;
+  const pct = hasEntry && o.entryMc ? (compareMc / o.entryMc - 1) * 100 : null;
+  const up = delta == null || delta >= 0;
+  const stat = up ? POS : NEG;
 
   // entry/exit price implied from the called mc, using the live price:mc ratio (not the last
   // candle's close, which can lag the live quote enough to skew the ratio and misplace both markers)
@@ -122,51 +129,57 @@ export async function flexImage(o) {
     if (o.entryMc) entryPx = o.entryMc * ratio;
     if (o.exitMc) exitPx = o.exitMc * ratio;
   }
-  const chart = sparklineSvg(o.series, entryPx, exitPx);
+  const CW = 660, CH = 460;
+  const chart = sparklineSvg(o.series, entryPx, exitPx, CW, CH, stat);
+
+  const bigNum = hasEntry
+    ? (delta >= 0 ? '+' : '−') + fUsd(Math.abs(delta))
+    : (o.nowMc ? 'MC ' + fUsd(o.nowMc) : '$' + (o.sym || '???'));
+
+  const metaBits = [];
+  metaBits.push('$' + (o.sym || '???'));
+  if (hasEntry) metaBits.push('IN ' + fUsd(o.entryMc) + '  →  ' + (hasExit ? 'OUT ' : 'NOW ') + fUsd(compareMc));
+  else if (o.nowMc) metaBits.push('now ' + fUsd(o.nowMc));
+  if (!hasExit && o.peakMc) metaBits.push('peak ' + fUsd(o.peakMc));
+  if (o.chain) metaBits.push(o.chain);
+  if (o.ago) metaBits.push(o.ago);
+
+  const topRow = div({ alignItems: 'center', gap: 10 }, [
+    ringIcon(FAINT),
+    div({ fontSize: 22, fontWeight: 700, letterSpacing: 1.5, color: FAINT, textTransform: 'uppercase' }, hasExit ? 'closed' : hasEntry ? 'open' : 'snapshot'),
+  ]);
+
+  const metaRow = div({ alignItems: 'center', justifyContent: 'space-between', width: 660, marginTop: 18 }, [
+    div({ fontSize: 22, fontWeight: 700, color: META, letterSpacing: 0.5 }, metaBits.join('   ·   ')),
+    pct != null ? div({ fontSize: 30, fontWeight: 800, color: stat, marginLeft: 24 }, (pct >= 0 ? '+' : '') + pct.toFixed(1) + '%') : null,
+  ].filter(Boolean));
+
+  const content = col({ position: 'absolute', left: 64, bottom: 60 }, [
+    topRow,
+    div({ fontSize: 108, fontWeight: 800, lineHeight: 1, color: hasEntry ? stat : INK, marginTop: 14 }, bigNum),
+    metaRow,
+  ]);
 
   const kids = [
-    header,
-    // middle
-    col({}, [
-      div({ fontSize: 100, fontWeight: 800, lineHeight: 1 }, '$' + (o.sym || '???')),
-      div({ fontSize: 34, fontWeight: 700, color: '#8a93a6', marginTop: 8 },
-        (o.entryMc ? 'in @ ' + fUsd(o.entryMc) : 'now ' + fUsd(o.nowMc)) +
-        (hasExit ? '   ·   out @ ' + fUsd(o.exitMc) : '') +
-        (o.by ? '   ·   ' + o.by : '') + (o.ago ? '   ·   ' + o.ago : '')),
+    // chart as atmosphere, right side, faded
+    chart ? div({ position: 'absolute', top: (630 - CH) / 2 - 20, right: -30, opacity: 0.9 }, [chart]) : null,
+    // top-right brand mark
+    div({ position: 'absolute', top: 40, right: 48, alignItems: 'center', gap: 10 }, [
+      o.avatar
+        ? { type: 'img', props: { src: o.avatar, width: 40, height: 40, style: { borderRadius: 20, objectFit: 'cover', border: '2px solid ' + FAINT } } }
+        : div({ width: 14, height: 14, borderRadius: 7, background: stat }, []),
+      div({ fontSize: 20, fontWeight: 700, letterSpacing: 2, color: FAINT, textTransform: 'uppercase' }, 'Morty Radar'),
     ]),
-    // chart
-    chart
-      ? div({ marginTop: 8, marginBottom: 4 }, [chart])
-      : div({ fontSize: 26, color: '#55607a', marginTop: 20, marginBottom: 20 }, 'chart unavailable for this chain — numbers only'),
-    // bottom row
-    div({ alignItems: 'flex-end', justifyContent: 'space-between' }, [
-      col({}, [
-        div({ fontSize: 42, fontWeight: 800 }, hasExit ? 'Exited ' + fUsd(o.exitMc) : (o.peakMc ? 'Reached ' + fUsd(o.peakMc) : 'MC ' + fUsd(o.nowMc))),
-        div({ fontSize: 28, fontWeight: 700, color: '#8a93a6', marginTop: 6 },
-          o.nowMc ? 'now ' + fUsd(o.nowMc) + (o.chain ? '  ·  ' + o.chain : '') : (o.chain || '')),
-      ]),
-      div({ fontSize: 150, fontWeight: 800, color: accent, lineHeight: 1 }, multStr),
-    ]),
+    content,
     // footer
-    div({ fontSize: 22, fontWeight: 700, color: '#55607a' }, 'meme-attention-radar.vercel.app   ·   not financial advice'),
-  ];
+    div({ position: 'absolute', right: 48, bottom: 40, fontSize: 15, fontWeight: 700, color: FAINT }, 'meme-attention-radar.vercel.app  ·  not financial advice'),
+  ].filter(Boolean);
 
-  const avatarSrc = o.avatar || A.morty;
-  if (avatarSrc) {
-    kids.push({
-      type: 'img',
-      props: {
-        src: avatarSrc, width: 120, height: 120,
-        style: { position: 'absolute', top: 44, right: 52, borderRadius: 60, border: '3px solid ' + accent, objectFit: 'cover' },
-      },
-    });
-  }
-
-  const el = col(
+  const el = div(
     {
-      width: 1200, height: 630, padding: 60, position: 'relative',
-      background: 'linear-gradient(135deg,#0a0c11 0%,#12161f 55%,#0d1b12 100%)',
-      color: '#ffffff', fontFamily: 'Inter', justifyContent: 'space-between',
+      width: 1200, height: 630, position: 'relative',
+      background: `linear-gradient(165deg, ${BG_TOP} 0%, ${BG_BOT} 75%)`,
+      color: INK, fontFamily: 'Inter',
     },
     kids,
   );
