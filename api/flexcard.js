@@ -45,7 +45,8 @@ async function tgAvatarDataUri(uid) {
 }
 
 function dicebearUrl(seed) {
-  return 'https://api.dicebear.com/9.x/identicon/svg?seed=' + encodeURIComponent(seed || 'anon') +
+  // .png, not .svg — the og-image renderer (satori) can't rasterize a remote SVG <img>, only bitmaps
+  return 'https://api.dicebear.com/9.x/identicon/png?seed=' + encodeURIComponent(seed || 'anon') +
     '&backgroundColor=eadfc4,f4ecd9,fdf3cf&backgroundType=solid&radius=50&size=120';
 }
 
