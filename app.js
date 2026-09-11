@@ -958,6 +958,28 @@ function researchScorePanel(pp,a,sf,hr,proj){
    x / (L/2 + x), the standard xy=k approximation when only the total USD liquidity is known
    (no exact reserve split). Concentrated-liquidity (CLMM) pools with lopsided ranges can differ
    from this meaningfully — called out explicitly rather than presented as exact. */
+/* ---------- quick stats grid — GMGN-style: every important number visible above the fold,
+   no scrolling into the long panels below just to see the basics. Each tile is one fact with a
+   plain-language tooltip, same data the long panels use, just surfaced first. ---------- */
+function qsTile(label,value,cls,tip){
+ return '<div class="qst'+(cls?' '+cls:'')+'" title="'+esc(tip||'')+'"><div class="qst-v">'+value+'</div><div class="qst-l">'+esc(label)+'</div></div>';
+}
+function quickStatsGrid(pp,a,sf,hr,proj){
+ var s=longTermScore(pp,a,sf,hr,proj);
+ var tiles=[];
+ tiles.push(qsTile('Score',s.pct+'/100',s.cls,'Overall research score out of 100. Weighted from this coin\'s holder safety, liquidity depth, holder growth, volume authenticity and project surface.'));
+ tiles.push(qsTile('Liquidity',fUsd(pp.liq),pp.liq==null?'':pp.liq<500?'neg':pp.liq<5000?'watch':'pos','Total value sitting in the trading pool right now. This is what actually backs your ability to exit a position.'));
+ if(sf&&sf.topPct!=null)tiles.push(qsTile('Top holder',sf.topPct.toFixed(1)+'%',sf.topPct>35?'neg':sf.topPct>15?'watch':'pos','The single largest holder wallet\'s share of total supply, excluding the pool itself.'));
+ if(sf&&sf.devPct!=null)tiles.push(qsTile('Dev holds',sf.devPct.toFixed(1)+'%',sf.devPct>10?'neg':sf.devPct>3?'watch':'pos','How much of the supply the deployer wallet itself still holds right now.'));
+ if(sf&&sf.lpPct!=null)tiles.push(qsTile('LP locked',sf.lpPct.toFixed(0)+'%',sf.lpPct<50?'neg':'pos','Share of the liquidity pool that is locked. Locked liquidity cannot be pulled out by the team.'));
+ if(sf&&sf.insiderPct!=null&&sf.insiderPct>0)tiles.push(qsTile('Insiders',sf.insiderPct.toFixed(0)+'%',sf.insiderPct>20?'neg':'watch','Combined supply share held by wallets flagged as insiders.'));
+ tiles.push(qsTile('Bundle',sf&&sf.bundle?'yes':'no',sf&&sf.bundle?'neg':'pos','Whether several wallets bought in near identical amounts right at launch, a common sign of a coordinated snipe rather than organic buying.'));
+ tiles.push(qsTile('Renounced',sf&&sf.renounced===true?'yes':sf&&sf.renounced===false?'no':'?',sf&&sf.renounced===false?'neg':sf&&sf.renounced===true?'pos':'','Whether the deployer has given up mint and freeze authority over the token.'));
+ var exitImp=exitImpactPct(5000,pp.liq);
+ if(exitImp!=null)tiles.push(qsTile('Exit $5k',exitImp.toFixed(1)+'%',exitImp>=25?'neg':exitImp>=8?'watch':'pos','Estimated price impact of exiting a $5,000 position right now, at this pool\'s current depth. An estimate, not a guarantee.'));
+ tiles.push(qsTile('Age',fAge(pp.ageMs),'','Time since this trading pair was created on-chain.'));
+ return '<div class="qsg">'+tiles.join('')+'</div>';
+}
 function exitImpactPct(sizeUsd,liqUsd){
  if(!liqUsd||liqUsd<=0||!sizeUsd||sizeUsd<=0)return null;
  var half=liqUsd/2;
@@ -1188,6 +1210,34 @@ function skelRows(n){var out='';for(var i=0;i<n;i++)out+=SKEL_ROW;return out;}
 // re-rendering right after a scan) can run entirely as microtasks with no paint in between,
 // so a skeleton set right before it never actually reaches the screen.
 function nextPaint(){return new Promise(function(resolve){requestAnimationFrame(function(){requestAnimationFrame(resolve);});});}
+/* ---------- at-a-glance safety icon row (GMGN-style: see the risk without opening the x-ray) ----------
+   Reads whatever's already in state.safety (screenPool prefetches it for every board candidate) —
+   no new fetch. Each badge carries a plain-language title tooltip, no dashes or jargon, so the
+   icon alone teaches what it means the first time someone hovers it. */
+function sfBadges(pp){
+ var sf=state.safety.get(pp.addr);
+ if(!sf)return '';
+ var out=[];
+ if(sf.topPct!=null){
+  var c1=sf.topPct>35?'neg':sf.topPct>15?'watch':'pos';
+  out.push('<span class="sfic '+c1+'" title="Top holder wallet owns '+sf.topPct.toFixed(1)+'% of supply. Above 15% is worth watching, above 35% is a real concentration risk.">&#128081;'+sf.topPct.toFixed(0)+'%</span>');
+ }
+ if(sf.devPct!=null){
+  var c2=sf.devPct>10?'neg':sf.devPct>3?'watch':'pos';
+  out.push('<span class="sfic '+c2+'" title="The deployer wallet holds '+sf.devPct.toFixed(1)+'% of supply. A dev with a large stake can dump on holders at any time.">&#128100;'+sf.devPct.toFixed(0)+'%</span>');
+ }
+ if(sf.lpPct!=null){
+  var c3=sf.lpPct<50?'neg':'pos';
+  out.push('<span class="sfic '+c3+'" title="'+sf.lpPct.toFixed(0)+'% of the liquidity pool is locked. Locked liquidity cannot be pulled out by the team.">&#128274;'+sf.lpPct.toFixed(0)+'%</span>');
+ }
+ if(sf.insiderPct!=null&&sf.insiderPct>0){
+  var c4=sf.insiderPct>20?'neg':'watch';
+  out.push('<span class="sfic '+c4+'" title="Wallets flagged as insiders hold '+sf.insiderPct.toFixed(0)+'% of supply combined.">&#128373;'+sf.insiderPct.toFixed(0)+'%</span>');
+ }
+ if(sf.bundle)out.push('<span class="sfic neg" title="Several wallets bought in near identical amounts right at launch. A common sign of a coordinated snipe, not organic buying.">&#127873;bundle</span>');
+ if(sf.renounced===true)out.push('<span class="sfic pos" title="Mint and freeze authority are renounced. The team can no longer mint new supply or freeze wallets.">&#9989;renounced</span>');
+ return out.length?'<span class="sficrow">'+out.join('')+'</span>':'';
+}
 function tokenRow(pp){
  var a=pp._a||attn(pp),tags=pp._tags||tagThemes(pp);
  var tg=tags.length?tags.map(function(k){var t=THEMES.filter(function(x){return x.k===k;})[0];return '<span class="tag">'+esc(t?t.name:k)+'</span>';}).join('')
@@ -1200,6 +1250,7 @@ function tokenRow(pp){
   +(pp.img?'<img class="ava" src="'+esc(pp.img)+'" alt="" loading="lazy" onerror="this.style.visibility=\'hidden\'">':'<span></span>')
   +'<span class="tmain"><span class="tsym">'+starBtn(pp.addr,pp.chain,pp.sym)+'$'+esc(pp.sym)+' <span class="cchip">'+esc(pp.chain)+'</span>'+pf+src+(pp.boosts?' <span class="cchip">boost</span>':'')+warn+'</span>'
   +'<span class="tmeta">'+fUsd(pp.mc)+' mc &middot; '+fUsd(pp.vol.h24)+' 24h &middot; '+fAge(pp.ageMs)+' old &middot; '+fPct(+pp.pc.h1||0)+' 1h</span>'
+  +sfBadges(pp)
   +'<span class="tags">'+tg+'</span></span>'
   +trajTag(a)+'</button>';
 }
@@ -1437,6 +1488,7 @@ function renderResearch(pp,sf,watchers,tinfo){
    +'<button class="btn" data-act="savefav">'+(state.watch.has(pp.addr)?'&#9733; on watchlist':'&#9734; watchlist')+'</button>'
    +'<button class="btn pri" data-act="flex">&#128248; flex $'+esc(pp.sym)+'</button></div>'
   +'<div style="font-size:12px;color:var(--ink-soft)">score <b>'+v.pct+'/100</b> &middot; attention '+Math.round(v.att*100)+' &middot; safety '+Math.round(v.safe*100)+' &middot; project '+proj.surface+'/4'+(v.meme?' &middot; your meme '+Math.round(v.meme*100):'')+'</div>'
+  +quickStatsGrid(pp,a,sf,hr,proj)
   +firehosePanel()
   +radarTile(rax)
   +chart
@@ -1868,6 +1920,7 @@ function renderBoard(){
    +'<span class="rank">'+medals[i]+'</span>'
    +'<div class="bsym">'+starBtn(pp.addr,pp.chain,pp.sym)+'$'+esc(pp.sym)+' <span class="cchip">'+esc(pp.chain)+'</span>'+pf+wr+'</div>'
    +'<div class="bmeta">'+fUsd(pp.mc)+' mc &middot; <span class="'+(ch>0?'up':ch<0?'dn':'')+'">'+fPct(ch)+' 1h</span> &middot; '+fAge(pp.ageMs)+'</div>'
+   +sfBadges(pp)
    +'<div class="battn"><span class="traj-mini '+a.traj+'">'+a.traj.toUpperCase()+'</span><span class="bar"><i style="width:'+Math.round(a.score/mx*100)+'%"></i></span><b>'+a.score+'</b></div>'
    +'</button>';
  }).join('')
