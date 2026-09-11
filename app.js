@@ -431,6 +431,48 @@ function trajTag(a){return '<span class="traj '+a.traj+'">'+a.traj.toUpperCase()
 /* ---------- pick-quality gates (why a coin is worth your attention) ---------- */
 var MIN_MC=7000,MIN_LIQ=5000;
 function pumpFun(pp){return pp.chain==='solana'&&/pump$/i.test(pp.addrRaw||pp.addr||'');}
+
+/* ---------- survival curve (pattern-in-the-chaos: base-rate death odds by age) ----------
+   Sourced from published launch-cohort studies, not a prediction model:
+   - CoinGecko, "Average Lifespan of Pump.fun Memecoins Is Less Than a Day" (2026)
+   - arXiv 2607.02823, Pump.fun Graduation Regime Windows: Survival Analysis of 832,941 Token Launches (2026)
+   - arXiv 2512.11850, The Memecoin Phenomenon: An In-Depth Study of Solana's Blockchain Trends
+   Step function, not interpolation: each row is "% of launches from these studies that were still
+   trading past this age." We show whichever bucket a coin has already cleared. */
+var SURVIVAL_CURVE=[
+ {days:0, survivePct:100, note:'just launched — the highest-mortality window there is'},
+ {days:1, survivePct:19.6, note:'past day one — ~80% of Pump.fun launches are already dead by here'},
+ {days:3, survivePct:15.5, note:'past 3 days — clears the worst of the cohort, still early'},
+ {days:7, survivePct:12.1, note:'past a week — under 1 in 8 launches make it this far'},
+ {days:14,survivePct:9.6, note:'past two weeks — rare air for a fresh memecoin'},
+ {days:90,survivePct:5.0, note:'past 90 days — only ~5% of Pump.fun launches ever get here'}
+];
+function survivalStage(pp){
+ if(pp.ageMs==null)return null;
+ var days=pp.ageMs/864e5;
+ var row=SURVIVAL_CURVE[0];
+ for(var i=0;i<SURVIVAL_CURVE.length;i++){if(days>=SURVIVAL_CURVE[i].days)row=SURVIVAL_CURVE[i];}
+ var idx=SURVIVAL_CURVE.indexOf(row);
+ var frac=idx/(SURVIVAL_CURVE.length-1); // 0..1 position for the gauge marker
+ var sourced=pp.chain==='solana'&&pumpFun(pp);
+ return {days:days,survivePct:row.survivePct,note:row.note,frac:frac,sourced:sourced,bucketDays:row.days};
+}
+function survivalPanel(pp){
+ var s=survivalStage(pp);
+ if(!s)return '';
+ var zones=['#a5301c','#a5301c','#c9762c','#c9762c','#2f7c4d','#2f7c4d'];
+ var stops=SURVIVAL_CURVE.map(function(r,i){return {pct:i/(SURVIVAL_CURVE.length-1)*100,col:zones[i]};});
+ var grad='linear-gradient(90deg,'+stops.map(function(z){return z.col+' '+z.pct.toFixed(0)+'%';}).join(',')+')';
+ var headline=s.sourced
+  ?'<b>'+fAge(pp.ageMs)+' old.</b> Roughly <b>'+s.survivePct+'%</b> of Pump.fun launches are still trading at this age or older &mdash; '+s.note+'.'
+  :'<b>'+fAge(pp.ageMs)+' old.</b> Age-based die-off is a Pump.fun-specific stat; treat this chain\'s curve as directional only, not sourced to that number.';
+ return '<div class="panel"><h3>Survival odds</h3>'
+  +'<div class="surv-gauge"><div class="surv-track" style="background:'+grad+'"><i class="surv-mark" style="left:'+Math.round(s.frac*100)+'%"></i></div>'
+  +'<div class="surv-labels"><span>launch</span><span>1d</span><span>3d</span><span>1wk</span><span>2wk</span><span>90d+</span></div></div>'
+  +'<p style="font-size:12.5px;color:var(--ink-soft);margin-top:8px">'+headline+'</p>'
+  +'<p style="font-size:11px;color:var(--ink-faint);margin-top:5px">Base rate from cohort studies of 800k&ndash;18.6M Pump.fun launches (CoinGecko Research; arXiv 2607.02823; arXiv 2512.11850) &mdash; describes what already happened to that population, not what this coin will do.</p>'
+  +'</div>';
+}
 function pickQuality(pp){
  var notes=[],ageMin=pp.ageMs!=null?pp.ageMs/60000:null,pf=pumpFun(pp);
  var mcOk=!pp.mc||pp.mc>=MIN_MC,liqOk=!pp.liq||pp.liq>=MIN_LIQ;
@@ -587,7 +629,10 @@ function verdict(pp,a,sf,surface){
  var safe=sf&&sf.ok===true?1:(!sf||sf.ok==null?0.55:0);
  var conv=(r.conviction||0)/5;
  var prj=surface==null?0.5:surface/4;
- var pct=Math.round(100*(0.28*att+0.26*meme+0.17*cs.v+0.11*safe+0.11*conv+0.07*prj));
+ // weights: holder/safety signal outweighs raw momentum (research: holder-concentration signal
+ // measured ~64% stronger than trader/volume signal on a risk-adjusted basis), so safety carries
+ // double its old weight instead of chasing whatever is pumping right now.
+ var pct=Math.round(100*(0.22*att+0.22*meme+0.14*cs.v+0.22*safe+0.10*conv+0.10*prj));
  var fomo=((+pp.pc.h1||0)>=45||(+pp.pc.m5||0)>=20);
  var label,cls;
  if(fomo&&pct<74){label='YOU&rsquo;D BE EXIT LIQUIDITY &#128128;';cls='fomo';}
@@ -731,6 +776,7 @@ function renderResearch(pp,sf,watchers,tinfo){
   +chart
   +'<div class="panel"><h3>What the radar sees</h3>'+autoKv+safeLine+watchLine+'</div>'
   +bundlePanel(pp,sf)
+  +survivalPanel(pp)
   +projPanel
   +checklistPanel(pp,proj)
   +tradesPanel()
