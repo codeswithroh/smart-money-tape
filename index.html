@@ -225,6 +225,23 @@
   .score-trend-bars i{display:block;width:6px;border-radius:2px 2px 0 0;background:var(--ink-soft);}
   .score-trend-bars i.pos{background:var(--pos);} .score-trend-bars i.neg{background:var(--neg);}
   .rscore-age span.pos{color:var(--pos);font-weight:700;} .rscore-age span.neg{color:var(--neg);font-weight:700;}
+
+  /* exit-liquidity sizing */
+  .exd-table{display:flex;flex-direction:column;gap:4px;font-family:"Share Tech Mono",monospace;font-size:12.5px;}
+  .exd-row{display:grid;grid-template-columns:110px 110px 1fr;gap:8px;padding:4px 0;border-bottom:1px dashed var(--rule);}
+  .exd-row span.pos{color:var(--pos);} .exd-row span.neg{color:var(--neg);} .exd-row span.watch{color:var(--hot);}
+  .exd-calc{display:flex;align-items:center;gap:10px;margin-top:10px;flex-wrap:wrap;}
+  .exd-calc label{font-size:12px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.03em;}
+  .exd-calc input{width:120px;}
+  .exd-out{font-family:"Share Tech Mono",monospace;font-size:13px;}
+  .exd-out .pos{color:var(--pos);} .exd-out .neg{color:var(--neg);} .exd-out .watch{color:var(--hot);}
+
+  /* mistake-pattern journal + correlated-exposure warning (watchlist) */
+  .journal summary{list-style:none;} .journal summary::-webkit-details-marker{display:none;}
+  .jrows{margin-top:10px;display:flex;flex-direction:column;gap:5px;max-height:260px;overflow-y:auto;}
+  .jrow{display:grid;grid-template-columns:60px 50px 55px 1fr auto;gap:8px;align-items:center;font-size:12px;padding:4px 2px;border-bottom:1px dashed var(--rule);}
+  .jrow .pos{color:var(--pos);font-weight:700;} .jrow .neg{color:var(--neg);font-weight:700;}
+  .exposure{border-color:var(--hot);background:linear-gradient(180deg,var(--note),var(--card));margin-bottom:10px;}
   .formrow{display:flex;flex-direction:column;gap:5px;margin-bottom:11px;}
   .formrow label{font-size:12px;text-transform:uppercase;letter-spacing:.03em;color:var(--ink-faint);}
   .seg{display:inline-flex;border:2px solid var(--ink);border-radius:9px 5px 10px 5px;overflow:hidden;flex-wrap:wrap;}
@@ -519,6 +536,8 @@
       <button class="btn sm" id="cmpClear">clear</button>
     </div>
     <div id="cmpPanel"></div>
+    <div id="journalPanel"></div>
+    <div id="exposureNote"></div>
     <div class="rows" id="watchList"><div class="skrow"><span class="skel ava"></span><span class="skcol"><span class="skel"></span><span class="skel"></span></span><span class="skel traj"></span></div><div class="skrow"><span class="skel ava"></span><span class="skcol"><span class="skel"></span><span class="skel"></span></span><span class="skel traj"></span></div></div>
   </section>
 

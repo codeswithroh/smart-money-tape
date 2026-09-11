@@ -4,7 +4,7 @@ var DEX='https://api.dexscreener.com',GT='https://api.geckoterminal.com/api/v2';
 // GeckoTerminal blocks browser CORS under load -> go through our cached edge proxy
 function gtUrl(p){return '/api/gt?path='+encodeURIComponent(p);}
 var RUG='https://api.rugcheck.xyz/v1/tokens',HP='https://api.honeypot.is/v2/IsHoneypot',FOMO='https://api.fomoapi.io';
-var LS_CFG='ar-cfg-v1',LS_RES='ar-research-v1',LS_HOLD='ar-holders-v1',LS_WATCH='ar-watch-v1',LS_SCORE='ar-scores-v1',LS_THESIS='ar-thesis-v1',LS_POOL='ar-poolcache-v2';
+var LS_CFG='ar-cfg-v1',LS_RES='ar-research-v1',LS_HOLD='ar-holders-v1',LS_WATCH='ar-watch-v1',LS_SCORE='ar-scores-v1',LS_THESIS='ar-thesis-v1',LS_POOL='ar-poolcache-v2',LS_JOURNAL='ar-journal-v1';
 var POOL_CACHE_MAX_AGE=20*60*1000; // stale cache older than this is skipped for instant-paint, straight to skeleton
 var EVM_CHAIN_ID={bsc:56,base:8453,ethereum:1};
 var reduceMotion=!!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -51,7 +51,7 @@ var state={
  tokenCache:new Map(),   // addr -> {ts,pair}
  boosts:[],trending:[],profiles:{},tinfo:new Map(),
  safety:new Map(),ohlcv:new Map(),
- research:{},holders:{},scores:{},thesis:{},watch:new Set(),watchMeta:new Map(),_watchBusy:false,
+ research:{},holders:{},scores:{},thesis:{},journal:[],watch:new Set(),watchMeta:new Map(),_watchBusy:false,
  compare:[], // addrs picked for side-by-side comparison, in pick order, capped at 3 — session-only
  chartMode:'entries',rcAddr:null,rcPair:null,rcInfo:null,trades:[],_tradesPoll:0,fhSound:false,
  lastOk:0,lastErr:null,scanAt:0
@@ -65,12 +65,16 @@ function loadAll(){
  try{var w=JSON.parse(localStorage.getItem(LS_WATCH)||'[]');state.watch=new Set(w);}catch(_){}
  try{state.scores=JSON.parse(localStorage.getItem(LS_SCORE)||'{}')||{};}catch(_){state.scores={};}
  try{state.thesis=JSON.parse(localStorage.getItem(LS_THESIS)||'{}')||{};}catch(_){state.thesis={};}
+ try{state.journal=JSON.parse(localStorage.getItem(LS_JOURNAL)||'[]')||[];}catch(_){state.journal=[];}
 }
 function saveCfg(){try{localStorage.setItem(LS_CFG,JSON.stringify({apiKey:state.apiKey,chains:state.chains,tab:state.tab,chartMode:state.chartMode,fhSound:state.fhSound}));}catch(_){}}
 function saveRes(){try{localStorage.setItem(LS_RES,JSON.stringify(state.research));}catch(_){}}
 function saveHold(){try{localStorage.setItem(LS_HOLD,JSON.stringify(state.holders));}catch(_){}}
 function saveScores(){try{localStorage.setItem(LS_SCORE,JSON.stringify(state.scores));}catch(_){}}
 function saveThesis(){try{localStorage.setItem(LS_THESIS,JSON.stringify(state.thesis));}catch(_){}}
+// journal entries are never deleted from the UI (that's the point — no quietly forgetting a
+// loss), so cap what we persist rather than let it grow unbounded across years of use.
+function saveJournal(){try{localStorage.setItem(LS_JOURNAL,JSON.stringify(state.journal.slice(-500)));}catch(_){}}
 function saveWatch(){try{localStorage.setItem(LS_WATCH,JSON.stringify(Array.from(state.watch)));}catch(_){}}
 // disk cache of the last live scan, purely for a fast FIRST PAINT on reload — it is never treated
 // as ground truth: attentionPool()'s hard-exclusion safety filter runs on it exactly like live data,
@@ -114,8 +118,37 @@ function recordThesis(addr){
  if(state.thesis[addr])return; // don't clobber an existing thesis by re-starring
  var c=state.tokenCache.get(addr),pp=c&&c.pair;if(!pp||!pp.mc)return;
  var a=pp._a||attn(pp);
- state.thesis[addr]={mc:pp.mc,price:pp.priceUsd||null,at:Date.now(),traj:a.traj,attn:a.score,invalidatePct:35};
+ // snapshot whatever safety data is already on hand (screenPool / an earlier x-ray visit may
+ // have already fetched it) — no new fetch triggered here, same "works from any tab, no
+ // friction" rule as the rest of the thesis system. Feeds the mistake-pattern journal on exit.
+ var sf=state.safety.get(addr);
+ state.thesis[addr]={
+  mc:pp.mc,price:pp.priceUsd||null,at:Date.now(),traj:a.traj,attn:a.score,invalidatePct:35,
+  sym:pp.sym,chain:pp.chain,liq:pp.liq!=null?pp.liq:null,
+  theme:(tagThemes(pp)[0]||null),
+  topPct:(sf&&sf.topPct!=null)?sf.topPct:null,
+  devPct:(sf&&sf.devPct!=null)?sf.devPct:null,
+  bundle:!!(sf&&sf.bundle),
+  renounced:(sf&&sf.renounced!=null)?sf.renounced:null,
+  lpPct:(sf&&sf.lpPct!=null)?sf.lpPct:null
+ };
  saveThesis();
+}
+// closes out the mistake-pattern journal entry for addr using whatever thesis + live price data
+// we have, THEN clears the thesis. Called right before a coin leaves the watchlist — that's the
+// "exit" event in this UI's model. A permanent record: journal entries are never deleted here.
+function closeJournalEntry(addr){
+ var t=state.thesis[addr];if(!t)return;
+ var c=state.tokenCache.get(addr),pp=c&&c.pair;
+ var exitMc=(pp&&pp.mc)||null;
+ var pct=(exitMc&&t.mc)?(exitMc/t.mc-1)*100:null;
+ var outcome=pct==null?'unknown':pct>=20?'win':pct<=-t.invalidatePct?'loss':'neutral';
+ state.journal.push({
+  addr:addr,sym:t.sym||(pp&&pp.sym)||'?',chain:t.chain||(pp&&pp.chain)||'',
+  enteredAt:t.at,exitedAt:Date.now(),entryMc:t.mc,exitMc:exitMc,pct:pct,outcome:outcome,
+  theme:t.theme,topPct:t.topPct,devPct:t.devPct,bundle:t.bundle,renounced:t.renounced,lpPct:t.lpPct,liq:t.liq
+ });
+ saveJournal();
 }
 function clearThesis(addr){if(state.thesis[addr]){delete state.thesis[addr];saveThesis();}}
 function thesisStatus(addr,pp){
@@ -131,7 +164,7 @@ function watchToggle(addr,chain,sym){
  addr=String(addr||'').toLowerCase();if(!addr||state._watchBusy)return;
  var on=state.watch.has(addr);
  state._watchBusy=true;
- if(on){state.watch.delete(addr);state.watchMeta.delete(addr);clearThesis(addr);}
+ if(on){state.watch.delete(addr);state.watchMeta.delete(addr);closeJournalEntry(addr);clearThesis(addr);}
  else{state.watch.add(addr);state.watchMeta.set(addr,{chain:chain||'',sym:sym||'',added:Date.now()});recordThesis(addr);}
  saveWatch();refreshStars();if(state.tab==='watch')renderWatch();
  var req=on
@@ -234,19 +267,23 @@ function renderCmpTable(rows){
 }
 function renderWatch(){
  var host=q1('watchList');if(!host)return;
+ var jp=q1('journalPanel');if(jp)jp.innerHTML=journalPanel(); // shows even with 0 currently watched — it's a record of the past, not the live list
  var addrs=Array.from(state.watch);
  q1('watchCount').textContent=addrs.length?addrs.length+' saved':'';
- if(!addrs.length){host.innerHTML='<div class="empty">No saved coins yet. Tap the &#9734; on any coin to keep it here.</div>';return;}
+ var exposureEl=q1('exposureNote');
+ if(!addrs.length){host.innerHTML='<div class="empty">No saved coins yet. Tap the &#9734; on any coin to keep it here.</div>';if(exposureEl)exposureEl.innerHTML='';return;}
  host.innerHTML=skelRows(Math.min(addrs.length,6));
  // ensure token data — nextPaint() guarantees the skeleton above is actually seen even when
  // every address is already warm in tokenCache and this resolves within the same tick.
  Promise.all([dexTokens(addrs),nextPaint()]).then(function(){
+  var livePairs=[];
   var rows=addrs.map(function(a){
    var c=state.tokenCache.get(a),pp=c&&c.pair,meta=state.watchMeta.get(a)||{};
    var sym=(pp&&pp.sym)||meta.sym||'?';
    if(pp){
     pp._a=pp._a||attn(pp);pp._tags=pp._tags||tagThemes(pp);pp._q=pp._q||pickQuality(pp);
     recordThesis(a); // backfill: the star may have fired before this coin's data was cached
+    livePairs.push(pp);
     var btn=tokenRow(pp).replace('</button>',cmpBtn(a,sym)+'</button>');
     return '<div class="wrow">'+btn+thesisLine(a,pp)+'</div>';
    }
@@ -256,6 +293,7 @@ function renderWatch(){
     +'<span class="traj">&mdash;</span>'+cmpBtn(a,sym)+'</button></div>';
   }).join('');
   host.innerHTML=rows;
+  if(exposureEl)exposureEl.innerHTML=exposurePanel(livePairs);
  });
 }
 function thesisLine(addr,pp){
@@ -263,6 +301,66 @@ function thesisLine(addr,pp){
  var s=thesisStatus(addr,pp);if(!s)return '';
  var pctStr=(s.pct>=0?'+':'')+s.pct.toFixed(0)+'%';
  return '<div class="thesis-line">Starred at '+fUsd(t.mc)+' ('+fAgo(t.at)+' ago, '+esc((t.traj||'').toLowerCase())+') &middot; now <b class="'+s.cls+'">'+pctStr+'</b> &middot; <b class="'+s.cls+'">'+esc(s.label)+'</b></div>';
+}
+
+/* ---------- mistake-pattern journal: a permanent record of what you knew at entry vs what
+   actually happened, built entirely from data the thesis tracker already collects. Never a
+   signal — it only ever describes YOUR past, never anyone's future. ---------- */
+function journalStats(){
+ var j=state.journal;if(!j.length)return null;
+ var closed=j.filter(function(e){return e.pct!=null;});
+ var wins=closed.filter(function(e){return e.outcome==='win';});
+ var losses=closed.filter(function(e){return e.outcome==='loss';});
+ function avg(arr,key){var v=arr.map(function(e){return e[key];}).filter(function(x){return x!=null;});return v.length?v.reduce(function(s,x){return s+x;},0)/v.length:null;}
+ var avgLossTop=avg(losses,'topPct'),avgWinTop=avg(wins,'topPct');
+ var flag=null;
+ if(losses.length>=3&&avgLossTop!=null){
+  var highCount=losses.filter(function(e){return e.topPct!=null&&e.topPct>40;}).length;
+  if(highCount/losses.length>=0.5){
+   flag='Your last '+losses.length+' losses average '+avgLossTop.toFixed(0)+'% top-holder concentration at entry'+(avgWinTop!=null?' vs '+avgWinTop.toFixed(0)+'% on wins':'')+' &mdash; you already flag this red flag, you&rsquo;re just not acting on it.';
+  }
+ }
+ return {total:j.length,closedN:closed.length,wins:wins.length,losses:losses.length,neutral:closed.length-wins.length-losses.length,avgLossTop:avgLossTop,avgWinTop:avgWinTop,flag:flag};
+}
+function journalList(){
+ var entries=state.journal.slice().reverse().slice(0,25);
+ if(!entries.length)return '';
+ return '<div class="jrows">'+entries.map(function(e){
+  var cls=e.outcome==='win'?'pos':e.outcome==='loss'?'neg':'';
+  var pctStr=e.pct!=null?((e.pct>=0?'+':'')+e.pct.toFixed(0)+'%'):'?';
+  var themeName=e.theme?(THEMES.filter(function(t){return t.k===e.theme;})[0]||{}).name||e.theme:null;
+  return '<div class="jrow"><span>$'+esc(e.sym||'?')+'</span><span class="cchip">'+esc(e.chain||'?')+'</span>'
+   +'<span class="'+cls+'">'+pctStr+'</span>'
+   +'<span style="color:var(--ink-faint)">'+(e.topPct!=null?'top holder '+e.topPct.toFixed(0)+'%':'top holder ?')+(themeName?' &middot; '+esc(themeName):'')+'</span>'
+   +'<span style="color:var(--ink-faint)">'+fAgo(e.exitedAt)+' ago</span></div>';
+ }).join('')+'</div>';
+}
+function journalPanel(){
+ var s=journalStats();
+ if(!s)return '';
+ var body;
+ if(s.closedN<3){
+  body='<p style="font-size:12.5px;color:var(--ink-soft)">'+s.closedN+' closed position'+(s.closedN===1?'':'s')+' logged so far &mdash; your pattern builds as you close more. Every coin you un-star gets a permanent entry here: what you knew at entry, what actually happened. Nothing here gets edited or deleted.</p>';
+ }else{
+  body='<p style="font-size:13px;color:var(--ink-soft)"><b class="pos">'+s.wins+'</b> win'+(s.wins===1?'':'s')+' &middot; <b class="neg">'+s.losses+'</b> loss'+(s.losses===1?'':'es')+' &middot; '+s.neutral+' neutral, out of '+s.closedN+' closed positions.'
+   +(s.flag?'<br><b class="neg">'+s.flag+'</b>':'')+'</p>';
+ }
+ return '<details class="panel journal"><summary style="cursor:pointer;font-weight:700">Your mistake-pattern journal ('+s.total+' logged)</summary>'
+  +'<div style="padding-top:8px">'+body+journalList()+'</div></details>';
+}
+/* ---------- correlated-exposure warning: your watchlist re-read as narrative bets, not
+   ticker bets ---------- */
+function exposurePanel(pairs){
+ var counts={};
+ pairs.forEach(function(pp){(pp._tags||[]).forEach(function(k){counts[k]=(counts[k]||0)+1;});});
+ var hot=Object.keys(counts).filter(function(k){return counts[k]>=2;}).sort(function(a,b){return counts[b]-counts[a];});
+ if(!hot.length)return '';
+ var lines=hot.map(function(k){
+  var t=THEMES.filter(function(x){return x.k===k;})[0];
+  return '<b>'+counts[k]+'</b> of your '+pairs.length+' watched coins are tagged <b>'+esc(t?t.name:k)+'</b>';
+ });
+ var covered=hot.reduce(function(s,k){return s+counts[k];},0);
+ return '<div class="panel exposure"><h3>&#9888; Correlated exposure</h3><p style="font-size:12.5px;color:var(--ink-soft)">'+lines.join('; ')+' &mdash; that&rsquo;s '+covered+' tickers riding one narrative, not '+covered+' separate bets. If that narrative cools, they likely cool together.</p></div>';
 }
 
 /* ---------- profile + account menu ---------- */
@@ -713,6 +811,43 @@ function researchScorePanel(pp,a,sf,hr,proj){
   +scoreTrendHtml(pp.addr)
   +'<p class="rscore-cite">Weights informed by published research: holder-concentration signal measured ~64% stronger than trader/volume signal (MemeTrans/MELT); Pump.fun cohort base rates from CoinGecko Research, arXiv 2607.02823 and arXiv 2512.11850. A heuristic score from public on-chain data &mdash; not financial advice.</p>'
   +'</div>';
+}
+/* ---------- exit-liquidity depth curve + sizing calculator ----------
+   The one number every dashboard skips: not "how much liquidity is in the pool" but "what does
+   it actually cost ME to get out at size X". Approximated as a balanced constant-product AMM —
+   average price impact of a trade of size x against a pool with combined liquidity L is
+   x / (L/2 + x), the standard xy=k approximation when only the total USD liquidity is known
+   (no exact reserve split). Concentrated-liquidity (CLMM) pools with lopsided ranges can differ
+   from this meaningfully — called out explicitly rather than presented as exact. */
+function exitImpactPct(sizeUsd,liqUsd){
+ if(!liqUsd||liqUsd<=0||!sizeUsd||sizeUsd<=0)return null;
+ var half=liqUsd/2;
+ return sizeUsd/(half+sizeUsd)*100;
+}
+function exitLiquidityPanel(pp){
+ var liq=pp.liq;
+ if(!liq)return '<div class="panel"><h3>Exit-liquidity sizing</h3><p style="font-size:12.5px;color:var(--ink-soft)">No pool liquidity figure available yet for this coin.</p></div>';
+ var sizes=[500,5000,25000,100000];
+ var rows=sizes.map(function(x){
+  var imp=exitImpactPct(x,liq);
+  var net=x*(1-imp/100);
+  var cls=imp>=25?'neg':imp>=8?'watch':'pos';
+  return '<div class="exd-row"><span>'+fUsd(x)+' exit</span><span class="'+cls+'">~'+imp.toFixed(1)+'% impact</span><span style="color:var(--ink-faint)">net ~'+fUsd(net)+'</span></div>';
+ }).join('');
+ return '<div class="panel exd">'
+  +'<h3>Exit-liquidity sizing</h3>'
+  +'<p style="font-size:12.5px;color:var(--ink-soft);margin-bottom:8px">Not the flat liquidity number &mdash; the estimated cost of actually exiting a position at this pool&rsquo;s current depth ('+fUsd(liq)+' total). Modeled as a balanced constant-product pool; a concentrated-liquidity (CLMM) pool with a lopsided range can behave differently. Math only, not a recommendation of size or timing.</p>'
+  +'<div class="exd-table">'+rows+'</div>'
+  +'<div class="exd-calc"><label for="exitCalcInput">Your size ($)</label><input id="exitCalcInput" type="text" inputmode="decimal" placeholder="e.g. 2000" data-f="exitsize"><span id="exitCalcOut" class="exd-out">&nbsp;</span></div>'
+  +'</div>';
+}
+function exitCalcUpdate(val){
+ var out=q1('exitCalcOut'),pp=state.rcPair;if(!out||!pp)return;
+ var x=parseFloat(String(val||'').replace(/[^0-9.]/g,''));
+ if(!x||isNaN(x)||!pp.liq){out.innerHTML='&nbsp;';return;}
+ var imp=exitImpactPct(x,pp.liq),net=x*(1-imp/100);
+ var cls=imp>=25?'neg':imp>=8?'watch':'pos';
+ out.innerHTML='&asymp; <b class="'+cls+'">'+imp.toFixed(1)+'%</b> impact &middot; net &asymp; '+fUsd(net);
 }
 
 /* ---------- narrative comps: how does THIS coin's story/structure rhyme with a real mega-runner ----------
@@ -1170,6 +1305,7 @@ function renderResearch(pp,sf,watchers,tinfo){
   +bundlePanel(pp,sf)
   +deployerPanel(sf)
   +researchScorePanel(pp,a,sf,hr,proj)
+  +exitLiquidityPanel(pp)
   +compPanel(pp,sf,tags)
   +projPanel
   +checklistPanel(pp,proj)
@@ -1488,6 +1624,7 @@ function rcardInput(ev){
  var f=t.getAttribute('data-f');
  if(f==='hook'||f==='entry'){setRes(addr,f==='hook'?{hook:t.value}:{entry:t.value});return;}
  if(f==='target'){var n=parseFloat(String(t.value).replace(/[^0-9.]/g,''));setRes(addr,{target:isNaN(n)?0:n});return;}
+ if(f==='exitsize'){exitCalcUpdate(t.value);return;} // pure client-side math, no rerender/refetch needed
  var cf=t.getAttribute('data-cf');
  if(cf){var i=+t.closest('.cat').getAttribute('data-i');var r=researchOf(addr);r.catalysts[i]=r.catalysts[i]||{};r.catalysts[i][cf]=t.value;setRes(addr,{catalysts:r.catalysts});}
 }
