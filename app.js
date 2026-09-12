@@ -1228,6 +1228,13 @@ function sfBadges(pp){
 // small clickable social-link icons — GMGN-style row density: real signal in a glance, not a
 // generic "you tag it" placeholder. data-link (not a real <a>) since a <button> can't legally
 // nest interactive content; watchClick() opens it in a new tab and stops the row's own click.
+// shared tax badge — buy/sell % taken out of every trade (EVM honeypot.is check only; Solana
+// pump.fun launches don't carry a tax mechanic, so this is legitimately absent there).
+function taxBadge(sf){
+ if(!sf||(sf.buyTax==null&&sf.sellTax==null))return '';
+ var bt=sf.buyTax!=null?sf.buyTax.toFixed(1):'?',st=sf.sellTax!=null?sf.sellTax.toFixed(1):'?';
+ return '<span class="cchip tax" title="Buy tax '+bt+'%, sell tax '+st+'% — taken out of every trade automatically">tax '+bt+'/'+st+'%</span>';
+}
 function rowSocials(pp){
  var out=[];
  var x=(pp.socials||[]).filter(function(s){return s.type==='twitter'||s.type==='x';})[0];
@@ -1254,11 +1261,7 @@ function tokenRow(pp){
  var q=pp._q||pickQuality(pp);
  var pf=q.pumpfun?'<span class="cchip pf">pump.fun</span>':'';
  var warn=(!q.mcOk||!q.liqOk||(state.safety.get(pp.addr)||{}).bundle)?'<span class="cchip warn">&#9888;</span>':'';
- var tax='';
- if(sf&&(sf.buyTax!=null||sf.sellTax!=null)){
-  var bt=sf.buyTax!=null?sf.buyTax.toFixed(1):'?',st=sf.sellTax!=null?sf.sellTax.toFixed(1):'?';
-  tax='<span class="cchip tax" title="Buy tax '+bt+'%, sell tax '+st+'% — taken out of every trade automatically">tax '+bt+'/'+st+'%</span>';
- }
+ var tax=taxBadge(sf);
  var holdersBit=(sf&&sf.holders!=null)?' &middot; '+fNum(sf.holders)+' holders':'';
  return '<button class="trow" data-addr="'+esc(pp.addr)+'" data-chain="'+esc(pp.chain)+'">'
   +(pp.img?'<img class="ava" src="'+esc(pp.img)+'" alt="" loading="lazy" onerror="this.style.visibility=\'hidden\'">':'<span></span>')
@@ -1924,7 +1927,6 @@ function rerenderRcard(){clearTimeout(_rerenderT);_rerenderT=setTimeout(function
 /* ---------- HOT BOARD ---------- */
 var SKEL_BC='<div class="skbc"><span class="skel"></span><span class="skel"></span><span class="skel"></span></div>';
 function skelBoard(n){var out='';for(var i=0;i<n;i++)out+=SKEL_BC;return out;}
-function bcTxCount(pp){var h=pp.tx&&pp.tx.h24;if(!h)return '&mdash;';var t=(+h.buys||0)+(+h.sells||0);return t?String(t):'&mdash;';}
 function renderBoard(){
  var el=q1('board');if(!el)return;
  var pool=(state._pool||[]).filter(function(pp){return pp._a;});
@@ -1932,24 +1934,20 @@ function renderBoard(){
  var top=pool.slice(0,6);
  var medals=['🥇','🥈','🥉','4','5','6'];
  el.innerHTML=top.map(function(pp,i){
-  var a=pp._a,ch=+pp.pc.h1||0,q=pp._q||pickQuality(pp);
+  var a=pp._a,ch=+pp.pc.h1||0,q=pp._q||pickQuality(pp),sf=state.safety.get(pp.addr);
   var pf=q.pumpfun?'<span class="cchip pf">pump.fun</span>':'';
-  var wr=(!q.mcOk||!q.liqOk||(state.safety.get(pp.addr)||{}).bundle)?'<span class="cchip warn">&#9888;</span>':'';
+  var wr=(!q.mcOk||!q.liqOk||(sf||{}).bundle)?'<span class="cchip warn">&#9888;</span>':'';
   var chCls=ch>0?'pos':ch<0?'neg':'';
+  var holdersBit=(sf&&sf.holders!=null)?'<span title="Holder count">'+fNum(sf.holders)+' holders</span>':'';
   return '<button class="bc'+(i===0?' r1':'')+'" data-addr="'+esc(pp.addr)+'" data-chain="'+esc(pp.chain)+'">'
    +'<div class="bc-top">'
     +(pp.img?'<img class="bc-ava" src="'+esc(pp.img)+'" alt="" loading="lazy" onerror="this.style.visibility=\'hidden\'">':'<span class="bc-ava ph">'+esc((pp.sym||'?').charAt(0).toUpperCase())+'</span>')
-    +'<div class="bc-id"><span class="bc-sym">'+starBtn(pp.addr,pp.chain,pp.sym)+'$'+esc(pp.sym)+'</span><span class="bc-chips"><span class="cchip">'+esc(pp.chain)+'</span>'+pf+wr+'</span></div>'
-    +'<span class="rank">'+medals[i]+'</span>'
+    +'<div class="bc-id"><span class="bc-sym">'+starBtn(pp.addr,pp.chain,pp.sym)+'$'+esc(pp.sym)+'</span><span class="bc-chips"><span class="cchip">'+esc(pp.chain)+'</span>'+pf+taxBadge(sf)+wr+'</span></div>'
+    +'<div class="bc-figs"><div class="bc-fig"><b>'+fUsd(pp.mc)+'</b><span>mc</span></div><div class="bc-fig '+chCls+'"><b>'+fPct(ch)+'</b><span>1h</span></div></div>'
    +'</div>'
-   +'<div class="bc-stats">'
-    +'<div class="bc-stat"><b>'+fUsd(pp.mc)+'</b><span>mc</span></div>'
-    +'<div class="bc-stat '+chCls+'"><b>'+fPct(ch)+'</b><span>1h</span></div>'
-    +'<div class="bc-stat"><b>'+fAge(pp.ageMs)+'</b><span>age</span></div>'
-    +'<div class="bc-stat"><b>'+bcTxCount(pp)+'</b><span>tx</span></div>'
-   +'</div>'
+   +'<div class="bc-meta2">'+fAge(pp.ageMs)+' old'+rowSocials(pp)+txBar(pp)+holdersBit+'</div>'
    +sfBadges(pp)
-   +'<div class="bc-foot"><span class="traj-pill '+a.traj+'">'+a.traj.toUpperCase()+'</span><span class="attn-num">'+a.score+'/100</span></div>'
+   +'<div class="bc-foot"><span class="rank">'+medals[i]+'</span><span class="traj-pill '+a.traj+'">'+a.traj.toUpperCase()+'</span><span class="attn-num">'+a.score+'/100</span></div>'
    +'</button>';
  }).join('');
 }
