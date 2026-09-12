@@ -47,6 +47,10 @@ var THEMES=[
 var state={
  tab:'scan',apiKey:'',
  chains:{solana:true,base:true,bsc:true,robinhood:true,ethereum:false},
+ // discovery-board filters — launchpad concept only applies to Solana rows; anything else
+ // (base/bsc/ethereum/robinhood, or a Solana coin from a launchpad we can't identify) falls
+ // into 'other' rather than being silently dropped or silently assumed to be one specific pad.
+ filters:{launchpads:{pump:true,bonk:true,boop:true,moonshot:true,other:true}},
  searchCache:new Map(), // q -> {ts,pairs}
  tokenCache:new Map(),   // addr -> {ts,pair}
  boosts:[],trending:[],profiles:{},tinfo:new Map(),
@@ -63,7 +67,7 @@ var state={
 
 /* ---------- storage ---------- */
 function loadAll(){
- try{var c=JSON.parse(localStorage.getItem(LS_CFG)||'{}');if(c.chains){state.chains=c.chains;if(state.chains.robinhood===undefined)state.chains.robinhood=true;}if(['scan','watch','research'].indexOf(c.tab)>=0)state.tab=c.tab;if(c.chartMode)state.chartMode=c.chartMode;if(c.fhSound)state.fhSound=true;}catch(_){}
+ try{var c=JSON.parse(localStorage.getItem(LS_CFG)||'{}');if(c.chains){state.chains=c.chains;if(state.chains.robinhood===undefined)state.chains.robinhood=true;}if(['scan','watch','research'].indexOf(c.tab)>=0)state.tab=c.tab;if(c.chartMode)state.chartMode=c.chartMode;if(c.fhSound)state.fhSound=true;if(c.minMc>0)MIN_MC=c.minMc;if(c.minLiq>0)MIN_LIQ=c.minLiq;if(c.launchpads)state.filters.launchpads=c.launchpads;}catch(_){}
  try{state.research=JSON.parse(localStorage.getItem(LS_RES)||'{}')||{};}catch(_){state.research={};}
  try{state.holders=JSON.parse(localStorage.getItem(LS_HOLD)||'{}')||{};}catch(_){state.holders={};}
  try{var w=JSON.parse(localStorage.getItem(LS_WATCH)||'[]');state.watch=new Set(w);}catch(_){}
@@ -71,7 +75,7 @@ function loadAll(){
  try{state.thesis=JSON.parse(localStorage.getItem(LS_THESIS)||'{}')||{};}catch(_){state.thesis={};}
  try{state.journal=JSON.parse(localStorage.getItem(LS_JOURNAL)||'[]')||[];}catch(_){state.journal=[];}
 }
-function saveCfg(){try{localStorage.setItem(LS_CFG,JSON.stringify({apiKey:state.apiKey,chains:state.chains,tab:state.tab,chartMode:state.chartMode,fhSound:state.fhSound}));}catch(_){}}
+function saveCfg(){try{localStorage.setItem(LS_CFG,JSON.stringify({apiKey:state.apiKey,chains:state.chains,tab:state.tab,chartMode:state.chartMode,fhSound:state.fhSound,minMc:MIN_MC,minLiq:MIN_LIQ,launchpads:state.filters.launchpads}));}catch(_){}}
 function saveRes(){try{localStorage.setItem(LS_RES,JSON.stringify(state.research));}catch(_){}}
 function saveHold(){try{localStorage.setItem(LS_HOLD,JSON.stringify(state.holders));}catch(_){}}
 function saveScores(){try{localStorage.setItem(LS_SCORE,JSON.stringify(state.scores));}catch(_){}}
@@ -699,6 +703,13 @@ function launchpadName(pp){
  if(/moon$/i.test(addr))return 'Moonshot';
  return null;
 }
+// filter-key form of launchpadName — non-Solana chains and unidentifiable Solana mints both
+// fall into 'other' rather than being excluded by a filter that doesn't actually apply to them.
+function launchpadKey(pp){
+ if(pp.chain!=='solana')return 'other';
+ var n=launchpadName(pp);
+ return n==='Pump.fun'?'pump':n==='LetsBonk.fun'?'bonk':n==='Boop.fun'?'boop':n==='Moonshot'?'moonshot':'other';
+}
 /* ---------- deployer reputation ledger (server-backed, shared across every user) ----------
    Every hard-excluded deployer wallet from anyone's screening feeds one shared Supabase table
    (api/intel.js -> deployer_flags), so a wallet flagged from someone else's session an hour ago
@@ -1161,6 +1172,7 @@ function rawPool(){
   if(pp.mc&&pp.mc>80000000)return;
   if(pp.mc&&pp.mc<MIN_MC)return;           // video: min mcap floor, skip dead sub-7k tokens
   if(pp.liq&&pp.liq<MIN_LIQ)return;        // needs real liquidity to be tradeable
+  if(!state.filters.launchpads[launchpadKey(pp)])return;
   var b=state.boosts.filter(function(x){return x.addr===addr;})[0];if(b&&!pp.desc)pp.desc=b.desc;
   pp._src=srcOf[addr];seen[addr]=1;pool.push(pp);
  });
@@ -2247,7 +2259,7 @@ q1('umProfile').addEventListener('click',openProfile);
 q1('pfClose').addEventListener('click',closeProfile);
 q1('pfBackdrop').addEventListener('click',closeProfile);
 document.addEventListener('click',function(ev){var m=q1('userMenu');if(m&&!m.hidden&&!ev.target.closest('.usermenu-wrap'))toggleMenu(false);});
-document.addEventListener('keydown',function(ev){if(ev.key==='Escape'){toggleMenu(false);closeProfile();}});
+document.addEventListener('keydown',function(ev){if(ev.key==='Escape'){toggleMenu(false);closeProfile();closeSearchModal();closeFilterModal();}});
 q1('scanFilters').addEventListener('click',function(ev){var b=ev.target.closest('[data-sf]');if(!b)return;state._scanFilter=b.getAttribute('data-sf');renderScan();});
 q1('attnList').addEventListener('click',function(ev){if(watchClick(ev))return;var r=ev.target.closest('[data-addr]');if(!r)return;openResearch(r.getAttribute('data-addr'),r.getAttribute('data-chain'));});
 q1('rcardHost').addEventListener('click',rcardClick);
@@ -2268,9 +2280,53 @@ q1('scanQ').addEventListener('keydown',function(e){if(e.key==='Enter')doQuery(q1
 q1('scanQResult').addEventListener('click',function(ev){if(watchClick(ev))return;var r=ev.target.closest('[data-addr]');if(!r)return;openResearch(r.getAttribute('data-addr'),r.getAttribute('data-chain'));});
 // top-of-page search — always visible regardless of tab, jumps straight into the x-ray on a
 // single match (same as the X-ray tab's own search box), same picker-on-ambiguous-ticker path.
-q1('topSearchGo').addEventListener('click',function(){doQuery(q1('topSearchQ').value,'topSearchResult',true);});
-q1('topSearchQ').addEventListener('keydown',function(e){if(e.key==='Enter')doQuery(q1('topSearchQ').value,'topSearchResult',true);});
-q1('topSearchResult').addEventListener('click',function(ev){if(watchClick(ev))return;var r=ev.target.closest('[data-addr]');if(!r)return;openResearch(r.getAttribute('data-addr'),r.getAttribute('data-chain'));});
+/* ---------- search modal: click the top search bar, or press / anywhere, to open it ---------- */
+function openSearchModal(){
+ var bd=q1('searchModalBackdrop');if(!bd)return;
+ closeFilterModal();
+ bd.hidden=false;
+ var inp=q1('modalSearchQ');inp.value='';q1('modalSearchResult').innerHTML='';
+ setTimeout(function(){inp.focus();},10);
+}
+function closeSearchModal(){var bd=q1('searchModalBackdrop');if(bd)bd.hidden=true;}
+q1('topSearchTrigger').addEventListener('click',openSearchModal);
+q1('searchModalBackdrop').addEventListener('click',function(ev){if(ev.target===this)closeSearchModal();});
+q1('modalSearchQ').addEventListener('keydown',function(e){if(e.key==='Enter')doQuery(q1('modalSearchQ').value,'modalSearchResult',true);});
+q1('modalSearchResult').addEventListener('click',function(ev){if(watchClick(ev))return;var r=ev.target.closest('[data-addr]');if(!r)return;closeSearchModal();openResearch(r.getAttribute('data-addr'),r.getAttribute('data-chain'));});
+/* ---------- filter modal: launchpad + min mc/liq — the filters people actually use, nothing else ---------- */
+function openFilterModal(){
+ var bd=q1('filterModalBackdrop');if(!bd)return;
+ closeSearchModal();
+ q1('fMinMc').value=MIN_MC;q1('fMinLiq').value=MIN_LIQ;
+ document.querySelectorAll('#fLaunchpads input[data-lp]').forEach(function(cb){cb.checked=!!state.filters.launchpads[cb.getAttribute('data-lp')];});
+ bd.hidden=false;
+}
+function closeFilterModal(){var bd=q1('filterModalBackdrop');if(bd)bd.hidden=true;}
+function updateFilterDot(){
+ var changed=MIN_MC!==7000||MIN_LIQ!==5000||Object.keys(state.filters.launchpads).some(function(k){return !state.filters.launchpads[k];});
+ var d=q1('filterDot');if(d)d.hidden=!changed;
+}
+q1('filterBtn').addEventListener('click',openFilterModal);
+q1('filterModalBackdrop').addEventListener('click',function(ev){if(ev.target===this)closeFilterModal();});
+q1('filterApply').addEventListener('click',function(){
+ var mc=parseInt(String(q1('fMinMc').value).replace(/[^0-9]/g,''),10);
+ var lq=parseInt(String(q1('fMinLiq').value).replace(/[^0-9]/g,''),10);
+ MIN_MC=isNaN(mc)?0:mc;MIN_LIQ=isNaN(lq)?0:lq;
+ document.querySelectorAll('#fLaunchpads input[data-lp]').forEach(function(cb){state.filters.launchpads[cb.getAttribute('data-lp')]=cb.checked;});
+ saveCfg();updateFilterDot();closeFilterModal();scan();
+});
+q1('filterReset').addEventListener('click',function(){
+ MIN_MC=7000;MIN_LIQ=5000;
+ state.filters.launchpads={pump:true,bonk:true,boop:true,moonshot:true,other:true};
+ saveCfg();updateFilterDot();closeFilterModal();scan();
+});
+document.addEventListener('keydown',function(ev){
+ if(ev.key==='/'){
+  var t=ev.target,tag=t&&t.tagName;
+  if(tag==='INPUT'||tag==='TEXTAREA'||(t&&t.isContentEditable))return; // don't hijack normal typing
+  ev.preventDefault();openSearchModal();
+ }
+});
 function doQuery(v,hostId,gotoResearch){
  v=String(v||'').trim();if(!v)return;var host=q1(hostId);
  if(/^0x[0-9a-f]{40}$/i.test(v)||/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(v)){openResearch(v.toLowerCase(),'');return;}
@@ -2286,6 +2342,7 @@ function doQuery(v,hostId,gotoResearch){
 
 /* init */
 loadAll();
+updateFilterDot();
 document.querySelectorAll('.chip-toggle[data-chain]').forEach(function(b){var c=b.getAttribute('data-chain');b.setAttribute('aria-pressed',state.chains[c]?'true':'false');});
 syncTabs();
 renderTicker();
