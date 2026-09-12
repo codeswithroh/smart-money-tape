@@ -195,6 +195,8 @@ function watchClick(ev){
  if(st){ev.preventDefault();ev.stopPropagation();watchToggle(st.getAttribute('data-star'),st.getAttribute('data-chain'),st.getAttribute('data-sym'));return true;}
  var cm=ev.target.closest('[data-cmp]');
  if(cm){ev.preventDefault();ev.stopPropagation();compareToggle(cm.getAttribute('data-cmp'),cm.getAttribute('data-sym'));return true;}
+ var lk=ev.target.closest('[data-link]');
+ if(lk){ev.preventDefault();ev.stopPropagation();window.open(lk.getAttribute('data-link'),'_blank','noopener');return true;}
  return false;
 }
 
@@ -1238,18 +1240,46 @@ function sfBadges(pp){
  if(sf.renounced===true)out.push('<span class="sfic pos" title="Mint and freeze authority are renounced. The team can no longer mint new supply or freeze wallets.">&#9989;renounced</span>');
  return out.length?'<span class="sficrow">'+out.join('')+'</span>':'';
 }
+// small clickable social-link icons — GMGN-style row density: real signal in a glance, not a
+// generic "you tag it" placeholder. data-link (not a real <a>) since a <button> can't legally
+// nest interactive content; watchClick() opens it in a new tab and stops the row's own click.
+function rowSocials(pp){
+ var out=[];
+ var x=(pp.socials||[]).filter(function(s){return s.type==='twitter'||s.type==='x';})[0];
+ var tg2=(pp.socials||[]).filter(function(s){return s.type==='telegram';})[0];
+ var site=(pp.sites||[])[0];
+ if(x)out.push(['&#120143;','Open on X / Twitter',x.url]);
+ if(tg2)out.push(['&#9993;','Open the Telegram group',tg2.url]);
+ if(site)out.push(['&#127760;','Open the project website',site]);
+ return out.map(function(o){return '<span class="rsoc" data-link="'+esc(o[2])+'" title="'+esc(o[1])+'">'+o[0]+'</span>';}).join('');
+}
+// 24h buy/sell mini-bar — real per-row signal from data DexScreener already gave us (pp.tx.h24),
+// no extra fetch, just never surfaced before.
+function txBar(pp){
+ var h=pp.tx&&pp.tx.h24;if(!h)return '';
+ var b=+h.buys||0,s=+h.sells||0,t=b+s;if(!t)return '';
+ var bp=Math.round(b/t*100);
+ return '<span class="txbar" title="'+t+' trades in the last 24h: '+b+' buys, '+s+' sells, '+bp+'% were buys"><i style="width:'+bp+'%"></i></span><span class="txn">'+t+' tx</span>';
+}
 function tokenRow(pp){
- var a=pp._a||attn(pp),tags=pp._tags||tagThemes(pp);
+ var a=pp._a||attn(pp),tags=pp._tags||tagThemes(pp),sf=state.safety.get(pp.addr);
  var tg=tags.length?tags.map(function(k){var t=THEMES.filter(function(x){return x.k===k;})[0];return '<span class="tag">'+esc(t?t.name:k)+'</span>';}).join('')
    :'<span class="tag n">'+esc(typeGuess(pp))+' &mdash; you tag it</span>';
  var src=(pp._src&&pp._src!=='boost')?'<span class="cchip">'+esc(pp._src)+'</span>':'';
  var q=pp._q||pickQuality(pp);
  var pf=q.pumpfun?'<span class="cchip pf">pump.fun</span>':'';
  var warn=(!q.mcOk||!q.liqOk||(state.safety.get(pp.addr)||{}).bundle)?'<span class="cchip warn">&#9888;</span>':'';
+ var tax='';
+ if(sf&&(sf.buyTax!=null||sf.sellTax!=null)){
+  var bt=sf.buyTax!=null?sf.buyTax.toFixed(1):'?',st=sf.sellTax!=null?sf.sellTax.toFixed(1):'?';
+  tax='<span class="cchip tax" title="Buy tax '+bt+'%, sell tax '+st+'% — taken out of every trade automatically">tax '+bt+'/'+st+'%</span>';
+ }
+ var holdersBit=(sf&&sf.holders!=null)?' &middot; '+fNum(sf.holders)+' holders':'';
  return '<button class="trow" data-addr="'+esc(pp.addr)+'" data-chain="'+esc(pp.chain)+'">'
   +(pp.img?'<img class="ava" src="'+esc(pp.img)+'" alt="" loading="lazy" onerror="this.style.visibility=\'hidden\'">':'<span></span>')
-  +'<span class="tmain"><span class="tsym">'+starBtn(pp.addr,pp.chain,pp.sym)+'$'+esc(pp.sym)+' <span class="cchip">'+esc(pp.chain)+'</span>'+pf+src+(pp.boosts?' <span class="cchip">boost</span>':'')+warn+'</span>'
-  +'<span class="tmeta">'+fUsd(pp.mc)+' mc &middot; '+fUsd(pp.vol.h24)+' 24h &middot; '+fAge(pp.ageMs)+' old &middot; '+fPct(+pp.pc.h1||0)+' 1h</span>'
+  +'<span class="tmain"><span class="tsym">'+starBtn(pp.addr,pp.chain,pp.sym)+'$'+esc(pp.sym)+' <span class="cchip">'+esc(pp.chain)+'</span>'+pf+src+(pp.boosts?' <span class="cchip">boost</span>':'')+tax+warn+'</span>'
+  +'<span class="tmeta">'+fUsd(pp.mc)+' mc &middot; '+fUsd(pp.vol.h24)+' 24h &middot; '+fAge(pp.ageMs)+' old &middot; '+fPct(+pp.pc.h1||0)+' 1h'+holdersBit+'</span>'
+  +'<span class="tmeta2">'+rowSocials(pp)+txBar(pp)+'</span>'
   +sfBadges(pp)
   +'<span class="tags">'+tg+'</span></span>'
   +trajTag(a)+'</button>';
@@ -1927,6 +1957,7 @@ function renderBoard(){
    +'<span class="rank">'+medals[i]+'</span>'
    +'<div class="bsym">'+starBtn(pp.addr,pp.chain,pp.sym)+'$'+esc(pp.sym)+' <span class="cchip">'+esc(pp.chain)+'</span>'+pf+wr+'</div>'
    +'<div class="bmeta">'+fUsd(pp.mc)+' mc &middot; <span class="'+(ch>0?'up':ch<0?'dn':'')+'">'+fPct(ch)+' 1h</span> &middot; '+fAge(pp.ageMs)+'</div>'
+   +'<div class="tmeta2">'+rowSocials(pp)+txBar(pp)+'</div>'
    +sfBadges(pp)
    +'<div class="battn"><span class="traj-mini '+a.traj+'">'+a.traj.toUpperCase()+'</span><span class="bar"><i style="width:'+Math.round(a.score/mx*100)+'%"></i></span><b>'+a.score+'</b></div>'
    +'</button>';
