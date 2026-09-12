@@ -2291,7 +2291,17 @@ function openSearchModal(){
 function closeSearchModal(){var bd=q1('searchModalBackdrop');if(bd)bd.hidden=true;}
 q1('topSearchTrigger').addEventListener('click',openSearchModal);
 q1('searchModalBackdrop').addEventListener('click',function(ev){if(ev.target===this)closeSearchModal();});
-q1('modalSearchQ').addEventListener('keydown',function(e){if(e.key==='Enter')doQuery(q1('modalSearchQ').value,'modalSearchResult',true);});
+var _modalSearchT=0;
+q1('modalSearchQ').addEventListener('input',function(){
+ var v=this.value,host=q1('modalSearchResult');
+ clearTimeout(_modalSearchT);
+ if(!v.trim()){host.innerHTML='';return;}
+ // live, as-you-type — never auto-jump on a partial string matching one result, only on
+ // an explicit Enter (below) or a full contract address, which doQuery already jumps on
+ // regardless of this flag.
+ _modalSearchT=setTimeout(function(){doQuery(v,'modalSearchResult',false);},250);
+});
+q1('modalSearchQ').addEventListener('keydown',function(e){if(e.key==='Enter'){clearTimeout(_modalSearchT);doQuery(this.value,'modalSearchResult',true);}});
 q1('modalSearchResult').addEventListener('click',function(ev){if(watchClick(ev))return;var r=ev.target.closest('[data-addr]');if(!r)return;closeSearchModal();openResearch(r.getAttribute('data-addr'),r.getAttribute('data-chain'));});
 /* ---------- filter modal: launchpad + min mc/liq — the filters people actually use, nothing else ---------- */
 function openFilterModal(){
