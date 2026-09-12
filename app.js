@@ -2374,7 +2374,20 @@ document.addEventListener('keydown',function(ev){
 });
 function doQuery(v,hostId,gotoResearch){
  v=String(v||'').trim();if(!v)return;var host=q1(hostId);
- if(/^0x[0-9a-f]{40}$/i.test(v)||/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(v)){openResearch(v.toLowerCase(),'');return;}
+ if(/^0x[0-9a-f]{40}$/i.test(v)||/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(v)){
+  var addr=v.toLowerCase();
+  if(gotoResearch){openResearch(addr,'');return;} // explicit Enter — still a fast path for a full pasted address
+  // as-you-type: show the card first, same as a ticker match — click it to open the x-ray,
+  // don't jump straight there on a pasted address before the user's chosen anything.
+  host.innerHTML='<div class="empty">looking up&hellip;</div>';
+  dexTokens([addr]).then(function(){
+   var c=state.tokenCache.get(addr),pp=c&&c.pair;
+   if(!pp){host.innerHTML='<div class="empty">No DexScreener data for that address on your chains.</div>';return;}
+   pp._a=attn(pp);pp._tags=tagThemes(pp);
+   host.innerHTML='<div class="rows" style="margin-bottom:10px">'+tokenRow(pp)+'</div>';
+  });
+  return;
+ }
  host.innerHTML='<div class="empty">searching&hellip;</div>';
  dexSearch(v).then(function(pairs){
   var list=pairs.filter(function(p){return chainOk(p.chain);}).sort(function(a,b){return b.vol.h24-a.vol.h24;}).slice(0,10);
