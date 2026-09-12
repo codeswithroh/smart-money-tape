@@ -50,7 +50,7 @@ var state={
  // discovery-board filters — launchpad concept only applies to Solana rows; anything else
  // (base/bsc/ethereum/robinhood, or a Solana coin from a launchpad we can't identify) falls
  // into 'other' rather than being silently dropped or silently assumed to be one specific pad.
- filters:{launchpads:{pump:true,bonk:true,boop:true,moonshot:true,other:true}},
+ filters:{launchpads:{pump:true,bonk:true,boop:true,moonshot:true,fourmeme:true,other:true}},
  searchCache:new Map(), // q -> {ts,pairs}
  tokenCache:new Map(),   // addr -> {ts,pair}
  boosts:[],trending:[],profiles:{},tinfo:new Map(),
@@ -67,7 +67,7 @@ var state={
 
 /* ---------- storage ---------- */
 function loadAll(){
- try{var c=JSON.parse(localStorage.getItem(LS_CFG)||'{}');if(c.chains){state.chains=c.chains;if(state.chains.robinhood===undefined)state.chains.robinhood=true;}if(['scan','watch','research'].indexOf(c.tab)>=0)state.tab=c.tab;if(c.chartMode)state.chartMode=c.chartMode;if(c.fhSound)state.fhSound=true;if(c.minMc>0)MIN_MC=c.minMc;if(c.minLiq>0)MIN_LIQ=c.minLiq;if(c.launchpads)state.filters.launchpads=c.launchpads;}catch(_){}
+ try{var c=JSON.parse(localStorage.getItem(LS_CFG)||'{}');if(c.chains){state.chains=c.chains;if(state.chains.robinhood===undefined)state.chains.robinhood=true;}if(['scan','watch','research'].indexOf(c.tab)>=0)state.tab=c.tab;if(c.chartMode)state.chartMode=c.chartMode;if(c.fhSound)state.fhSound=true;if(c.minMc>0)MIN_MC=c.minMc;if(c.maxMc>0)MAX_MC=c.maxMc;if(c.minLiq>0)MIN_LIQ=c.minLiq;if(c.maxLiq>0)MAX_LIQ=c.maxLiq;if(c.minAgeH>0)MIN_AGE_H=c.minAgeH;if(c.maxAgeH>0)MAX_AGE_H=c.maxAgeH;if(c.launchpads)state.filters.launchpads=c.launchpads;}catch(_){}
  try{state.research=JSON.parse(localStorage.getItem(LS_RES)||'{}')||{};}catch(_){state.research={};}
  try{state.holders=JSON.parse(localStorage.getItem(LS_HOLD)||'{}')||{};}catch(_){state.holders={};}
  try{var w=JSON.parse(localStorage.getItem(LS_WATCH)||'[]');state.watch=new Set(w);}catch(_){}
@@ -75,7 +75,7 @@ function loadAll(){
  try{state.thesis=JSON.parse(localStorage.getItem(LS_THESIS)||'{}')||{};}catch(_){state.thesis={};}
  try{state.journal=JSON.parse(localStorage.getItem(LS_JOURNAL)||'[]')||[];}catch(_){state.journal=[];}
 }
-function saveCfg(){try{localStorage.setItem(LS_CFG,JSON.stringify({apiKey:state.apiKey,chains:state.chains,tab:state.tab,chartMode:state.chartMode,fhSound:state.fhSound,minMc:MIN_MC,minLiq:MIN_LIQ,launchpads:state.filters.launchpads}));}catch(_){}}
+function saveCfg(){try{localStorage.setItem(LS_CFG,JSON.stringify({apiKey:state.apiKey,chains:state.chains,tab:state.tab,chartMode:state.chartMode,fhSound:state.fhSound,minMc:MIN_MC,maxMc:MAX_MC,minLiq:MIN_LIQ,maxLiq:MAX_LIQ,minAgeH:MIN_AGE_H,maxAgeH:MAX_AGE_H,launchpads:state.filters.launchpads}));}catch(_){}}
 function saveRes(){try{localStorage.setItem(LS_RES,JSON.stringify(state.research));}catch(_){}}
 function saveHold(){try{localStorage.setItem(LS_HOLD,JSON.stringify(state.holders));}catch(_){}}
 function saveScores(){try{localStorage.setItem(LS_SCORE,JSON.stringify(state.scores));}catch(_){}}
@@ -493,6 +493,7 @@ function parsePair(p){
   sites:((p.info&&p.info.websites)||[]).map(function(w){return w.url;}),
   img:(p.info&&p.info.imageUrl)||null,
   boosts:(p.boosts&&p.boosts.active)||0,
+  dexId:String(p.dexId||''), // real signal for a BSC launchpad filter (Four.meme reports its own dexId); no equivalent exists for Base/Ethereum
   url:p.url||null,desc:''
  };
 }
@@ -689,26 +690,37 @@ function attn(pp){
 }
 function trajTag(a){return '<span class="traj '+a.traj+'">'+a.traj.toUpperCase()+'<small>attn '+a.score+'</small></span>';}
 /* ---------- pick-quality gates (why a coin is worth your attention) ---------- */
-var MIN_MC=7000,MIN_LIQ=5000;
+// user-adjustable via the Filter modal; null on a MAX_* means no ceiling, same for MIN_AGE_H/
+// MAX_AGE_H (age in hours — the filter people actually reach for: newer vs. older coins).
+var MIN_MC=7000,MIN_LIQ=5000,MAX_MC=null,MAX_LIQ=null,MIN_AGE_H=null,MAX_AGE_H=null;
 function pumpFun(pp){return pp.chain==='solana'&&/pump$/i.test(pp.addrRaw||pp.addr||'');}
 // real launchpad identification from the mint's own vanity suffix — a few Solana launchpads
 // mint addresses ending in a fixed string, which is a genuine, checkable fact, not a guess.
 // Anything else: say plainly that it isn't identifiable, instead of asserting an opinion about it.
 function launchpadName(pp){
- if(pp.chain!=='solana')return null;
- var addr=String(pp.addrRaw||pp.addr||'');
- if(/pump$/i.test(addr))return 'Pump.fun';
- if(/bonk$/i.test(addr))return 'LetsBonk.fun';
- if(/boop$/i.test(addr))return 'Boop.fun';
- if(/moon$/i.test(addr))return 'Moonshot';
+ // Solana: the mint's own vanity address suffix is a permanent record of which launchpad
+ // actually created it (survives migration to a different AMM later) — a real, checkable fact.
+ if(pp.chain==='solana'){
+  var addr=String(pp.addrRaw||pp.addr||'');
+  if(/pump$/i.test(addr))return 'Pump.fun';
+  if(/bonk$/i.test(addr))return 'LetsBonk.fun';
+  if(/boop$/i.test(addr))return 'Boop.fun';
+  if(/moon$/i.test(addr))return 'Moonshot';
+  return null;
+ }
+ // BSC: no vanity-address convention exists, but DexScreener's own dexId reports 'fourmeme'
+ // while a token is still trading on the Four.meme bonding curve — real data, not a guess.
+ if(pp.chain==='bsc'&&pp.dexId==='fourmeme')return 'Four.meme';
+ // Base/Ethereum: no reliable per-launchpad signal exists in the data this tool has (no vanity
+ // suffix, no distinct dexId for Clanker/Virtuals/etc — they all just report the AMM they trade
+ // on). Rather than fabricate a detector, these stay unidentified.
  return null;
 }
-// filter-key form of launchpadName — non-Solana chains and unidentifiable Solana mints both
-// fall into 'other' rather than being excluded by a filter that doesn't actually apply to them.
+// filter-key form of launchpadName — non-Solana/non-Four.meme chains and unidentifiable Solana
+// mints all fall into 'other' rather than being excluded by a filter that doesn't apply to them.
 function launchpadKey(pp){
- if(pp.chain!=='solana')return 'other';
  var n=launchpadName(pp);
- return n==='Pump.fun'?'pump':n==='LetsBonk.fun'?'bonk':n==='Boop.fun'?'boop':n==='Moonshot'?'moonshot':'other';
+ return n==='Pump.fun'?'pump':n==='LetsBonk.fun'?'bonk':n==='Boop.fun'?'boop':n==='Moonshot'?'moonshot':n==='Four.meme'?'fourmeme':'other';
 }
 /* ---------- deployer reputation ledger (server-backed, shared across every user) ----------
    Every hard-excluded deployer wallet from anyone's screening feeds one shared Supabase table
@@ -1171,7 +1183,14 @@ function rawPool(){
   if(seen[addr])return;var c=state.tokenCache.get(addr);var pp=c&&c.pair;if(!pp||!chainOk(pp.chain))return;
   if(pp.mc&&pp.mc>80000000)return;
   if(pp.mc&&pp.mc<MIN_MC)return;           // video: min mcap floor, skip dead sub-7k tokens
+  if(MAX_MC!=null&&pp.mc&&pp.mc>MAX_MC)return;
   if(pp.liq&&pp.liq<MIN_LIQ)return;        // needs real liquidity to be tradeable
+  if(MAX_LIQ!=null&&pp.liq&&pp.liq>MAX_LIQ)return;
+  if(pp.ageMs!=null){
+   var ageH=pp.ageMs/3600000;
+   if(MIN_AGE_H!=null&&ageH<MIN_AGE_H)return;
+   if(MAX_AGE_H!=null&&ageH>MAX_AGE_H)return;
+  }
   if(!state.filters.launchpads[launchpadKey(pp)])return;
   var b=state.boosts.filter(function(x){return x.addr===addr;})[0];if(b&&!pp.desc)pp.desc=b.desc;
   pp._src=srcOf[addr];seen[addr]=1;pool.push(pp);
@@ -2315,30 +2334,35 @@ q1('modalSearchQ').addEventListener('input',function(){
 q1('modalSearchQ').addEventListener('keydown',function(e){if(e.key==='Enter'){clearTimeout(_modalSearchT);doQuery(this.value,'modalSearchResult',true);}});
 q1('modalSearchResult').addEventListener('click',function(ev){if(watchClick(ev))return;var r=ev.target.closest('[data-addr]');if(!r)return;closeSearchModal();openResearch(r.getAttribute('data-addr'),r.getAttribute('data-chain'));});
 /* ---------- filter modal: launchpad + min mc/liq — the filters people actually use, nothing else ---------- */
+function fillN(id,v){q1(id).value=(v==null?'':v);}
+function readN(id){var n=parseInt(String(q1(id).value).replace(/[^0-9]/g,''),10);return isNaN(n)?null:n;}
 function openFilterModal(){
  var bd=q1('filterModalBackdrop');if(!bd)return;
  closeSearchModal();
- q1('fMinMc').value=MIN_MC;q1('fMinLiq').value=MIN_LIQ;
+ fillN('fMinAge',MIN_AGE_H);fillN('fMaxAge',MAX_AGE_H);
+ fillN('fMinMc',MIN_MC);fillN('fMaxMc',MAX_MC);
+ fillN('fMinLiq',MIN_LIQ);fillN('fMaxLiq',MAX_LIQ);
  document.querySelectorAll('#fLaunchpads input[data-lp]').forEach(function(cb){cb.checked=!!state.filters.launchpads[cb.getAttribute('data-lp')];});
  bd.hidden=false;
 }
 function closeFilterModal(){var bd=q1('filterModalBackdrop');if(bd)bd.hidden=true;}
 function updateFilterDot(){
- var changed=MIN_MC!==7000||MIN_LIQ!==5000||Object.keys(state.filters.launchpads).some(function(k){return !state.filters.launchpads[k];});
+ var changed=MIN_MC!==7000||MIN_LIQ!==5000||MAX_MC!=null||MAX_LIQ!=null||MIN_AGE_H!=null||MAX_AGE_H!=null
+  ||Object.keys(state.filters.launchpads).some(function(k){return !state.filters.launchpads[k];});
  var d=q1('filterDot');if(d)d.hidden=!changed;
 }
 q1('filterBtn').addEventListener('click',openFilterModal);
 q1('filterModalBackdrop').addEventListener('click',function(ev){if(ev.target===this)closeFilterModal();});
 q1('filterApply').addEventListener('click',function(){
- var mc=parseInt(String(q1('fMinMc').value).replace(/[^0-9]/g,''),10);
- var lq=parseInt(String(q1('fMinLiq').value).replace(/[^0-9]/g,''),10);
- MIN_MC=isNaN(mc)?0:mc;MIN_LIQ=isNaN(lq)?0:lq;
+ MIN_MC=readN('fMinMc')||0;MAX_MC=readN('fMaxMc');
+ MIN_LIQ=readN('fMinLiq')||0;MAX_LIQ=readN('fMaxLiq');
+ MIN_AGE_H=readN('fMinAge');MAX_AGE_H=readN('fMaxAge');
  document.querySelectorAll('#fLaunchpads input[data-lp]').forEach(function(cb){state.filters.launchpads[cb.getAttribute('data-lp')]=cb.checked;});
  saveCfg();updateFilterDot();closeFilterModal();scan();
 });
 q1('filterReset').addEventListener('click',function(){
- MIN_MC=7000;MIN_LIQ=5000;
- state.filters.launchpads={pump:true,bonk:true,boop:true,moonshot:true,other:true};
+ MIN_MC=7000;MIN_LIQ=5000;MAX_MC=null;MAX_LIQ=null;MIN_AGE_H=null;MAX_AGE_H=null;
+ state.filters.launchpads={pump:true,bonk:true,boop:true,moonshot:true,fourmeme:true,other:true};
  saveCfg();updateFilterDot();closeFilterModal();scan();
 });
 document.addEventListener('keydown',function(ev){

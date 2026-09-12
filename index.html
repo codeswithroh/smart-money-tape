@@ -617,20 +617,35 @@
       </div>
       <div class="filter-modal-body">
         <div class="filter-section">
-          <div class="filter-section-h">Minimum to show up at all</div>
+          <div class="filter-section-h">Age</div>
           <div class="filter-row2">
-            <label>Market cap &ge; $<input id="fMinMc" type="text" inputmode="numeric" value="7000"></label>
-            <label>Liquidity &ge; $<input id="fMinLiq" type="text" inputmode="numeric" value="5000"></label>
+            <label>Min <input id="fMinAge" type="text" inputmode="numeric" placeholder="any"> h</label>
+            <label>Max <input id="fMaxAge" type="text" inputmode="numeric" placeholder="any"> h</label>
           </div>
         </div>
         <div class="filter-section">
-          <div class="filter-section-h">Launchpad (Solana)</div>
+          <div class="filter-section-h">Market cap ($)</div>
+          <div class="filter-row2">
+            <label>Min <input id="fMinMc" type="text" inputmode="numeric" value="7000"></label>
+            <label>Max <input id="fMaxMc" type="text" inputmode="numeric" placeholder="any"></label>
+          </div>
+        </div>
+        <div class="filter-section">
+          <div class="filter-section-h">Liquidity ($)</div>
+          <div class="filter-row2">
+            <label>Min <input id="fMinLiq" type="text" inputmode="numeric" value="5000"></label>
+            <label>Max <input id="fMaxLiq" type="text" inputmode="numeric" placeholder="any"></label>
+          </div>
+        </div>
+        <div class="filter-section">
+          <div class="filter-section-h">Launchpad</div>
           <div class="filter-chips" id="fLaunchpads">
             <label class="fchip"><input type="checkbox" data-lp="pump" checked> Pump.fun</label>
             <label class="fchip"><input type="checkbox" data-lp="bonk" checked> LetsBonk.fun</label>
             <label class="fchip"><input type="checkbox" data-lp="boop" checked> Boop.fun</label>
             <label class="fchip"><input type="checkbox" data-lp="moonshot" checked> Moonshot</label>
-            <label class="fchip"><input type="checkbox" data-lp="other" checked> Other / not Solana</label>
+            <label class="fchip"><input type="checkbox" data-lp="fourmeme" checked> Four.meme (BSC)</label>
+            <label class="fchip"><input type="checkbox" data-lp="other" checked> Other</label>
           </div>
         </div>
         <div class="filter-actions">
@@ -666,7 +681,7 @@
     <div id="ideaBox"><div class="empty">reading the narratives&hellip;</div></div>
 
     <div class="shead"><h2>Everything moving</h2><span class="hint" id="scanHint">boosts + trending + new &middot; ~90s</span>
-      <button class="filter-btn" id="filterBtn" type="button" title="Filter by launchpad, minimum market cap and liquidity">
+      <button class="filter-btn" id="filterBtn" type="button" title="Filter by age, market cap, liquidity and launchpad">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h18M6 12h12M10 19h4"/></svg>
         Filter<span class="filter-dot" id="filterDot" hidden></span>
       </button>
