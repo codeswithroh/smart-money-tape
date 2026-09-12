@@ -264,8 +264,7 @@ function renderCmpTable(rows){
   return '<div class="cmp-row" style="grid-template-columns:'+cols+'"><div>'+esc(k)+'</div>'
    +rows.map(function(r){var v=Math.round(r.s.factors[fi].v*100),cls=v>=65?'pos':v<=35?'neg':'';return '<div class="cmp-cell '+cls+'">'+v+'</div>';}).join('')+'</div>';
  }).join('');
- panel.innerHTML='<div class="panel"><h3>Side-by-side</h3><div class="cmp-table">'+head+scoreRow+factorRows+'</div>'
-  +'<p class="rscore-cite">Same weighting as the Long-term research score panel on each coin&rsquo;s own x-ray. Refetches live each time you compare.</p></div>';
+ panel.innerHTML='<div class="panel"><h3 title="Same weighting as the Long-term research score panel on each coin\'s own x-ray. Refetches live each time.">Side-by-side</h3><div class="cmp-table">'+head+scoreRow+factorRows+'</div></div>';
 }
 function renderWatch(){
  var host=q1('watchList');if(!host)return;
@@ -342,12 +341,12 @@ function journalPanel(){
  if(!s)return '';
  var body;
  if(s.closedN<3){
-  body='<p style="font-size:12.5px;color:var(--ink-soft)">'+s.closedN+' closed position'+(s.closedN===1?'':'s')+' logged so far &mdash; your pattern builds as you close more. Every coin you un-star gets a permanent entry here: what you knew at entry, what actually happened. Nothing here gets edited or deleted.</p>';
+  body='<p style="font-size:12px;color:var(--ink-faint)">'+s.closedN+' closed position'+(s.closedN===1?'':'s')+' logged.</p>';
  }else{
-  body='<p style="font-size:13px;color:var(--ink-soft)"><b class="pos">'+s.wins+'</b> win'+(s.wins===1?'':'s')+' &middot; <b class="neg">'+s.losses+'</b> loss'+(s.losses===1?'':'es')+' &middot; '+s.neutral+' neutral, out of '+s.closedN+' closed positions.'
+  body='<p style="font-size:13px;color:var(--ink-soft)"><b class="pos">'+s.wins+'</b> win'+(s.wins===1?'':'s')+' &middot; <b class="neg">'+s.losses+'</b> loss'+(s.losses===1?'':'es')+' &middot; '+s.neutral+' neutral'
    +(s.flag?'<br><b class="neg">'+s.flag+'</b>':'')+'</p>';
  }
- return '<details class="panel journal"><summary style="cursor:pointer;font-weight:700">Your mistake-pattern journal ('+s.total+' logged)</summary>'
+ return '<details class="panel journal"><summary style="cursor:pointer;font-weight:700" title="Every coin you un-star gets a permanent entry: what you knew at entry, what actually happened. Never edited or deleted.">Your mistake-pattern journal ('+s.total+' logged)</summary>'
   +'<div style="padding-top:8px">'+body+journalList()+'</div></details>';
 }
 /* ---------- correlated-exposure warning: your watchlist re-read as narrative bets, not
@@ -362,7 +361,7 @@ function exposurePanel(pairs){
   return '<b>'+counts[k]+'</b> of your '+pairs.length+' watched coins are tagged <b>'+esc(t?t.name:k)+'</b>';
  });
  var covered=hot.reduce(function(s,k){return s+counts[k];},0);
- return '<div class="panel exposure"><h3>&#9888; Correlated exposure</h3><p style="font-size:12.5px;color:var(--ink-soft)">'+lines.join('; ')+' &mdash; that&rsquo;s '+covered+' tickers riding one narrative, not '+covered+' separate bets. If that narrative cools, they likely cool together.</p></div>';
+ return '<div class="panel exposure"><h3 title="These coins ride one narrative, not '+covered+' separate bets &mdash; if it cools, they likely cool together.">&#9888; Correlated exposure</h3><p style="font-size:12.5px;color:var(--ink-soft)">'+lines.join('; ')+'</p></div>';
 }
 
 /* ---------- profile + account menu ---------- */
@@ -678,8 +677,8 @@ function deployerRepPanel(sf){
  return fetch('/api/intel?kind=deployer&addr='+encodeURIComponent(sf.creator)).then(function(r){return r.ok?r.json():null;}).then(function(j){
   var f=j&&j.flag;
   if(!f||!f.flag_count)return '';
-  return '<div class="panel"><h3>&#9888; Deployer reputation (shared history)</h3>'
-   +'<p style="font-size:12.5px;color:var(--ink-soft)">This deployer wallet has been flagged <b class="neg">'+f.flag_count+' time'+(f.flag_count>1?'s':'')+'</b> across everyone&rsquo;s screenings on this tool, not just this coin: '+esc((f.reasons||[]).join(', ')||'failed safety screen')+'. First seen '+fAgo(Date.parse(f.first_flagged_at))+' ago.</p>'
+  return '<div class="panel"><h3 title="Flagged across everyone\'s screenings on this tool, not just this coin. First seen '+fAgo(Date.parse(f.first_flagged_at))+' ago.">&#9888; Deployer reputation</h3>'
+   +'<p style="font-size:12.5px;color:var(--ink-soft)">Flagged <b class="neg">'+f.flag_count+'&times;</b>: '+esc((f.reasons||[]).join(', ')||'failed safety screen')+'</p>'
    +'</div>';
  }).catch(function(){return '';});
 }
@@ -696,7 +695,7 @@ function narrativePulsePanel(theme,pp,a){
  if(!theme)return Promise.resolve('');
  return fetch('/api/intel?kind=pulse&theme='+encodeURIComponent(theme)).then(function(r){return r.ok?r.json():null;}).then(function(j){
   var rows=(j&&j.rows)||[];
-  if(rows.length<15)return '<div class="panel"><h3>Narrative half-life</h3><p style="font-size:12.5px;color:var(--ink-soft)">Only '+rows.length+' logged sample'+(rows.length===1?'':'s')+' for this narrative so far &mdash; this builds up across every coin anyone x-rays. Check back as more data comes in.</p></div>';
+  if(rows.length<15)return ''; // not enough logged samples yet for this narrative — show nothing rather than an empty-state explainer
   var buckets=PULSE_BUCKETS.map(function(d,i){
    var hi=PULSE_BUCKETS[i+1]!=null?PULSE_BUCKETS[i+1]:Infinity;
    var vals=rows.filter(function(r){return r.age_days>=d&&r.age_days<hi&&r.attn_score!=null;}).map(function(r){return r.attn_score;}).sort(function(a2,b2){return a2-b2;});
@@ -710,8 +709,8 @@ function narrativePulsePanel(theme,pp,a){
    var h=b.med!=null?Math.max(4,Math.round(b.med/mx*60)):2;
    return '<div class="hlbar'+(i===curBucketIdx?' cur':'')+'"><i style="height:'+h+'px"></i><span>'+(b.d===0?'launch':b.d+'d+')+'</span></div>';
   }).join('');
-  return '<div class="panel"><h3>Narrative half-life</h3>'
-   +'<p style="font-size:12.5px;color:var(--ink-soft)">Median attention score by age, across '+rows.length+' logged coins in this narrative &mdash; not this coin&rsquo;s own history, the category&rsquo;s. This coin is '+curDays.toFixed(1)+' day'+(curDays>=2||curDays<1?'s':'')+' in (highlighted bucket). Descriptive pattern, not a forecast.</p>'
+  return '<div class="panel"><h3 title="Median attention score by age across '+rows.length+' logged coins in this narrative &mdash; the category\'s pattern, not this coin\'s own history. Descriptive, not a forecast.">Narrative half-life</h3>'
+   +'<p style="font-size:12px;color:var(--ink-faint)">This coin: day '+curDays.toFixed(1)+' (highlighted)</p>'
    +'<div class="hlbars">'+bars+'</div>'
    +'</div>';
  }).catch(function(){return '';});
@@ -735,8 +734,7 @@ function walletSightingsPanel(pp,wals){
    var hits=byWal[w],syms=hits.slice(0,4).map(function(h){return '$'+esc(h.sym||'?');}).join(', ');
    return '<div class="wtrow"><span>'+esc(walShort(w))+'</span><span style="color:var(--ink-faint)">early on '+hits.length+' other tracked coin'+(hits.length>1?'s':'')+': '+syms+'</span></div>';
   }).join('');
-  return '<div class="panel"><h3>Cross-coin wallet sightings</h3>'
-   +'<p style="font-size:12.5px;color:var(--ink-soft)">'+wallets.length+' of this coin&rsquo;s early buyer'+(wallets.length>1?'s':'')+' also bought early on other coins tracked by this tool. Fact, not a signal &mdash; being early elsewhere isn&rsquo;t good or bad on its own.</p>'
+  return '<div class="panel"><h3 title="Fact, not a signal &mdash; being early elsewhere isn\'t good or bad on its own.">Cross-coin wallet sightings</h3>'
    +'<div class="wtrows">'+rows+'</div>'
    +'</div>';
  }).catch(function(){return '';});
@@ -753,16 +751,14 @@ function graduationPanel(pp){
  if(!(pp.chain==='solana'&&pumpFun(pp)))return '';
  var mc=pp.mc||0;
  if(mc>=GRAD_THRESHOLD_USD*1.15){
-  return '<div class="panel"><h3>Bonding-curve graduation</h3><p style="font-size:12.5px;color:var(--ink-soft)">Already well past the commonly-cited ~'+fUsd(GRAD_THRESHOLD_USD)+' Pump.fun graduation mark &mdash; this is very likely trading on a real AMM pool now, not the bonding curve itself.</p></div>';
+  return '<div class="panel"><h3 title="Commonly-cited ~'+fUsd(GRAD_THRESHOLD_USD)+' Pump.fun graduation mark">Bonding-curve graduation</h3><p style="font-size:12.5px;color:var(--ink-soft)">Already graduated &mdash; trading on a real AMM pool now.</p></div>';
  }
  var pct=Math.max(1,Math.min(100,Math.round(mc/GRAD_THRESHOLD_USD*100)));
  var remaining=Math.max(0,GRAD_THRESHOLD_USD-mc);
  var cls=pct>=85?'watch':pct<25?'neg':'';
- return '<div class="panel"><h3>Bonding-curve graduation</h3>'
-  +'<p style="font-size:12.5px;color:var(--ink-soft)">Approaching the market cap where Pump.fun bonding-curve launches historically migrate to a real AMM pool. At that migration, liquidity resets into a brand-new pool &mdash; a real structural break in depth (and often price), not a smooth continuation of the curve.</p>'
+ return '<div class="panel"><h3 title="Approximate: reads DexScreener\'s market cap, not the bonding-curve program\'s own reserve state. At migration, liquidity resets into a brand-new pool — a real structural break, not a smooth continuation.">Bonding-curve graduation</h3>'
   +'<div class="grad-bar"><i class="'+cls+'" style="width:'+pct+'%"></i></div>'
-  +'<p style="font-size:12px;color:var(--ink-soft);margin-top:6px">'+fUsd(mc)+' of ~'+fUsd(GRAD_THRESHOLD_USD)+' ('+pct+'%) &mdash; roughly '+fUsd(remaining)+' of market-cap growth left at this rate of approximation.</p>'
-  +'<p style="font-size:11px;color:var(--ink-faint);margin-top:8px">Approximate: reads DexScreener&rsquo;s market cap, not the bonding-curve program&rsquo;s own on-chain reserve state, and the real threshold has varied historically. Directional, not exact — and not a timing signal.</p>'
+  +'<p style="font-size:12px;color:var(--ink-soft);margin-top:6px">'+fUsd(mc)+' of ~'+fUsd(GRAD_THRESHOLD_USD)+' ('+pct+'%)</p>'
   +'</div>';
 }
 /* ---------- copycat cohort ranking ----------
@@ -795,10 +791,9 @@ function cohortPanel(pp){
    var isSelf=x.addr===self;
    return '<div class="chrow'+(isSelf?' me':'')+'"><span>#'+(i+1)+'</span><span>$'+esc(x.sym)+(isSelf?' <i>(this one)</i>':'')+'</span><span class="cchip">'+esc(x.chain)+'</span><span style="color:var(--ink-faint)">'+fUsd(x.liq)+' liq</span><span style="color:var(--ink-faint)">'+fAge(x.ageMs)+' old</span></div>';
   }).join('');
-  return '<div class="panel"><h3>Copycat cohort</h3>'
-   +'<p style="font-size:12.5px;color:var(--ink-soft)">'+arr.length+' live coin'+(arr.length>1?'s':'')+' share a name keyword with $'+esc(pp.sym)+' right now. In a copycat wave at most one usually survives &mdash; by liquidity, this one ranks <b>#'+rank+' of '+arr.length+'</b> in its own cohort.</p>'
+  return '<div class="panel"><h3 title="Matched on shared name keywords via a live search, not a verified relationship — some matches may be coincidental.">Copycat cohort</h3>'
+   +'<p style="font-size:12.5px;color:var(--ink-soft)">Ranks <b>#'+rank+' of '+arr.length+'</b> by liquidity</p>'
    +'<div class="chrows">'+rows+'</div>'
-   +'<p style="font-size:11px;color:var(--ink-faint);margin-top:8px">Matched on shared name keywords via a live DexScreener search, not a verified relationship &mdash; some matches may be coincidental, and a real original can still rank low right after a fresh copy launches.</p>'
    +'</div>';
  }).catch(function(){return '';});
 }
@@ -942,15 +937,13 @@ function researchScorePanel(pp,a,sf,hr,proj){
    +'<div class="rfbar"><i class="'+cls+'" style="width:'+pct+'%"></i></div>'
    +'<p class="rfnote">'+f.note+'</p></div>';
  }).join('');
- var ageLine=surv?('<p class="rscore-age">'+fAge(pp.ageMs)+' old'+(surv.sourced?' &mdash; '+surv.survivePct+'% of Pump.fun launches are still trading at this age or older (context, not part of the score).':'.')+'</p>'):'';
- return '<div class="panel rscore"><h3>Long-term research score</h3>'
+ var ageLine=surv?('<p class="rscore-age" title="'+(surv.sourced?surv.survivePct+'% of Pump.fun launches are still trading at this age or older (context, not part of the score).':'')+'">'+fAge(pp.ageMs)+' old</p>'):'';
+ return '<div class="panel rscore"><h3 title="Weighted from this coin\'s own holder concentration, liquidity depth, holder growth, volume authenticity and project surface — not its age. A heuristic score from public on-chain data, not financial advice.">Long-term research score</h3>'
   +'<div class="rscore-top"><div class="score-ring" style="background:'+ring+'"><div class="score-ring-inner"><b>'+s.pct+'</b><span>/100</span></div></div>'
   +'<div class="rscore-verdict"><div class="rscore-label '+s.cls+'">'+s.label+'</div>'
-  +'<p class="rscore-sub">Weighted from this coin&rsquo;s own holder concentration, liquidity depth, holder growth, volume authenticity and project surface &mdash; not its age.</p>'
   +ageLine+'</div></div>'
   +'<div class="rfactors">'+rows+'</div>'
   +scoreTrendHtml(pp.addr)
-  +'<p class="rscore-cite">Weights informed by published research: holder-concentration signal measured ~64% stronger than trader/volume signal (MemeTrans/MELT); Pump.fun cohort base rates from CoinGecko Research, arXiv 2607.02823 and arXiv 2512.11850. A heuristic score from public on-chain data &mdash; not financial advice.</p>'
   +'</div>';
 }
 /* ---------- exit-liquidity depth curve + sizing calculator ----------
@@ -989,7 +982,7 @@ function exitImpactPct(sizeUsd,liqUsd){
 }
 function exitLiquidityPanel(pp){
  var liq=pp.liq;
- if(!liq)return '<div class="panel"><h3>Exit-liquidity sizing</h3><p style="font-size:12.5px;color:var(--ink-soft)">No pool liquidity figure available yet for this coin.</p></div>';
+ if(!liq)return '';
  var sizes=[500,5000,25000,100000];
  var rows=sizes.map(function(x){
   var imp=exitImpactPct(x,liq);
@@ -998,8 +991,7 @@ function exitLiquidityPanel(pp){
   return '<div class="exd-row"><span>'+fUsd(x)+' exit</span><span class="'+cls+'">~'+imp.toFixed(1)+'% impact</span><span style="color:var(--ink-faint)">net ~'+fUsd(net)+'</span></div>';
  }).join('');
  return '<div class="panel exd">'
-  +'<h3>Exit-liquidity sizing</h3>'
-  +'<p style="font-size:12.5px;color:var(--ink-soft);margin-bottom:8px">Not the flat liquidity number &mdash; the estimated cost of actually exiting a position at this pool&rsquo;s current depth ('+fUsd(liq)+' total). Modeled as a balanced constant-product pool; a concentrated-liquidity (CLMM) pool with a lopsided range can behave differently. Math only, not a recommendation of size or timing.</p>'
+  +'<h3 title="Estimated cost of actually exiting at this pool\'s current depth ('+fUsd(liq)+' total), modeled as a balanced constant-product pool. Math only, not a recommendation.">Exit-liquidity sizing</h3>'
   +'<div class="exd-table">'+rows+'</div>'
   +'<div class="exd-calc"><label for="exitCalcInput">Your size ($)</label><input id="exitCalcInput" type="text" inputmode="decimal" placeholder="e.g. 2000" data-f="exitsize"><span id="exitCalcOut" class="exd-out">&nbsp;</span></div>'
   +'</div>';
@@ -1058,26 +1050,20 @@ function bestComp(tags,pp,sf){
 }
 function compPanel(pp,sf,tags){
  var m=bestComp(tags,pp,sf);
- if(!m){
-  return '<div class="panel"><h3>Narrative comp</h3>'
-   +'<p style="font-size:12.5px;color:var(--ink-soft)">No strong match against the reference set below. Dog and frog metas dominate the mega-runners on record &mdash; a coin outside those narratives needs its own catalyst; it doesn&rsquo;t inherit one from a legend.</p>'
-   +'<p style="font-size:11px;color:var(--ink-faint);margin-top:6px">Reference set: PEPE, WIF, BONK, SHIB, DOGE &mdash; sourced milestones, not a prediction model.</p></div>';
- }
+ if(!m)return '';
  var c=m.c;
  var ageDays=pp.ageMs!=null?pp.ageMs/864e5:null;
  var stageLine=ageDays!=null
   ?'This coin is <b>'+fAge(pp.ageMs)+'</b> in. '+esc(c.name)+' took <b>'+c.daysToAth+' days</b> from launch to its '+fUsd(c.athMc)+' peak.'
   :'';
- return '<div class="panel"><h3>Narrative comp</h3>'
+ return '<div class="panel"><h3 title="Matched on narrative + launch structure, not price action. '+esc(c.name)+' is a survivor — most coins in its own cohort went to zero. Source: '+c.src+'.">Narrative comp</h3>'
   +'<div class="kv">'
   +kv('closest archetype',esc(c.name))
   +kv('shared traits',(tags.indexOf(c.theme)>=0?esc(c.theme)+' narrative':'')+((fairLaunchLikely(sf)===c.fairLaunch)?' &middot; '+(c.fairLaunch?'fair launch':'insider-allocated launch'):'')+(chainFamily(pp.chain)===c.chainFam?' &middot; '+esc(c.chainFam):''))
   +kv(esc(c.name)+' launched',esc(c.launched))
   +kv(esc(c.name)+' ATH mc',fUsd(c.athMc)+' ('+c.daysToAth+'d from launch)')
   +'</div>'
-  +'<p style="font-size:12.5px;color:var(--ink-soft);margin-top:9px">'+c.note+'</p>'
-  +(stageLine?'<p style="font-size:12.5px;color:var(--ink-soft);margin-top:6px">'+stageLine+'</p>':'')
-  +'<p style="font-size:11px;color:var(--ink-faint);margin-top:8px">Matched on narrative + launch structure, not price action. '+esc(c.name)+' is a survivor &mdash; most coins in its own cohort went to zero, per the research cited above. Source: '+c.src+'.</p>'
+  +(stageLine?'<p style="font-size:12.5px;color:var(--ink-soft);margin-top:9px">'+stageLine+'</p>':'')
   +'</div>';
 }
 /* ---------- deployer history: does this creator wallet have a track record ----------
@@ -1090,12 +1076,12 @@ function deployerPanel(sf){
  var toks=sf.creatorTokens||[];
  var short=sf.creator.slice(0,4)+'&hellip;'+sf.creator.slice(-4);
  if(!toks.length){
-  return '<div class="panel"><h3>Deployer history</h3>'
-   +'<p style="font-size:12.5px;color:var(--ink-soft)">First known launch from <span style="font-family:\'Share Tech Mono\',monospace">'+short+'</span> &mdash; no track record yet, good or bad.</p></div>';
+  return '<div class="panel"><h3 title="Deployer wallet '+short+'">Deployer history</h3>'
+   +'<p style="font-size:12.5px;color:var(--ink-soft)">First known launch &mdash; no track record yet.</p></div>';
  }
  var graduated=toks.filter(function(t){return (t.marketCap||0)>=50000;}).length;
  var verdict,cls;
- if(toks.length>=5&&graduated/toks.length<0.2){verdict='Prolific low-traction deployer &mdash; '+toks.length+' other tokens, only '+graduated+' ever cleared $50k mc. Treat this creator as a red flag.';cls='neg';}
+ if(toks.length>=5&&graduated/toks.length<0.2){verdict='Prolific low-traction deployer &mdash; '+toks.length+' other tokens, only '+graduated+' ever cleared $50k mc.';cls='neg';}
  else if(graduated>=2){verdict='Has landed real traction before &mdash; '+graduated+' of '+toks.length+' other launches cleared $50k mc.';cls='pos';}
  else{verdict=toks.length+' other launch'+(toks.length>1?'es':'')+' from this wallet, mostly low-traction so far.';cls='watch';}
  var rows=toks.slice(0,6).map(function(t){
@@ -1103,10 +1089,9 @@ function deployerPanel(sf){
   var mint=String(t.mint||'');
   return '<div class="cmp-row" style="grid-template-columns:1fr 90px 80px"><div style="font-family:\'Share Tech Mono\',monospace;font-size:11.5px">'+esc(mint.slice(0,4))+'&hellip;'+esc(mint.slice(-4))+'</div><div>'+fUsd(t.marketCap)+'</div><div>'+age+' old</div></div>';
  }).join('');
- return '<div class="panel"><h3>Deployer history</h3>'
+ return '<div class="panel"><h3 title="Deployer wallet '+short+' &middot; source: RugCheck creatorTokens. Market cap is a traction proxy, not a rug confirmation.">Deployer history</h3>'
   +'<p style="font-size:12.5px;color:var(--ink-soft)"><b class="'+cls+'">'+verdict+'</b></p>'
   +'<div class="cmp-table" style="margin-top:8px">'+rows+'</div>'
-  +'<p style="font-size:11px;color:var(--ink-faint);margin-top:8px">Deployer wallet <span style="font-family:\'Share Tech Mono\',monospace">'+short+'</span> &middot; source: RugCheck creatorTokens. Market cap is a traction proxy, not a rug confirmation &mdash; still eyeball holder behavior yourself.</p>'
   +'</div>';
 }
 function pickQuality(pp){
@@ -1191,7 +1176,7 @@ function renderScan(){
  var cur=state._scanFilter||'all';
  var note=q1('screenNote');
  if(note){
-  if(state._screenedOut>0){note.hidden=false;note.style.display='';note.innerHTML='&#128737; screened out <b>'+state._screenedOut+'</b> coin'+(state._screenedOut>1?'s':'')+' that failed a real rug/safety check before showing you this list &mdash; honeypot, bundle pattern, or unrenounced with heavy dev holdings.';}
+  if(state._screenedOut>0){note.hidden=false;note.style.display='';note.title='Screened out '+state._screenedOut+' coin'+(state._screenedOut>1?'s':'')+' that failed a safety check before this list was shown: honeypot, bundle pattern, or heavy unrenounced dev holdings.';note.innerHTML='&#128737; '+state._screenedOut+' screened out';}
   else{note.hidden=true;note.style.display='none';}
  }
  q1('scanFilters').innerHTML=chips.map(function(c){return '<button class="chip-toggle" data-sf="'+c[0]+'" aria-pressed="'+(cur===c[0])+'">'+esc(c[1])+'</button>';}).join('');
@@ -1402,7 +1387,7 @@ function launchShape(pp){
  return {bundleish:false,pump:pump};
 }
 function bundlePanel(pp,sf){
- if(pp.chain!=='solana')return '<div class="panel"><h3>Bundle &amp; insider check</h3><p style="font-size:12.5px;color:var(--ink-faint)">Wallet-level bundle detection runs on Solana only (RugCheck). For '+esc(pp.chain)+', lean on the rug screen above and the manual checklist below.</p></div>';
+ if(pp.chain!=='solana')return '';
  var ls=launchShape(pp);
  var rows=[];
  var flag=function(bad,txt){return '<div class="bchk '+(bad?'bad':'ok')+'">'+(bad?'&#9888; ':'&#10003; ')+txt+'</div>';};
@@ -1417,8 +1402,8 @@ function bundlePanel(pp,sf){
  }
  if(ls)rows.push(flag(ls.bundleish,'launch candle '+(ls.pump>0?'+':'')+ls.pump.toFixed(0)+'% '+(ls.bundleish?'straight up with no pullback &mdash; classic bundle-launch shape':'with normal staggered follow-through')));
  var verdict=(sf&&(sf.bundle||(sf.devPct>5)||(sf.insiderPct>20)||(sf.top5Pct>25)))||(ls&&ls.bundleish)
-  ?'<b class="neg">Treat as bundled / insider-heavy until proven otherwise.</b> Cross-check holder SOL balances + funding times yourself (see checklist).'
-  :'<b class="pos">No bundle red flags in the automated checks.</b> Still eyeball holder balances + funding times before you buy.';
+  ?'<b class="neg">Treat as bundled / insider-heavy until proven otherwise.</b>'
+  :'<b class="pos">No bundle red flags in the automated checks.</b>';
  return '<div class="panel"><h3>Bundle &amp; insider check</h3><div class="bchks">'+rows.join('')+'</div>'
   +'<p style="font-size:12.5px;color:var(--ink-soft);margin-top:8px">'+verdict+'</p></div>';
 }
@@ -1441,7 +1426,6 @@ function checklistPanel(pp,proj){
   +'<a class="btn sm" href="https://x.com/search?q='+xq+'&f=live" target="_blank" rel="noopener">$'+esc(pp.sym)+' on X (Latest)</a>'
   +(proj.x?'<a class="btn sm" href="'+esc(proj.xUrl)+'" target="_blank" rel="noopener">@'+esc(proj.x)+'</a>':'')+'</div>'
   +'<ol class="chklist">'+items.map(function(it){return '<li><b>'+it[0]+'.</b> '+it[1]+'</li>';}).join('')+'</ol>'
-  +'<p style="font-size:11.5px;color:var(--ink-faint);margin-top:8px">Source: trader workflow notes. Not financial advice &mdash; this is a research aid, do your own checks.</p>'
   +'</div></details>';
 }
 function planFrom(pp,r){
@@ -1512,7 +1496,7 @@ function renderResearch(pp,sf,watchers,tinfo){
   +'<span class="nm">$'+esc(pp.sym)+'</span><span class="chain">'+esc(pp.chain)+'</span>'
   +(proj.x?'<a class="xh" href="'+esc(proj.xUrl)+'" target="_blank" rel="noopener">@'+esc(proj.x)+'</a>':'')
   +'<span class="lnks">'+lnk.join('')+'</span></div>'
-  +(gtOk(pp.chain)?'':'<div class="rc-banner"><b>&#9888; '+esc(pp.chain)+' chain &mdash; slow data.</b> The network is congested and there\'s no fast indexer for it, so the chart and trade feed load slowly and can read a little stale. The attention score, holders, socials and project info are unaffected.</div>')
+  +(gtOk(pp.chain)?'':'<div class="rc-banner" title="No fast indexer for this chain, so the chart and trade feed can read a little stale. Everything else is unaffected.">&#9888; '+esc(pp.chain)+' &mdash; slow chart/trade data</div>')
   +'<div class="body">'
   +'<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><div class="verdict '+v.cls+'">'+v.label+'</div>'
    +'<button class="btn" data-act="savefav">'+(state.watch.has(pp.addr)?'&#9733; on watchlist':'&#9734; watchlist')+'</button>'
@@ -1563,12 +1547,11 @@ function projectPanel(pp,proj){
  (proj.cats||[]).slice(0,5).forEach(function(c){badges.push('<span class="tag n">'+esc(c)+'</span>');});
  var d=proj.desc||'';
  var descHtml=d?'<p class="proj-desc'+(d.length>420?' clamp':'')+'">'+esc(d)+'</p>'+(d.length>420?'<button class="btn sm" data-act="moredesc">read more</button>':'')
-   :'<p class="proj-desc" style="color:var(--ink-faint)">No project description published anywhere public yet. For a fresh coin that is normal &mdash; but it also means the story lives only on X. Read the replies before you trust it.</p>';
+   :'<p class="proj-desc" style="color:var(--ink-faint)">No project description found yet.</p>';
  return '<div class="panel proj"><h3>The project</h3>'
   +descHtml
   +(badges.length?'<div class="tags" style="margin:8px 0">'+badges.join('')+'</div>':'')
   +'<div class="proj-links">'+links.join('')+'</div>'
-  +'<div style="font-size:11.5px;color:var(--ink-faint);margin-top:7px">Sources: GeckoTerminal token info, DexScreener profile'+(proj.cto?', flagged community-takeover':'')+'. Always read what people are actually saying on X, not just the bio.</div>'
   +'</div>';
 }
 function kv(k,v,cls){return '<div><div class="k">'+esc(k)+'</div><div class="v'+(cls?' '+cls:'')+'">'+v+'</div></div>';}
@@ -1778,18 +1761,17 @@ function washTradingSignals(){
 }
 function washTradingPanel(){
  var s=washTradingSignals();
- if(!s)return '<div class="panel"><h3>Wash-trading fingerprint</h3><p style="font-size:12.5px;color:var(--ink-soft)">Not enough of the live trade tape has loaded yet to fingerprint anything &mdash; check back once the tape above has more prints.</p></div>';
+ if(!s)return '';
  var flags=[];
  if(s.selfLoop.length)flags.push(s.selfLoop.length+' wallet'+(s.selfLoop.length>1?'s':'')+' bought <b>and</b> sold repeatedly in this sample (self-trade loop pattern)');
  if(s.cadence.length)flags.push(s.cadence.length+' wallet'+(s.cadence.length>1?'s':'')+' trading at near-identical time intervals (scripted-cadence pattern)');
  if(s.topShare>=0.5)flags.push('top 3 wallets account for '+Math.round(s.topShare*100)+'% of trades in this sample &mdash; volume concentrated in very few hands');
- var verdict=flags.length?'<b class="neg">Wash-trading pattern signals present in this sample.</b>':'<b class="pos">No wash-trading pattern flagged in this sample.</b>';
+ var verdict=flags.length?'<b class="neg">Wash-trading pattern signals present.</b>':'<b class="pos">No wash-trading pattern flagged.</b>';
  var walRows=s.selfLoop.slice(0,4).map(function(w){return '<div class="wtrow"><span>'+esc(walShort(w.wal))+'</span><span style="color:var(--ink-faint)">'+w.buys+' buys / '+w.sells+' sells</span></div>';}).join('');
- return '<div class="panel"><h3>Wash-trading fingerprint</h3>'
-  +'<p style="font-size:12.5px;color:var(--ink-soft)">Reads wallet-level buy/sell attribution straight off the live trade tape ('+s.sample+' recent trades, '+s.uniqueWallets+' unique wallets) &mdash; not the aggregate volume number. '+verdict+'</p>'
+ return '<div class="panel"><h3 title="Reads wallet-level buy/sell attribution off the live trade tape ('+s.sample+' recent trades, '+s.uniqueWallets+' unique wallets), a limited sample &mdash; not proof either way.">Wash-trading fingerprint</h3>'
+  +'<p style="font-size:12.5px;color:var(--ink-soft)">'+verdict+'</p>'
   +(flags.length?'<ul style="font-size:12px;color:var(--ink-soft);margin:6px 0 0;padding-left:18px">'+flags.map(function(f){return '<li>'+f+'</li>';}).join('')+'</ul>':'')
   +(walRows?'<div class="wtrows" style="margin-top:8px">'+walRows+'</div>':'')
-  +'<p style="font-size:11px;color:var(--ink-faint);margin-top:8px">Heuristic on a limited live sample &mdash; a clean read here is not proof of clean volume, and a flagged wallet alone is not proof of manipulation. Cross-check with the manual checklist above.</p>'
   +'</div>';
 }
 function walShort(w){return w?w.slice(0,4)+'…'+w.slice(-3):'?';}
@@ -1961,8 +1943,7 @@ function renderBoard(){
    +sfBadges(pp)
    +'<div class="battn"><span class="traj-mini '+a.traj+'">'+a.traj.toUpperCase()+'</span><span class="bar"><i style="width:'+Math.round(a.score/mx*100)+'%"></i></span><b>'+a.score+'</b></div>'
    +'</button>';
- }).join('')
- +'<div class="board-note">Filtered to &ge;$'+(MIN_MC/1000)+'k mc &amp; &ge;$'+(MIN_LIQ/1000)+'k liq &middot; Pump.fun launches ranked up, other Solana launchpads down &middot; &#9888; = failed a gate or bundle-pattern holders. This is attention, not a buy &mdash; run the checklist on the card.</div>';
+ }).join('');
 }
 /* ---------- MINT AN IDEA ---------- */
 var IDEA_BANK={
