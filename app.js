@@ -669,6 +669,18 @@ function trajTag(a){return '<span class="traj '+a.traj+'">'+a.traj.toUpperCase()
 /* ---------- pick-quality gates (why a coin is worth your attention) ---------- */
 var MIN_MC=7000,MIN_LIQ=5000;
 function pumpFun(pp){return pp.chain==='solana'&&/pump$/i.test(pp.addrRaw||pp.addr||'');}
+// real launchpad identification from the mint's own vanity suffix — a few Solana launchpads
+// mint addresses ending in a fixed string, which is a genuine, checkable fact, not a guess.
+// Anything else: say plainly that it isn't identifiable, instead of asserting an opinion about it.
+function launchpadName(pp){
+ if(pp.chain!=='solana')return null;
+ var addr=String(pp.addrRaw||pp.addr||'');
+ if(/pump$/i.test(addr))return 'Pump.fun';
+ if(/bonk$/i.test(addr))return 'LetsBonk.fun';
+ if(/boop$/i.test(addr))return 'Boop.fun';
+ if(/moon$/i.test(addr))return 'Moonshot';
+ return null;
+}
 /* ---------- deployer reputation ledger (server-backed, shared across every user) ----------
    Every hard-excluded deployer wallet from anyone's screening feeds one shared Supabase table
    (api/intel.js -> deployer_flags), so a wallet flagged from someone else's session an hour ago
@@ -1470,7 +1482,7 @@ function renderResearch(pp,sf,watchers,tinfo){
   +kv('price 1h / 6h',fPct(+pp.pc.h1||0)+' / '+fPct(+pp.pc.h6||0))
   +kv('holders',hr?fNum(hr.now)+'  ('+ (hr.perHr>=0?'+':'') +Math.round(hr.perHr)+'/hr)':(sf&&sf.holders?fNum(sf.holders)+' (tracking...)':'tracking...'),hr&&hr.perHr>0?'pos':'')
   +kv('boosted',pp.boosts?'yes ('+pp.boosts+')':'no')
-  +(pp.chain==='solana'?kv('launchpad',pumpFun(pp)?'Pump.fun':'not Pump.fun &mdash; 99% of other SOL launchpads are dead/scam',pumpFun(pp)?'pos':'neg'):'')
+  +(pp.chain==='solana'?kv('launchpad',launchpadName(pp)||'not identifiable from the address'):'')
   +kv('pick gates',(pp.mc&&pp.mc<MIN_MC?'mc &lt;$'+(MIN_MC/1000)+'k ':'')+(pp.liq&&pp.liq<MIN_LIQ?'liq &lt;$'+(MIN_LIQ/1000)+'k ':'')+((pp.mc>=MIN_MC||!pp.mc)&&(pp.liq>=MIN_LIQ||!pp.liq)?'mc + liq OK':'') ,((pp.mc&&pp.mc<MIN_MC)||(pp.liq&&pp.liq<MIN_LIQ))?'neg':'pos')
   +kv('trajectory',a.traj.toUpperCase()+' &middot; attn '+a.score,a.traj==='ramping'?'pos':a.traj==='fading'?'neg':'')
   +kv('project surface',proj.surface+'/4 '+(proj.surface>=3?'(desc + site + socials)':proj.surface===0?'(bare &mdash; no story surface)':'(partial)'),proj.surface>=3?'pos':proj.surface===0?'neg':'')
