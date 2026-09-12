@@ -53,7 +53,11 @@ var state={
  safety:new Map(),ohlcv:new Map(),
  research:{},holders:{},scores:{},thesis:{},journal:[],watch:new Set(),watchMeta:new Map(),_watchBusy:false,
  compare:[], // addrs picked for side-by-side comparison, in pick order, capped at 3 — session-only
- chartMode:'entries',rcAddr:null,rcPair:null,rcInfo:null,trades:[],_tradesPoll:0,fhSound:false,
+ // 'chart' (the full GeckoTerminal-hosted chart, drawing tools + indicators, loaded straight
+ // from their own servers) is the reliable default — 'entries' (our own bare candlestick canvas
+ // with just the mechanical levels drawn on) depends on our own rate-limited OHLCV proxy and can
+ // come up empty under load. Users who prefer the plain view can still switch to it.
+ chartMode:'chart',rcAddr:null,rcPair:null,rcInfo:null,trades:[],_tradesPoll:0,fhSound:false,
  lastOk:0,lastErr:null,scanAt:0
 };
 
@@ -1506,10 +1510,8 @@ function renderResearch(pp,sf,watchers,tinfo){
    +'<button class="btn pri" data-act="flex">&#128248; flex $'+esc(pp.sym)+'</button></div>'
   +'<div style="font-size:12px;color:var(--ink-soft)">score <b>'+v.pct+'/100</b> &middot; attention '+Math.round(v.att*100)+' &middot; safety '+Math.round(v.safe*100)+' &middot; project '+proj.surface+'/4'+(v.meme?' &middot; your meme '+Math.round(v.meme*100):'')+'</div>'
   +quickStatsGrid(pp,a,sf,hr,proj)
-  +firehosePanel()
-  +radarTile(rax)
   +chart
-  +'<div class="panel"><h3>What the radar sees</h3>'+autoKv+safeLine+watchLine+'</div>'
+  +'<div class="rc-2col">'+radarTile(rax)+'<div class="panel"><h3>What the radar sees</h3>'+autoKv+safeLine+watchLine+'</div></div>'
   +bundlePanel(pp,sf)
   +deployerPanel(sf)
   +'<div id="deployerRepPanel"></div>'
@@ -1521,6 +1523,7 @@ function renderResearch(pp,sf,watchers,tinfo){
   +compPanel(pp,sf,tags)
   +projPanel
   +checklistPanel(pp,proj)
+  +firehosePanel()
   +tradesPanel()
   +form
   +'</div></div>';
@@ -1579,12 +1582,13 @@ function chartBlock(pp,plan){
         :'<div class="lwchart" style="display:flex;align-items:center;justify-content:center;color:#8a8a76;font-family:\'Share Tech Mono\',monospace;font-size:12px;padding:20px">no chart source for this token</div>')
    +'<div class="lwchart-note">DexScreener chart ('+esc(pp.chain)+') &middot; mechanical levels: entry '+fPrice(plan.lo)+'&ndash;'+fPrice(plan.hi)+', stop '+fPrice(plan.stop)+' (-'+plan.stopPct+'%), targets '+fPrice(plan.t1)+' / '+fPrice(plan.t2)+' / '+fPrice(plan.t3)+'. Not advice.</div></div>';
  }
- var toggle='<div class="ctoggle"><button data-cm="entries" aria-pressed="'+(mode==='entries')+'">TradingView + levels</button>'+(canEmbed?'<button data-cm="chart" aria-pressed="'+(mode==='chart')+'">Full toolbar</button>':'')+'</div>';
+ var toggle='<div class="ctoggle">'+(canEmbed?'<button data-cm="chart" aria-pressed="'+(mode==='chart')+'">Full chart (indicators &amp; drawing tools)</button>':'')+'<button data-cm="entries" aria-pressed="'+(mode==='entries')+'">Simple + my levels</button></div>';
  var embSrc=canEmbed?'https://www.geckoterminal.com/'+net+'/pools/'+esc(pp.pairAddr)+'?embed=1&info=0&swaps=0&grayscale=0&light_chart=0&resolution=15m':'';
  var embed=canEmbed?'<div class="chart-embed"'+(mode==='entries'?' hidden':'')+'><iframe loading="lazy" title="chart" src="'+(mode==='chart'?embSrc:'')+'" data-embsrc="'+embSrc+'"></iframe></div>':'';
- var cand='<div class="lwchart" data-caddr="'+esc(pp.addr)+'"'+(mode==='chart'?' hidden':'')+'></div>';
+ var cand='<div class="lwchart" data-caddr="'+esc(pp.addr)+'"'+(mode==='chart'?' hidden':'')+'></div>'
+  +'<div class="lwchart-fallback" hidden><p>Chart data is slow to load right now.</p><button class="btn sm" data-cm="chart">Switch to the full chart</button></div>';
  var note='<div class="lwchart-note">TradingView Lightweight Charts &middot; GeckoTerminal 5m data &middot; entry '+fPrice(plan.lo)+'&ndash;'+fPrice(plan.hi)+', stop '+fPrice(plan.stop)+' (-'+plan.stopPct+'%), targets '+fPrice(plan.t1)+' / '+fPrice(plan.t2)+' / '+fPrice(plan.t3)+(plan.tMult?' (to your '+plan.tMult.toFixed(1)+'x goal)':'')+'. Not advice.</div>';
- return '<div>'+toggle+embed+cand+note+'</div>';
+ return '<div class="chart-wrap">'+toggle+embed+cand+note+'</div>';
 }
 /* ---------- ATTENTION RADAR hex ---------- */
 function radarAxes(pp,a,sf,proj,hr){
@@ -1835,18 +1839,27 @@ function startTrades(){
 }
 function stopTrades(){clearInterval(state._tradesPoll);state._tradesPoll=0;}
 /* ---------- TradingView Lightweight Charts ---------- */
-var _lw=null,_lwCandle=null,_lwVol=null,_lwAddr=null,_lwLines=[],_lwRO=null;
+var _lw=null,_lwCandle=null,_lwVol=null,_lwAddr=null,_lwLines=[],_lwRO=null,_lwFallbackT=0,_lwGotData=false;
 function stopChart(){
  if(_lwRO){try{_lwRO.disconnect();}catch(_){}_lwRO=null;}
  if(_lw){try{_lw.remove();}catch(_){}}
- _lw=_lwCandle=_lwVol=null;_lwAddr=null;_lwLines=[];
+ clearTimeout(_lwFallbackT);_lwFallbackT=0;
+ _lw=_lwCandle=_lwVol=null;_lwAddr=null;_lwLines=[];_lwGotData=false;
 }
 function mountChart(){
  stopChart();
  var pp=state.rcPair;if(!pp)return;
  var el=document.querySelector('.lwchart[data-caddr]');if(!el)return;
  if(typeof LightweightCharts==='undefined'){el.innerHTML='<div style="padding:20px;color:#8a8a76;font-family:\'Share Tech Mono\',monospace;font-size:12px">chart library failed to load &mdash; check connection</div>';return;}
- _lwAddr=pp.addr;
+ _lwAddr=pp.addr;_lwGotData=false;
+ // if the OHLCV fetch hasn't produced real candles within a few seconds (proxy rate-limited,
+ // slow chain), surface a real way out instead of leaving the canvas blank forever.
+ clearTimeout(_lwFallbackT);
+ _lwFallbackT=setTimeout(function(){
+  if(_lwGotData||!state.rcPair||state.rcPair.addr!==pp.addr)return;
+  var fb=el.parentNode&&el.parentNode.querySelector('.lwchart-fallback');
+  if(fb)fb.hidden=false;
+ },4500);
  _lw=LightweightCharts.createChart(el,{
   width:el.clientWidth||600,height:el.clientHeight||360,
   layout:{background:{type:'solid',color:'#12131c'},textColor:'#9aa0ad',fontFamily:'"Share Tech Mono", monospace',fontSize:10},
@@ -1877,6 +1890,8 @@ function lwApply(){
  });
  bars.sort(function(a,b){return a.time-b.time;});vol.sort(function(a,b){return a.time-b.time;});
  try{_lwCandle.setData(bars);_lwVol.setData(vol);}catch(_){return;}
+ _lwGotData=true;clearTimeout(_lwFallbackT);
+ var fb=document.querySelector('.lwchart-fallback');if(fb)fb.hidden=true;
  var plan=planFrom(pp,researchOf(pp.addr));
  _lwLines.forEach(function(l){try{_lwCandle.removePriceLine(l);}catch(_){}});_lwLines=[];
  function line(price,color,title,solid){if(!price||!isFinite(price))return;_lwLines.push(_lwCandle.createPriceLine({price:price,color:color,lineWidth:1,lineStyle:solid?LightweightCharts.LineStyle.Solid:LightweightCharts.LineStyle.Dashed,axisLabelVisible:true,title:title}));}
@@ -1896,10 +1911,10 @@ function rcardClick(ev){
  if(st){var f2=st.parentNode.getAttribute('data-f');var patch2={};patch2[f2]=+st.getAttribute('data-v');setRes(addr,patch2);rerenderRcard();return;}
  var cm=ev.target.closest('[data-cm]');
  if(cm){var m=cm.getAttribute('data-cm')==='chart'?'chart':'entries';state.chartMode=m;saveCfg();
-  var box=cm.closest('.ctoggle').parentNode;
-  box.querySelectorAll('[data-cm]').forEach(function(b){b.setAttribute('aria-pressed',b.getAttribute('data-cm')===m?'true':'false');});
-  var emb=box.querySelector('.chart-embed'),cvv=box.querySelector('.lwchart'),ifr=box.querySelector('.chart-embed iframe');
-  if(m==='chart'){if(ifr&&!ifr.getAttribute('src'))ifr.setAttribute('src',ifr.getAttribute('data-embsrc')||'');if(emb)emb.hidden=false;if(cvv)cvv.hidden=true;}
+  var box=cm.closest('.chart-wrap');if(!box)return;
+  box.querySelectorAll('.ctoggle [data-cm]').forEach(function(b){b.setAttribute('aria-pressed',b.getAttribute('data-cm')===m?'true':'false');});
+  var emb=box.querySelector('.chart-embed'),cvv=box.querySelector('.lwchart'),ifr=box.querySelector('.chart-embed iframe'),fb=box.querySelector('.lwchart-fallback');
+  if(m==='chart'){if(ifr&&!ifr.getAttribute('src'))ifr.setAttribute('src',ifr.getAttribute('data-embsrc')||'');if(emb)emb.hidden=false;if(cvv)cvv.hidden=true;if(fb)fb.hidden=true;}
   else{if(emb)emb.hidden=true;if(cvv){cvv.hidden=false;if(!_lw)mountChart();else if(_lw&&cvv.clientWidth)_lw.applyOptions({width:cvv.clientWidth,height:cvv.clientHeight});}}
   return;}
  var act=ev.target.closest('[data-act]');if(!act)return;
