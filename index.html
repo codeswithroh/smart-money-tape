@@ -6,6 +6,12 @@
 <style>html,body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
 <title>Attention Radar</title>
 <meta name="description" content="Live memecoin attention radar: a streaming trade firehose, a hot-right-now board, and every public data point behind any coin. A radar, not a shortcut." />
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png" />
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+<link rel="manifest" href="/site.webmanifest" />
+<meta name="theme-color" content="#cf3a26" />
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Patrick+Hand&family=Share+Tech+Mono&display=swap" />
 <style>
   :root{
@@ -39,7 +45,8 @@
 
   header.top{display:flex;flex-wrap:wrap;align-items:flex-end;gap:8px 20px;border-bottom:2px dashed var(--ink);padding-bottom:12px;}
   .brand{margin-right:auto;display:flex;flex-direction:column;gap:2px;}
-  .brand h1{font-size:clamp(32px,6vw,50px);line-height:.95;margin:0;transform:rotate(-1deg);}
+  .brand h1{font-size:clamp(32px,6vw,50px);line-height:.95;margin:0;transform:rotate(-1deg);display:flex;align-items:center;gap:10px;}
+  .brand-mark{width:36px;height:36px;flex:none;filter:drop-shadow(1px 2px 0 rgba(44,53,80,.18));}
   .brand .sub{color:var(--ink-soft);font-size:14.5px;max-width:66ch;}
   .status{display:flex;align-items:center;gap:8px;font-size:13.5px;color:var(--ink-soft);}
   .dot{width:12px;height:12px;border:2px solid var(--ink);background:transparent;border-radius:60% 40% 55% 45% / 50% 60% 45% 55%;flex:none;filter:url(#rough);}
@@ -564,7 +571,7 @@
 <div class="wrap">
   <header class="top">
     <div class="brand">
-      <h1>Attention Radar</h1>
+      <h1><img src="/favicon.svg" alt="" class="brand-mark" width="36" height="36">Attention Radar</h1>
       <span class="sub">Live trades, holders, safety &amp; the story behind every coin.</span>
     </div>
     <div class="hgroup">
