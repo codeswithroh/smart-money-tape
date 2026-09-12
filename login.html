@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Sign in — Attention Radar</title>
+<title>Sign in — Meme Xray</title>
 <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
@@ -50,7 +50,7 @@
 </style>
 </head>
 <body>
-<div id="root"><div class="card"><h1>Attention Radar</h1><p class="tag">loading sign-in…</p></div></div>
+<div id="root"><div class="card"><h1>Meme Xray</h1><p class="tag">loading sign-in…</p></div></div>
 
 <script>
   // small shims some wallet deps expect in the browser
@@ -267,12 +267,12 @@ function Gate() {
 
   // ---- render ----
   if (phase === 'boot' || !ready) {
-    return html`<div class="card"><h1>Attention Radar</h1><p class="tag">starting up…</p></div>`;
+    return html`<div class="card"><h1>Meme Xray</h1><p class="tag">starting up…</p></div>`;
   }
 
   if (phase === 'need-login') {
     return html`<div class="card">
-      <h1>Attention Radar</h1>
+      <h1>Meme Xray</h1>
       <p class="tag">Memecoins are attention markets. Sign in to continue.</p>
       <div class="row">
         <button class="pri" onClick=${() => login()}>Connect wallet or email</button>
@@ -283,12 +283,12 @@ function Gate() {
   }
 
   if (phase === 'checking') {
-    return html`<div class="card"><h1>Attention Radar</h1><p class="tag"><span class="spin">◠</span> checking your access…</p></div>`;
+    return html`<div class="card"><h1>Meme Xray</h1><p class="tag"><span class="spin">◠</span> checking your access…</p></div>`;
   }
 
   if (phase === 'error') {
     return html`<div class="card">
-      <h1>Attention Radar</h1>
+      <h1>Meme Xray</h1>
       <p class="tag">Hit a snag.</p>
       <div class="msg err">${msg}</div>
       <div class="row mt"><button onClick=${doSession}>Try again</button>
@@ -333,7 +333,7 @@ class ErrorBoundary extends React.Component {
   render() {
     if (!this.state.err) return this.props.children;
     return html`<div class="card">
-      <h1>Attention Radar</h1>
+      <h1>Meme Xray</h1>
       <p class="tag">The sign-in screen hit an error.</p>
       <div class="msg err">${String(this.state.err && this.state.err.message || this.state.err).slice(0, 200)}</div>
       <div class="row mt">

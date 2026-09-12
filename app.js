@@ -2143,7 +2143,7 @@ function drawFlex(cv,draw){
  x.strokeStyle='#2c3550';x.lineWidth=6;x.strokeRect(24,24,W-48,H-48);
  draw(x,W,H);
  x.fillStyle='#8a8a76';x.font='26px Caveat, cursive';x.textAlign='right';
- x.fillText('made on attention radar · not financial advice',W-60,H-54);
+ x.fillText('made on memexray.fun · not financial advice',W-60,H-54);
 }
 function flexCoin(pp){
  var v,a,sc;try{a=attn(pp);var sf=state.safety.get(pp.addr);var proj=buildProject(pp,state.rcInfo);v=verdict(pp,a,sf,proj.surface);}catch(_){a={traj:'steady',score:0};v={pct:0,label:'',cls:'pass'};}
