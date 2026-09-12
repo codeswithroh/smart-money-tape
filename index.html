@@ -371,17 +371,18 @@
   .fh-stats .s .v{font-family:"Share Tech Mono",monospace;font-size:22px;line-height:1;margin-top:5px;color:#eef1f7;letter-spacing:.02em;}
   .fh-stats .s .v::before{content:"[ ";color:#3a3f4d;} .fh-stats .s .v::after{content:" ]";color:#3a3f4d;}
   .fh-stats .s .v.g{color:#4dd97a;text-shadow:0 0 10px rgba(77,217,122,.5);} .fh-stats .s .v.r{color:#ff5c4d;text-shadow:0 0 10px rgba(255,92,77,.5);} .fh-stats .s .v.h{color:#ffab3d;text-shadow:0 0 10px rgba(255,171,61,.5);}
-  /* github-style contribution grid of trades */
-  .gh-wrap{padding:10px 12px 12px;}
-  .gh-head{display:flex;align-items:center;gap:10px;font-family:"Share Tech Mono",monospace;font-size:10px;color:#6b7180;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;}
-  .gh-head #fhHint{color:#8a8a76;}
-  .gh-leg{margin-left:auto;display:flex;align-items:center;gap:4px;}
-  .gh-leg i{width:9px;height:9px;border-radius:2px;background:#151620;display:inline-block;}
-  .gh-leg i:nth-child(1){background:#0e4429;} .gh-leg i:nth-child(2){background:#006d32;} .gh-leg i:nth-child(3){background:#26a641;} .gh-leg i:nth-child(4){background:#39d353;}
-  .gh-leg b{font-weight:400;} .gh-leg b.lg{color:#39d353;} .gh-leg b.ls{color:#ff5c4d;}
-  .gh-grid{display:grid;grid-template-rows:repeat(7,1fr);grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:3px;}
-  .gh-grid i{aspect-ratio:1;border-radius:2px;background:#151620;transition:background .3s;}
-  .gh-grid i.now{outline:1.5px solid rgba(255,255,255,.55);}
+  /* buy/sell volume timeline — replaces the old contribution-grid heatmap, which tested as
+     unreadable ("clients can't understand anything from this"). A mirrored bar chart reads in
+     one glance: green bars rising = buying, red bars falling = selling, height = size. */
+  .tl-wrap{padding:10px 12px 12px;}
+  .tl-head{display:flex;align-items:center;gap:10px;font-family:"Share Tech Mono",monospace;font-size:10px;color:#6b7180;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;}
+  .tl-head #fhHint{color:#8a8a76;}
+  .tl-grid{display:flex;align-items:center;gap:2px;height:96px;position:relative;}
+  .tl-grid::before{content:"";position:absolute;left:0;right:0;top:50%;height:1px;background:rgba(205,210,223,.18);}
+  .tlcol{flex:1;height:100%;position:relative;cursor:help;}
+  .tlcol i{position:absolute;left:50%;transform:translateX(-50%);width:80%;max-width:9px;border-radius:2px;}
+  .tlcol i.tlbuy{bottom:50%;background:#39d353;border-radius:2px 2px 0 0;}
+  .tlcol i.tlsell{top:50%;background:#ff5c4d;border-radius:0 0 2px 2px;}
   .fh-sound{background:#0c0d12;border:1.5px solid rgba(205,210,223,.25);color:#cdd2df;border-radius:7px 4px 8px 4px;padding:2px 8px;font-size:12px;cursor:pointer;}
   .fh-sound[aria-pressed="true"]{border-color:#4dd97a;color:#4dd97a;}
   .fh-duel{position:relative;height:16px;background:#14151c;overflow:hidden;}
@@ -483,8 +484,6 @@
     @keyframes spin{to{transform:rotate(360deg)}}
     .shead h2 .sweep::after{animation:spin 2.4s linear infinite;}
     .bc.r1{animation:rmppulse 2.4s ease-in-out infinite;}
-    @keyframes ghpop{0%{transform:scale(.2);opacity:.3}60%{transform:scale(1.35)}100%{transform:scale(1);opacity:1}}
-    .gh-grid i.now{animation:ghpop .5s cubic-bezier(.2,.8,.3,1);}
   }
 </style>
 </head>

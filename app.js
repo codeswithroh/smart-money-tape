@@ -1617,8 +1617,14 @@ function radarTile(axes){
   +'<div class="rc-grid">'+chips+'</div>'
   +'<p class="rl-s">'+s+'</p></div></div>';
 }
-/* ---------- FIREHOSE (github-style contribution grid of trades) ---------- */
-var GH_COLS=52,GH_ROWS=7;
+/* ---------- FIREHOSE ----------
+   Was a GitHub-style contribution grid of colored squares — looked busy, told users nothing at
+   a glance (real feedback: "clients can't understand anything from this"). Replaced with a
+   buy/sell volume timeline: one bar per minute, green rising above the line for buy $, red
+   falling below it for sell $, taller = bigger. That's the actual question a trader has looking
+   at live flow — "when did buying happen, when did selling happen, how big" — answered as a
+   shape you read in one glance instead of a grid you have to hover cell-by-cell to decode. */
+var FH_WINDOW_MIN=20;
 var fh={buys:[],streak:0,streakSide:0,biggest:null,flow:[],ac:null};
 function firehosePanel(){
  return '<div class="firehose">'
@@ -1628,32 +1634,33 @@ function firehosePanel(){
    +'<div class="s"><div class="k">biggest buy</div><div class="v" id="fhBIG">--</div></div>'
    +'<div class="s"><div class="k">trades / 5m</div><div class="v" id="fhFLOW">--</div></div>'
   +'</div>'
-  +'<div class="gh-wrap">'
-   +'<div class="gh-head"><span id="fhHint">every square = one trade &middot; newest bottom-right</span>'
-   +'<span class="gh-leg">small<i></i><i></i><i></i><i></i>big &nbsp;<b class="lg">&#9632;buy</b> <b class="ls">&#9632;sell</b></span>'
+  +'<div class="tl-wrap">'
+   +'<div class="tl-head"><span id="fhHint">buy/sell volume, last '+FH_WINDOW_MIN+' minutes &mdash; green up = bought, red down = sold, taller = bigger</span>'
    +'<button class="fh-sound" id="fhSound" aria-pressed="'+(state.fhSound?'true':'false')+'">'+(state.fhSound?'&#128266;':'&#128263;')+'</button></div>'
-   +'<div class="gh-grid" id="ghGrid"></div>'
+   +'<div class="tl-grid" id="fhTimeline"></div>'
   +'</div>'
   +'<div class="fh-duel"><i class="g" id="fhG" style="width:50%"></i><i class="r" id="fhR" style="width:50%"></i><span class="seam" id="fhSeam" style="left:50%"></span><span class="pc l" id="fhPL">50</span><span class="pc rr" id="fhPR">50</span></div>'
   +'</div>';
 }
 function fhReset(){fh.buys=[];fh.streak=0;fh.streakSide=0;fh.biggest=null;fh.flow=[];}
-function startFirehose(){if(!state.trades.length)fhReset();renderGrid();feedFirehose();}
+function startFirehose(){if(!state.trades.length)fhReset();renderTimeline();feedFirehose();}
 function stopFirehose(){}
-function ghLevel(usd){return usd>=2000?4:usd>=500?3:usd>=80?2:1;}
-function renderGrid(freshIds){
- var el=q1('ghGrid');if(!el)return;
- var N=GH_COLS*GH_ROWS;
- var BUY=['#0e4429','#006d32','#26a641','#39d353'],SELL=['#5c1a14','#8a241b','#c62f22','#ff5c4d'];
- var tr=state.trades.slice(0,N).slice().reverse(); // oldest -> newest
- var pad=N-tr.length,cells=[];
- for(var i=0;i<pad;i++)cells.push('<i></i>');
- tr.forEach(function(t,ix){
-  var lv=ghLevel(t.usd),pal=t.buy?BUY:SELL;
-  var isNew=freshIds&&freshIds.indexOf(t.id)>=0&&!reduceMotion;
-  cells.push('<i class="'+(ix===tr.length-1?'now':'')+(isNew?' now':'')+'" style="background:'+pal[lv-1]+'" title="'+(t.buy?'BUY ':'SELL ')+fUsd(t.usd)+' &middot; '+fAgo(t.ts)+' ago"></i>');
+function renderTimeline(){
+ var el=q1('fhTimeline');if(!el)return;
+ var n=FH_WINDOW_MIN,bucketMs=60000,now=Date.now();
+ var buckets=[];for(var i=n-1;i>=0;i--)buckets.push({buy:0,sell:0});
+ state.trades.forEach(function(t){
+  var age=now-t.ts;if(age<0||age>=n*bucketMs)return;
+  var idx=n-1-Math.floor(age/bucketMs);if(idx<0||idx>=n)return;
+  if(t.buy)buckets[idx].buy+=t.usd;else buckets[idx].sell+=t.usd;
  });
- el.innerHTML=cells.join('');
+ var mx=Math.max.apply(null,buckets.map(function(b){return Math.max(b.buy,b.sell);}))||1;
+ el.innerHTML=buckets.map(function(b,i){
+  var bh=b.buy?Math.max(2,Math.round(b.buy/mx*44)):0,sh=b.sell?Math.max(2,Math.round(b.sell/mx*44)):0;
+  var mAgo=n-1-i;
+  var tip=(mAgo===0?'this minute':mAgo+'m ago')+': '+fUsd(b.buy)+' bought, '+fUsd(b.sell)+' sold';
+  return '<div class="tlcol" title="'+esc(tip)+'"><i class="tlbuy" style="height:'+bh+'px"></i><i class="tlsell" style="height:'+sh+'px"></i></div>';
+ }).join('');
 }
 function fhCtx(){if(!fh.ac){try{fh.ac=new (window.AudioContext||window.webkitAudioContext)();}catch(_){fh.ac=null;}}return fh.ac;}
 function fhBlip(usd,buy){
@@ -1685,7 +1692,7 @@ function feedFirehose(fresh){
   fh.flow=state.trades.map(function(t){return t.ts;});
  }
  fh.flow=fh.flow.filter(function(ts){return Date.now()-ts<300000;});
- renderGrid(seed?null:(fresh||[]).map(function(t){return t.id;}));
+ renderTimeline();
  var bp=fh.buys.length?Math.round(fh.buys.reduce(function(a,b){return a+b;},0)/fh.buys.length*100):50;
  var bpEl=q1('fhBP'),stEl=q1('fhST'),bgEl=q1('fhBIG'),flEl=q1('fhFLOW'),hintEl=q1('fhHint');
  var g=q1('fhG'),rr=q1('fhR'),seam=q1('fhSeam'),pl=q1('fhPL'),pr=q1('fhPR');
