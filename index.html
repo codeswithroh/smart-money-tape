@@ -454,7 +454,10 @@
   .botbar .bb-x{flex:none;background:none;border:none;color:var(--ink-faint);font-size:18px;line-height:1;cursor:pointer;padding:2px 4px;}
   .botbar .bb-x:hover{color:var(--ink);}
   @media (max-width:640px){.botbar .bb-x{display:none}}
-  .ticker{margin:12px 0 4px;border:2px solid var(--ink);border-radius:9px 6px 10px 6px / 6px 10px 6px 9px;background:#171821;overflow:hidden;position:relative;filter:url(#rough);}
+  .topsearch{display:flex;gap:9px;margin:14px 0 6px;}
+  .topsearch input{flex:1;font-size:16px;padding:10px 14px;}
+  .topsearch .btn{padding:10px 20px;}
+  .ticker{margin:20px 0 4px;border:2px solid var(--ink);border-radius:9px 6px 10px 6px / 6px 10px 6px 9px;background:#171821;overflow:hidden;position:relative;filter:url(#rough);}
   .ticker::after{content:"";position:absolute;top:0;bottom:0;right:0;width:44px;background:linear-gradient(90deg,transparent,#171821);pointer-events:none;}
   .ticker-track{display:flex;gap:0;white-space:nowrap;padding:6px 0;width:max-content;}
   .tk-item{padding:0 16px;font-size:13.5px;color:#cdd2df;border-right:1px dashed rgba(205,210,223,.18);cursor:pointer;flex:none;}
@@ -540,7 +543,11 @@
     <button class="bb-x" id="botbarX" aria-label="dismiss">&times;</button>
   </div>
 
-  <div class="ticker" id="ticker"><div class="ticker-track" id="tickerTrack"></div></div>
+  <div class="topsearch">
+    <input id="topSearchQ" type="text" placeholder="Search any ticker or contract &mdash; e.g. jalapeno, $CATE, or paste a CA" />
+    <button class="btn pri" id="topSearchGo">Search</button>
+  </div>
+  <div id="topSearchResult"></div>
 
   <div class="tabs" role="tablist">
     <button role="tab" data-tab="scan" aria-selected="true">Radar</button>
@@ -601,6 +608,7 @@
     <div id="rcardHost"></div>
   </section>
 
+  <div class="ticker" id="ticker"><div class="ticker-track" id="tickerTrack"></div></div>
 </div>
 
 <!-- PROFILE MODAL -->

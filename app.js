@@ -2238,6 +2238,11 @@ q1('q').addEventListener('keydown',function(e){if(e.key==='Enter')doQuery(q1('q'
 q1('scanGo').addEventListener('click',function(){doQuery(q1('scanQ').value,'scanQResult',false);});
 q1('scanQ').addEventListener('keydown',function(e){if(e.key==='Enter')doQuery(q1('scanQ').value,'scanQResult',false);});
 q1('scanQResult').addEventListener('click',function(ev){if(watchClick(ev))return;var r=ev.target.closest('[data-addr]');if(!r)return;openResearch(r.getAttribute('data-addr'),r.getAttribute('data-chain'));});
+// top-of-page search — always visible regardless of tab, jumps straight into the x-ray on a
+// single match (same as the X-ray tab's own search box), same picker-on-ambiguous-ticker path.
+q1('topSearchGo').addEventListener('click',function(){doQuery(q1('topSearchQ').value,'topSearchResult',true);});
+q1('topSearchQ').addEventListener('keydown',function(e){if(e.key==='Enter')doQuery(q1('topSearchQ').value,'topSearchResult',true);});
+q1('topSearchResult').addEventListener('click',function(ev){if(watchClick(ev))return;var r=ev.target.closest('[data-addr]');if(!r)return;openResearch(r.getAttribute('data-addr'),r.getAttribute('data-chain'));});
 function doQuery(v,hostId,gotoResearch){
  v=String(v||'').trim();if(!v)return;var host=q1(hostId);
  if(/^0x[0-9a-f]{40}$/i.test(v)||/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(v)){openResearch(v.toLowerCase(),'');return;}
