@@ -1343,13 +1343,27 @@ function openResearch(addr,chain,fromUrl){
   if(!pp){q1('rcardHost').innerHTML='<div class="empty">No DexScreener data for that address on the selected chains.</div>';return;}
   state.rcPair=pp;
   var raw=pp.addrRaw||addr;
-  return Promise.all([
+  // fast first paint: render the full card immediately with whatever's already cached (very
+  // often already screened from the discovery board, in which case this is already complete)
+  // instead of blocking the entire card on every network call. fetchOhlcv isn't awaited here
+  // at all — mountChart()/lwApply() already fetch it themselves, so waiting for it here was a
+  // second, wasted round-trip on the critical path for something not even read directly.
+  var tc=state.tinfo.get(addr);
+  renderResearch(pp,state.safety.get(addr)||null,null,tc?tc.v:null);
+  startTrades();
+  // then quietly hydrate with the complete picture once it's actually in, rather than making
+  // the whole card wait on the slowest of these — a coin no one's screened yet now shows
+  // something immediately and fills in seconds later instead of showing nothing at all.
+  Promise.all([
    fetchSafety(addr,pp.chain,raw),
-   fetchOhlcv(addr,pp.pairAddr,pp.chain),
    fomoWatchers(addr),
    primeThemePeers(pp),
    fetchTokenInfo(addr,pp.chain,raw)
-  ]).then(function(r){state.rcInfo=r[4];renderResearch(pp,r[0],r[2],r[4]);startTrades();});
+  ]).then(function(r2){
+   if(state.rcAddr!==addr)return; // navigated away before this settled — don't clobber the new card
+   state.rcInfo=r2[3];
+   renderResearch(pp,r2[0],r2[1],r2[3]);
+  });
  });
 }
 function skelCard(){
@@ -2275,9 +2289,6 @@ q1('pfSave').addEventListener('click',submitProfile);
 q1("flexBoard").addEventListener("click",flexBoard);
 q1("ideaRoll").addEventListener("click",renderIdeas);
 q1("ideaBox").addEventListener("click",function(ev){var b=ev.target.closest("[data-idea]");if(!b)return;try{navigator.clipboard.writeText(b.getAttribute("data-idea"));toast("concept copied");}catch(_){}});
-q1('scanGo').addEventListener('click',function(){doQuery(q1('scanQ').value,'scanQResult',false);});
-q1('scanQ').addEventListener('keydown',function(e){if(e.key==='Enter')doQuery(q1('scanQ').value,'scanQResult',false);});
-q1('scanQResult').addEventListener('click',function(ev){if(watchClick(ev))return;var r=ev.target.closest('[data-addr]');if(!r)return;openResearch(r.getAttribute('data-addr'),r.getAttribute('data-chain'));});
 // top-of-page search — always visible regardless of tab, jumps straight into the x-ray on a
 // single match (same as the X-ray tab's own search box), same picker-on-ambiguous-ticker path.
 /* ---------- search modal: click the top search bar, or press / anywhere, to open it ---------- */
