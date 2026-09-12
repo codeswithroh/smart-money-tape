@@ -112,7 +112,7 @@ export async function flexImage(o) {
     ]),
     content,
     // footer
-    div({ position: 'absolute', right: 48, bottom: 40, fontSize: 15, fontWeight: 700, color: FAINT }, 'meme-attention-radar.vercel.app  ·  not financial advice'),
+    div({ position: 'absolute', right: 48, bottom: 40, fontSize: 15, fontWeight: 700, color: FAINT }, 'memexray.fun  ·  not financial advice'),
   ].filter(Boolean);
 
   const bgStyle = A.bg

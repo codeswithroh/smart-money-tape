@@ -1,7 +1,7 @@
 export const config = { runtime: 'edge' };
 
 const TOKEN = globalThis.process && process.env && process.env.TELEGRAM_BOT_TOKEN;
-const SITE = (globalThis.process && process.env && process.env.SITE_URL) || 'https://meme-attention-radar.vercel.app';
+const SITE = (globalThis.process && process.env && process.env.SITE_URL) || 'https://memexray.fun';
 const ADMIN = (globalThis.process && process.env && process.env.CRON_SECRET) || '';
 const TG_SECRET = (globalThis.process && process.env && process.env.TELEGRAM_SECRET) || '';
 

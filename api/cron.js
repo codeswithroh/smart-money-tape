@@ -4,7 +4,7 @@ export const config = { runtime: 'edge' };
 
 const TOKEN = globalThis.process && process.env && process.env.TELEGRAM_BOT_TOKEN;
 const SECRET = (globalThis.process && process.env && process.env.CRON_SECRET) || '';
-const SITE = (globalThis.process && process.env && process.env.SITE_URL) || 'https://meme-attention-radar.vercel.app';
+const SITE = (globalThis.process && process.env && process.env.SITE_URL) || 'https://memexray.fun';
 const DEX = 'https://api.dexscreener.com';
 
 function fUsd(n) {

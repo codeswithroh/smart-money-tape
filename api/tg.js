@@ -5,7 +5,7 @@ export const config = { runtime: 'edge' };
 
 const TOKEN = globalThis.process && process.env && process.env.TELEGRAM_BOT_TOKEN;
 const SECRET = (globalThis.process && process.env && process.env.TELEGRAM_SECRET) || '';
-const SITE = (globalThis.process && process.env && process.env.SITE_URL) || 'https://meme-attention-radar.vercel.app';
+const SITE = (globalThis.process && process.env && process.env.SITE_URL) || 'https://memexray.fun';
 
 const MORTY_PIC = SITE + '/morty.png';
 const BOT_USER = 'MortyRadarBot';

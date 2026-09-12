@@ -56,7 +56,7 @@ function parsePair(p) {
   };
 }
 
-const GT_PROXY = 'https://meme-attention-radar.vercel.app/api/gt?path=';
+const GT_PROXY = ((globalThis.process && process.env && process.env.SITE_URL) || 'https://memexray.fun') + '/api/gt?path=';
 const GT_NET = { solana: 'solana', bsc: 'bsc', base: 'base', ethereum: 'eth' };
 
 // peak market cap estimate from OHLCV highs since the pool was created
