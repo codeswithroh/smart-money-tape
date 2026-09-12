@@ -127,13 +127,18 @@
   .trow .tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:3px;}
   /* at-a-glance safety icon badges — real data, tooltip explains each on hover */
   .sficrow{display:flex;flex-wrap:wrap;gap:5px;margin-top:3px;}
-  .sfic{font-family:"Share Tech Mono",monospace;font-size:11px;border:1.5px solid var(--pencil);border-radius:5px;padding:1px 6px;cursor:help;white-space:nowrap;}
+  .sfic{font-family:"Share Tech Mono",monospace;font-size:11px;border:1.5px solid var(--pencil);border-radius:5px;padding:1px 6px;cursor:help;white-space:nowrap;display:inline-flex;align-items:center;gap:3px;}
+  .sfic svg{width:11px;height:11px;flex:none;}
   .sfic.pos{border-color:var(--pos);color:var(--pos);} .sfic.watch{border-color:var(--hot);color:var(--hot);} .sfic.neg{border-color:var(--neg);color:var(--neg);background:var(--neg-wash);}
 
   /* quick stats grid — the x-ray's above-the-fold summary, every key number in one glance */
-  .qsg{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:7px;margin:12px 0;}
+  /* auto-fit (not auto-fill) is what matters here: auto-fill reserves empty implicit tracks to
+     fill the row even with nothing in them, leaving dead space on the right; auto-fit collapses
+     those and lets the real tiles stretch to fill the row instead. */
+  .qsg{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,96px),1fr));gap:7px;margin:12px 0;}
   .qst{border:1.5px solid var(--pencil);border-radius:8px 4px 9px 4px;background:var(--card);padding:7px 8px;cursor:help;text-align:center;}
-  .qst-i{font-size:15px;line-height:1;margin-bottom:3px;}
+  .qst-i{line-height:1;margin-bottom:3px;color:var(--ink-faint);}
+  .qst-i svg{display:block;margin:0 auto;}
   .qst-v{font-family:"Share Tech Mono",monospace;font-size:15px;font-weight:700;line-height:1.15;}
   .qst-l{font-size:10px;text-transform:uppercase;letter-spacing:.02em;color:var(--ink-faint);margin-top:2px;}
   .qst.pos{border-color:var(--pos);} .qst.pos .qst-v{color:var(--pos);}

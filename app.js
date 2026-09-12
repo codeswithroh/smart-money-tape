@@ -451,6 +451,24 @@ function fNum(n){if(n==null||isNaN(n))return '-';var a=Math.abs(n);if(a>=1e6)ret
 function fAge(ms){if(ms==null)return '?';var m=ms/60000;if(m<90)return Math.round(m)+'m';var h=m/60;if(h<48)return h.toFixed(0)+'h';return (h/24).toFixed(0)+'d';}
 function fAgo(ts){var s=(Date.now()-ts)/1000;if(s<60)return Math.round(s)+'s';if(s<3600)return Math.round(s/60)+'m';if(s<86400)return Math.round(s/3600)+'h';return Math.round(s/86400)+'d';}
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c];});}
+// shared line-icon set — inline SVG, currentColor-driven so each icon inherits whatever color
+// its container is styled with (pos/watch/neg tile states, etc). Used instead of emoji: renders
+// identically everywhere instead of depending on the visitor's OS emoji font.
+var ICONS={
+ x:'<svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>',
+ telegram:'<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>',
+ globe:'<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="3" y1="12" x2="21" y2="12"/><path d="M12 3a13.5 13.5 0 0 1 3.5 9A13.5 13.5 0 0 1 12 21 13.5 13.5 0 0 1 8.5 12 13.5 13.5 0 0 1 12 3z"/></svg>',
+ gauge:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 13 15.5 9.5"/><path d="M8 6l1 2M16 6l-1 2"/></svg>',
+ droplet:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3c4 5 6 8 6 11a6 6 0 0 1-12 0c0-3 2-6 6-11z"/></svg>',
+ user:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.4"/><path d="M5 20c1.2-4 4-6 7-6s5.8 2 7 6"/></svg>',
+ wrench:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L4 17l3 3 5.3-5.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2-2 2.6-2.6z"/></svg>',
+ lock:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>',
+ eye:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="2.6"/></svg>',
+ gift:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="9" width="16" height="11" rx="1"/><path d="M4 9h16M12 9v11"/><path d="M12 9c-2-4-6-4-6-1s3 1 6 1zM12 9c2-4 6-4 6-1s-3 1-6 1z"/></svg>',
+ shield:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z"/><path d="M9 12l2 2 4-4"/></svg>',
+ doorexit:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4H6a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h8"/><path d="M11 12h9m0 0-3-3m3 3-3 3"/></svg>',
+ clock:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg>'
+};
 function q1(s){return document.getElementById(s);}
 
 /* ---------- api ---------- */
@@ -978,17 +996,17 @@ function qsTile(icon,label,value,cls,tip){
 function quickStatsGrid(pp,a,sf,hr,proj){
  var s=longTermScore(pp,a,sf,hr,proj);
  var tiles=[];
- tiles.push(qsTile('&#129517;','Score',s.pct+'/100',s.cls,'Overall research score out of 100. Weighted from this coin\'s holder safety, liquidity depth, holder growth, volume authenticity and project surface.'));
- tiles.push(qsTile('&#128167;','Liquidity',fUsd(pp.liq),pp.liq==null?'':pp.liq<500?'neg':pp.liq<5000?'watch':'pos','Total value sitting in the trading pool right now. This is what actually backs your ability to exit a position.'));
- if(sf&&sf.topPct!=null)tiles.push(qsTile('&#128051;','Top holder',sf.topPct.toFixed(1)+'%',sf.topPct>35?'neg':sf.topPct>15?'watch':'pos','The single largest holder wallet\'s share of total supply, excluding the pool itself.'));
- if(sf&&sf.devPct!=null)tiles.push(qsTile('&#128736;&#65039;','Dev holds',sf.devPct.toFixed(1)+'%',sf.devPct>10?'neg':sf.devPct>3?'watch':'pos','How much of the supply the deployer wallet itself still holds right now.'));
- if(sf&&sf.lpPct!=null)tiles.push(qsTile('&#128274;','LP locked',sf.lpPct.toFixed(0)+'%',sf.lpPct<50?'neg':'pos','Share of the liquidity pool that is locked. Locked liquidity cannot be pulled out by the team.'));
- if(sf&&sf.insiderPct!=null&&sf.insiderPct>0)tiles.push(qsTile('&#128373;&#65039;','Insiders',sf.insiderPct.toFixed(0)+'%',sf.insiderPct>20?'neg':'watch','Combined supply share held by wallets flagged as insiders.'));
- tiles.push(qsTile('&#127873;','Bundle',sf&&sf.bundle?'yes':'no',sf&&sf.bundle?'neg':'pos','Whether several wallets bought in near identical amounts right at launch, a common sign of a coordinated snipe rather than organic buying.'));
- tiles.push(qsTile('&#128274;','Renounced',sf&&sf.renounced===true?'yes':sf&&sf.renounced===false?'no':'?',sf&&sf.renounced===false?'neg':sf&&sf.renounced===true?'pos':'','Whether the deployer has given up mint and freeze authority over the token.'));
+ tiles.push(qsTile(ICONS.gauge,'Score',s.pct+'/100',s.cls,'Overall research score out of 100. Weighted from this coin\'s holder safety, liquidity depth, holder growth, volume authenticity and project surface.'));
+ tiles.push(qsTile(ICONS.droplet,'Liquidity',fUsd(pp.liq),pp.liq==null?'':pp.liq<500?'neg':pp.liq<5000?'watch':'pos','Total value sitting in the trading pool right now. This is what actually backs your ability to exit a position.'));
+ if(sf&&sf.topPct!=null)tiles.push(qsTile(ICONS.user,'Top holder',sf.topPct.toFixed(1)+'%',sf.topPct>35?'neg':sf.topPct>15?'watch':'pos','The single largest holder wallet\'s share of total supply, excluding the pool itself.'));
+ if(sf&&sf.devPct!=null)tiles.push(qsTile(ICONS.wrench,'Dev holds',sf.devPct.toFixed(1)+'%',sf.devPct>10?'neg':sf.devPct>3?'watch':'pos','How much of the supply the deployer wallet itself still holds right now.'));
+ if(sf&&sf.lpPct!=null)tiles.push(qsTile(ICONS.lock,'LP locked',sf.lpPct.toFixed(0)+'%',sf.lpPct<50?'neg':'pos','Share of the liquidity pool that is locked. Locked liquidity cannot be pulled out by the team.'));
+ if(sf&&sf.insiderPct!=null&&sf.insiderPct>0)tiles.push(qsTile(ICONS.eye,'Insiders',sf.insiderPct.toFixed(0)+'%',sf.insiderPct>20?'neg':'watch','Combined supply share held by wallets flagged as insiders.'));
+ tiles.push(qsTile(ICONS.gift,'Bundle',sf&&sf.bundle?'yes':'no',sf&&sf.bundle?'neg':'pos','Whether several wallets bought in near identical amounts right at launch, a common sign of a coordinated snipe rather than organic buying.'));
+ tiles.push(qsTile(ICONS.shield,'Renounced',sf&&sf.renounced===true?'yes':sf&&sf.renounced===false?'no':'?',sf&&sf.renounced===false?'neg':sf&&sf.renounced===true?'pos':'','Whether the deployer has given up mint and freeze authority over the token.'));
  var exitImp=exitImpactPct(5000,pp.liq);
- if(exitImp!=null)tiles.push(qsTile('&#128682;','Exit $5k',exitImp.toFixed(1)+'%',exitImp>=25?'neg':exitImp>=8?'watch':'pos','Estimated price impact of exiting a $5,000 position right now, at this pool\'s current depth. An estimate, not a guarantee.'));
- tiles.push(qsTile('&#9201;&#65039;','Age',fAge(pp.ageMs),'','Time since this trading pair was created on-chain.'));
+ if(exitImp!=null)tiles.push(qsTile(ICONS.doorexit,'Exit $5k',exitImp.toFixed(1)+'%',exitImp>=25?'neg':exitImp>=8?'watch':'pos','Estimated price impact of exiting a $5,000 position right now, at this pool\'s current depth. An estimate, not a guarantee.'));
+ tiles.push(qsTile(ICONS.clock,'Age',fAge(pp.ageMs),'','Time since this trading pair was created on-chain.'));
  return '<div class="qsg">'+tiles.join('')+'</div>';
 }
 function exitImpactPct(sizeUsd,liqUsd){
@@ -1223,22 +1241,22 @@ function sfBadges(pp){
  var out=[];
  if(sf.topPct!=null){
   var c1=sf.topPct>35?'neg':sf.topPct>15?'watch':'pos';
-  out.push('<span class="sfic '+c1+'" title="Top holder wallet owns '+sf.topPct.toFixed(1)+'% of supply. Above 15% is worth watching, above 35% is a real concentration risk.">&#128081;'+sf.topPct.toFixed(0)+'%</span>');
+  out.push('<span class="sfic '+c1+'" title="Top holder wallet owns '+sf.topPct.toFixed(1)+'% of supply. Above 15% is worth watching, above 35% is a real concentration risk.">'+ICONS.user+sf.topPct.toFixed(0)+'%</span>');
  }
  if(sf.devPct!=null){
   var c2=sf.devPct>10?'neg':sf.devPct>3?'watch':'pos';
-  out.push('<span class="sfic '+c2+'" title="The deployer wallet holds '+sf.devPct.toFixed(1)+'% of supply. A dev with a large stake can dump on holders at any time.">&#128100;'+sf.devPct.toFixed(0)+'%</span>');
+  out.push('<span class="sfic '+c2+'" title="The deployer wallet holds '+sf.devPct.toFixed(1)+'% of supply. A dev with a large stake can dump on holders at any time.">'+ICONS.wrench+sf.devPct.toFixed(0)+'%</span>');
  }
  if(sf.lpPct!=null){
   var c3=sf.lpPct<50?'neg':'pos';
-  out.push('<span class="sfic '+c3+'" title="'+sf.lpPct.toFixed(0)+'% of the liquidity pool is locked. Locked liquidity cannot be pulled out by the team.">&#128274;'+sf.lpPct.toFixed(0)+'%</span>');
+  out.push('<span class="sfic '+c3+'" title="'+sf.lpPct.toFixed(0)+'% of the liquidity pool is locked. Locked liquidity cannot be pulled out by the team.">'+ICONS.lock+sf.lpPct.toFixed(0)+'%</span>');
  }
  if(sf.insiderPct!=null&&sf.insiderPct>0){
   var c4=sf.insiderPct>20?'neg':'watch';
-  out.push('<span class="sfic '+c4+'" title="Wallets flagged as insiders hold '+sf.insiderPct.toFixed(0)+'% of supply combined.">&#128373;'+sf.insiderPct.toFixed(0)+'%</span>');
+  out.push('<span class="sfic '+c4+'" title="Wallets flagged as insiders hold '+sf.insiderPct.toFixed(0)+'% of supply combined.">'+ICONS.eye+sf.insiderPct.toFixed(0)+'%</span>');
  }
- if(sf.bundle)out.push('<span class="sfic neg" title="Several wallets bought in near identical amounts right at launch. A common sign of a coordinated snipe, not organic buying.">&#127873;bundle</span>');
- if(sf.renounced===true)out.push('<span class="sfic pos" title="Mint and freeze authority are renounced. The team can no longer mint new supply or freeze wallets.">&#9989;renounced</span>');
+ if(sf.bundle)out.push('<span class="sfic neg" title="Several wallets bought in near identical amounts right at launch. A common sign of a coordinated snipe, not organic buying.">'+ICONS.gift+'bundle</span>');
+ if(sf.renounced===true)out.push('<span class="sfic pos" title="Mint and freeze authority are renounced. The team can no longer mint new supply or freeze wallets.">'+ICONS.shield+'renounced</span>');
  return out.length?'<span class="sficrow">'+out.join('')+'</span>':'';
 }
 // small clickable social-link icons — GMGN-style row density: real signal in a glance, not a
@@ -1256,9 +1274,9 @@ function rowSocials(pp){
  var x=(pp.socials||[]).filter(function(s){return s.type==='twitter'||s.type==='x';})[0];
  var tg2=(pp.socials||[]).filter(function(s){return s.type==='telegram';})[0];
  var site=(pp.sites||[])[0];
- if(x)out.push(['&#120143;','Open on X / Twitter',x.url]);
- if(tg2)out.push(['&#9993;','Open the Telegram group',tg2.url]);
- if(site)out.push(['&#127760;','Open the project website',site]);
+ if(x)out.push([ICONS.x,'Open on X / Twitter',x.url]);
+ if(tg2)out.push([ICONS.telegram,'Open the Telegram group',tg2.url]);
+ if(site)out.push([ICONS.globe,'Open the project website',site]);
  return out.map(function(o){return '<span class="rsoc" data-link="'+esc(o[2])+'" title="'+esc(o[1])+'">'+o[0]+'</span>';}).join('');
 }
 // 24h buy/sell mini-bar — real per-row signal from data DexScreener already gave us (pp.tx.h24),
