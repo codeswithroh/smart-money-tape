@@ -133,6 +133,7 @@
   /* quick stats grid — the x-ray's above-the-fold summary, every key number in one glance */
   .qsg{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:7px;margin:12px 0;}
   .qst{border:1.5px solid var(--pencil);border-radius:8px 4px 9px 4px;background:var(--card);padding:7px 8px;cursor:help;text-align:center;}
+  .qst-i{font-size:15px;line-height:1;margin-bottom:3px;}
   .qst-v{font-family:"Share Tech Mono",monospace;font-size:15px;font-weight:700;line-height:1.15;}
   .qst-l{font-size:10px;text-transform:uppercase;letter-spacing:.02em;color:var(--ink-faint);margin-top:2px;}
   .qst.pos{border-color:var(--pos);} .qst.pos .qst-v{color:var(--pos);}
@@ -193,12 +194,14 @@
 
   /* RESEARCH CARD */
   .rcard{border:2px solid var(--ink);border-radius:20px 9px 22px 8px / 9px 20px 11px 20px;background:var(--note);box-shadow:3px 4px 0 rgba(44,53,80,.18);margin:14px 0;overflow:hidden;}
-  .rcard .cap{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:2px dashed var(--ink);}
+  .rcard .cap{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:2px dashed var(--ink);flex-wrap:wrap;}
   .rcard .cap img{width:38px;height:38px;border-radius:50%;border:2px solid var(--ink);object-fit:cover;background:var(--paper-2);}
   .rcard .cap .nm{font-family:"Caveat",cursive;font-weight:700;font-size:30px;line-height:.9;}
   .rcard .cap .chain{font-size:12px;text-transform:uppercase;border:2px solid var(--ink);border-radius:7px 4px 8px 4px;padding:1px 6px;color:var(--ink-soft);}
   .rcard .cap .xh{font-size:13px;color:var(--accent);}
-  .rcard .cap .lnks{margin-left:auto;display:flex;gap:10px;font-size:13px;flex-wrap:wrap;}
+  .rcard .cap .lnks{display:flex;gap:10px;font-size:13px;flex-wrap:wrap;}
+  .rcard .cap-right{margin-left:auto;display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+  .rcard .cap-actions{display:flex;gap:8px;flex-wrap:wrap;}
   .rc-banner{background:linear-gradient(180deg,rgba(217,130,43,.22),rgba(217,130,43,.10));border-bottom:2px dashed var(--ink);padding:8px 16px;font-size:12.5px;line-height:1.5;color:var(--ink-soft);}
   .rc-banner b{color:var(--hot);}
   .cchip.pf{border-color:#2ea043;color:#2ea043;}
@@ -216,8 +219,6 @@
   .proj-links{display:flex;flex-wrap:wrap;gap:7px;}
   .proj-links .btn.sm{text-decoration:none;}
   .rcard .body{padding:16px;display:flex;flex-direction:column;gap:16px;}
-  .verdict{font-family:"Caveat",cursive;font-weight:700;font-size:25px;}
-  .verdict.go{color:var(--pos);} .verdict.watch{color:var(--hot);} .verdict.pass{color:var(--ink-soft);} .verdict.fomo{color:var(--neg);}
   .panel{border:2px solid var(--ink);border-radius:11px 7px 12px 7px;background:var(--card);padding:12px 14px;}
   .panel h3{margin:0 0 8px;font-size:16px;text-transform:uppercase;letter-spacing:.03em;color:var(--accent);}
   .kv{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px 14px;}
@@ -420,8 +421,8 @@
   .radar-tile canvas{flex:none;width:230px;height:230px;}
   .radar-tile .rl{flex:1;display:flex;flex-direction:column;min-width:0;}
   .radar-tile .rl-h{color:#eef1f7;font-family:"Share Tech Mono",monospace;font-size:12px;letter-spacing:.12em;margin-bottom:12px;}
-  .radar-tile .rc-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px 14px;}
-  .radar-tile .rc{display:flex;flex-direction:column;gap:2px;}
+  .radar-tile .rc-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px 14px;}
+  .radar-tile .rc{display:flex;flex-direction:column;gap:2px;min-width:0;}
   .radar-tile .rc span{font-size:9px;text-transform:uppercase;letter-spacing:.05em;color:#6b7180;font-family:"Share Tech Mono",monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .radar-tile .rc b{font-family:"Share Tech Mono",monospace;font-size:24px;font-weight:400;color:#cdd2df;line-height:1;}
   .radar-tile .rc b.g{color:#4dd97a;text-shadow:0 0 8px rgba(77,217,122,.4);} .radar-tile .rc b.r{color:#ff5c4d;text-shadow:0 0 8px rgba(255,92,77,.4);}
@@ -442,7 +443,6 @@
   .idea .io{font-size:13.5px;color:var(--ink-soft);line-height:1.5;}
   .idea .icopy{margin-top:9px;font-size:12px;color:var(--accent);cursor:pointer;background:none;border:0;padding:0;text-decoration:underline;text-decoration-style:wavy;}
 
-  .verdict.go{color:var(--pos);} .verdict.watch{color:var(--hot);} .verdict.pass{color:var(--ink-soft);} .verdict.fomo{color:var(--neg);}
   .collapsed-form>summary{cursor:pointer;font-size:13px;color:var(--ink-soft);padding:4px 0;list-style:none;}
   .collapsed-form>summary::-webkit-details-marker{display:none;}
   .collapsed-form>summary::before{content:"\25B8 ";}
@@ -605,10 +605,6 @@
 
   <!-- RESEARCH -->
   <section id="tab-research" hidden>
-    <div class="controls">
-      <input id="q" type="text" placeholder="contract address or ticker (e.g. jalapeno)" style="flex:1;min-width:200px" />
-      <button class="btn pri" id="qgo">X-ray</button>
-    </div>
     <div id="rcardHost"></div>
   </section>
 

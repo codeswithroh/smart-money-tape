@@ -972,23 +972,23 @@ function researchScorePanel(pp,a,sf,hr,proj){
 /* ---------- quick stats grid — GMGN-style: every important number visible above the fold,
    no scrolling into the long panels below just to see the basics. Each tile is one fact with a
    plain-language tooltip, same data the long panels use, just surfaced first. ---------- */
-function qsTile(label,value,cls,tip){
- return '<div class="qst'+(cls?' '+cls:'')+'" title="'+esc(tip||'')+'"><div class="qst-v">'+value+'</div><div class="qst-l">'+esc(label)+'</div></div>';
+function qsTile(icon,label,value,cls,tip){
+ return '<div class="qst'+(cls?' '+cls:'')+'" title="'+esc(tip||'')+'"><div class="qst-i">'+icon+'</div><div class="qst-v">'+value+'</div><div class="qst-l">'+esc(label)+'</div></div>';
 }
 function quickStatsGrid(pp,a,sf,hr,proj){
  var s=longTermScore(pp,a,sf,hr,proj);
  var tiles=[];
- tiles.push(qsTile('Score',s.pct+'/100',s.cls,'Overall research score out of 100. Weighted from this coin\'s holder safety, liquidity depth, holder growth, volume authenticity and project surface.'));
- tiles.push(qsTile('Liquidity',fUsd(pp.liq),pp.liq==null?'':pp.liq<500?'neg':pp.liq<5000?'watch':'pos','Total value sitting in the trading pool right now. This is what actually backs your ability to exit a position.'));
- if(sf&&sf.topPct!=null)tiles.push(qsTile('Top holder',sf.topPct.toFixed(1)+'%',sf.topPct>35?'neg':sf.topPct>15?'watch':'pos','The single largest holder wallet\'s share of total supply, excluding the pool itself.'));
- if(sf&&sf.devPct!=null)tiles.push(qsTile('Dev holds',sf.devPct.toFixed(1)+'%',sf.devPct>10?'neg':sf.devPct>3?'watch':'pos','How much of the supply the deployer wallet itself still holds right now.'));
- if(sf&&sf.lpPct!=null)tiles.push(qsTile('LP locked',sf.lpPct.toFixed(0)+'%',sf.lpPct<50?'neg':'pos','Share of the liquidity pool that is locked. Locked liquidity cannot be pulled out by the team.'));
- if(sf&&sf.insiderPct!=null&&sf.insiderPct>0)tiles.push(qsTile('Insiders',sf.insiderPct.toFixed(0)+'%',sf.insiderPct>20?'neg':'watch','Combined supply share held by wallets flagged as insiders.'));
- tiles.push(qsTile('Bundle',sf&&sf.bundle?'yes':'no',sf&&sf.bundle?'neg':'pos','Whether several wallets bought in near identical amounts right at launch, a common sign of a coordinated snipe rather than organic buying.'));
- tiles.push(qsTile('Renounced',sf&&sf.renounced===true?'yes':sf&&sf.renounced===false?'no':'?',sf&&sf.renounced===false?'neg':sf&&sf.renounced===true?'pos':'','Whether the deployer has given up mint and freeze authority over the token.'));
+ tiles.push(qsTile('&#129517;','Score',s.pct+'/100',s.cls,'Overall research score out of 100. Weighted from this coin\'s holder safety, liquidity depth, holder growth, volume authenticity and project surface.'));
+ tiles.push(qsTile('&#128167;','Liquidity',fUsd(pp.liq),pp.liq==null?'':pp.liq<500?'neg':pp.liq<5000?'watch':'pos','Total value sitting in the trading pool right now. This is what actually backs your ability to exit a position.'));
+ if(sf&&sf.topPct!=null)tiles.push(qsTile('&#128051;','Top holder',sf.topPct.toFixed(1)+'%',sf.topPct>35?'neg':sf.topPct>15?'watch':'pos','The single largest holder wallet\'s share of total supply, excluding the pool itself.'));
+ if(sf&&sf.devPct!=null)tiles.push(qsTile('&#128736;&#65039;','Dev holds',sf.devPct.toFixed(1)+'%',sf.devPct>10?'neg':sf.devPct>3?'watch':'pos','How much of the supply the deployer wallet itself still holds right now.'));
+ if(sf&&sf.lpPct!=null)tiles.push(qsTile('&#128274;','LP locked',sf.lpPct.toFixed(0)+'%',sf.lpPct<50?'neg':'pos','Share of the liquidity pool that is locked. Locked liquidity cannot be pulled out by the team.'));
+ if(sf&&sf.insiderPct!=null&&sf.insiderPct>0)tiles.push(qsTile('&#128373;&#65039;','Insiders',sf.insiderPct.toFixed(0)+'%',sf.insiderPct>20?'neg':'watch','Combined supply share held by wallets flagged as insiders.'));
+ tiles.push(qsTile('&#127873;','Bundle',sf&&sf.bundle?'yes':'no',sf&&sf.bundle?'neg':'pos','Whether several wallets bought in near identical amounts right at launch, a common sign of a coordinated snipe rather than organic buying.'));
+ tiles.push(qsTile('&#128274;','Renounced',sf&&sf.renounced===true?'yes':sf&&sf.renounced===false?'no':'?',sf&&sf.renounced===false?'neg':sf&&sf.renounced===true?'pos':'','Whether the deployer has given up mint and freeze authority over the token.'));
  var exitImp=exitImpactPct(5000,pp.liq);
- if(exitImp!=null)tiles.push(qsTile('Exit $5k',exitImp.toFixed(1)+'%',exitImp>=25?'neg':exitImp>=8?'watch':'pos','Estimated price impact of exiting a $5,000 position right now, at this pool\'s current depth. An estimate, not a guarantee.'));
- tiles.push(qsTile('Age',fAge(pp.ageMs),'','Time since this trading pair was created on-chain.'));
+ if(exitImp!=null)tiles.push(qsTile('&#128682;','Exit $5k',exitImp.toFixed(1)+'%',exitImp>=25?'neg':exitImp>=8?'watch':'pos','Estimated price impact of exiting a $5,000 position right now, at this pool\'s current depth. An estimate, not a guarantee.'));
+ tiles.push(qsTile('&#9201;&#65039;','Age',fAge(pp.ageMs),'','Time since this trading pair was created on-chain.'));
  return '<div class="qsg">'+tiles.join('')+'</div>';
 }
 function exitImpactPct(sizeUsd,liqUsd){
@@ -1514,14 +1514,14 @@ function renderResearch(pp,sf,watchers,tinfo){
   +(pp.img?'<img src="'+esc(pp.img)+'" alt="" onerror="this.style.visibility=\'hidden\'">':'')
   +'<span class="nm">$'+esc(pp.sym)+'</span><span class="chain">'+esc(pp.chain)+'</span>'
   +(proj.x?'<a class="xh" href="'+esc(proj.xUrl)+'" target="_blank" rel="noopener">@'+esc(proj.x)+'</a>':'')
-  +'<span class="lnks">'+lnk.join('')+'</span></div>'
+  +'<div class="cap-right"><span class="lnks">'+lnk.join('')+'</span>'
+   +'<div class="cap-actions"><button class="btn sm" data-act="savefav">'+(state.watch.has(pp.addr)?'&#9733; watchlist':'&#9734; watchlist')+'</button>'
+   +'<button class="btn sm pri" data-act="flex">&#128248; flex $'+esc(pp.sym)+'</button></div></div>'
+  +'</div>'
   +(gtOk(pp.chain)?'':'<div class="rc-banner" title="No fast indexer for this chain, so the chart and trade feed can read a little stale. Everything else is unaffected.">&#9888; '+esc(pp.chain)+' &mdash; slow chart/trade data</div>')
   +'<div class="body">'
-  +'<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><div class="verdict '+v.cls+'">'+v.label+'</div>'
-   +'<button class="btn" data-act="savefav">'+(state.watch.has(pp.addr)?'&#9733; on watchlist':'&#9734; watchlist')+'</button>'
-   +'<button class="btn pri" data-act="flex">&#128248; flex $'+esc(pp.sym)+'</button></div>'
-  +'<div style="font-size:12px;color:var(--ink-soft)">score <b>'+v.pct+'/100</b> &middot; attention '+Math.round(v.att*100)+' &middot; safety '+Math.round(v.safe*100)+' &middot; project '+proj.surface+'/4'+(v.meme?' &middot; your meme '+Math.round(v.meme*100):'')+'</div>'
   +quickStatsGrid(pp,a,sf,hr,proj)
+  +'<div style="font-size:12px;color:var(--ink-soft)">score <b>'+v.pct+'/100</b> &middot; attention '+Math.round(v.att*100)+' &middot; safety '+Math.round(v.safe*100)+' &middot; project '+proj.surface+'/4'+(v.meme?' &middot; your meme '+Math.round(v.meme*100):'')+'</div>'
   +chart
   +'<div class="rc-2col">'+radarTile(rax)+'<div class="panel"><h3>What the radar sees</h3>'+autoKv+safeLine+watchLine+'</div></div>'
   +bundlePanel(pp,sf)
@@ -2245,8 +2245,6 @@ q1('pfSave').addEventListener('click',submitProfile);
 q1("flexBoard").addEventListener("click",flexBoard);
 q1("ideaRoll").addEventListener("click",renderIdeas);
 q1("ideaBox").addEventListener("click",function(ev){var b=ev.target.closest("[data-idea]");if(!b)return;try{navigator.clipboard.writeText(b.getAttribute("data-idea"));toast("concept copied");}catch(_){}});
-q1('qgo').addEventListener('click',function(){doQuery(q1('q').value,'rcardHost',true);});
-q1('q').addEventListener('keydown',function(e){if(e.key==='Enter')doQuery(q1('q').value,'rcardHost',true);});
 q1('scanGo').addEventListener('click',function(){doQuery(q1('scanQ').value,'scanQResult',false);});
 q1('scanQ').addEventListener('keydown',function(e){if(e.key==='Enter')doQuery(q1('scanQ').value,'scanQResult',false);});
 q1('scanQResult').addEventListener('click',function(ev){if(watchClick(ev))return;var r=ev.target.closest('[data-addr]');if(!r)return;openResearch(r.getAttribute('data-addr'),r.getAttribute('data-chain'));});
