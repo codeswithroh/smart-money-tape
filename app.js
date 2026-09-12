@@ -1924,24 +1924,32 @@ function rerenderRcard(){clearTimeout(_rerenderT);_rerenderT=setTimeout(function
 /* ---------- HOT BOARD ---------- */
 var SKEL_BC='<div class="skbc"><span class="skel"></span><span class="skel"></span><span class="skel"></span></div>';
 function skelBoard(n){var out='';for(var i=0;i<n;i++)out+=SKEL_BC;return out;}
+function bcTxCount(pp){var h=pp.tx&&pp.tx.h24;if(!h)return '&mdash;';var t=(+h.buys||0)+(+h.sells||0);return t?String(t):'&mdash;';}
 function renderBoard(){
  var el=q1('board');if(!el)return;
  var pool=(state._pool||[]).filter(function(pp){return pp._a;});
  if(!pool.length){el.innerHTML=skelBoard(6);return;}
  var top=pool.slice(0,6);
  var medals=['🥇','🥈','🥉','4','5','6'];
- var mx=Math.max.apply(null,top.map(function(p){return p._a.score;}))||1;
  el.innerHTML=top.map(function(pp,i){
   var a=pp._a,ch=+pp.pc.h1||0,q=pp._q||pickQuality(pp);
-  var pf=q.pumpfun?' <span class="cchip pf">pump.fun</span>':'';
-  var wr=(!q.mcOk||!q.liqOk||(state.safety.get(pp.addr)||{}).bundle)?' <span class="cchip warn">&#9888;</span>':'';
+  var pf=q.pumpfun?'<span class="cchip pf">pump.fun</span>':'';
+  var wr=(!q.mcOk||!q.liqOk||(state.safety.get(pp.addr)||{}).bundle)?'<span class="cchip warn">&#9888;</span>':'';
+  var chCls=ch>0?'pos':ch<0?'neg':'';
   return '<button class="bc'+(i===0?' r1':'')+'" data-addr="'+esc(pp.addr)+'" data-chain="'+esc(pp.chain)+'">'
-   +'<span class="rank">'+medals[i]+'</span>'
-   +'<div class="bsym">'+starBtn(pp.addr,pp.chain,pp.sym)+'$'+esc(pp.sym)+' <span class="cchip">'+esc(pp.chain)+'</span>'+pf+wr+'</div>'
-   +'<div class="bmeta">'+fUsd(pp.mc)+' mc &middot; <span class="'+(ch>0?'up':ch<0?'dn':'')+'">'+fPct(ch)+' 1h</span> &middot; '+fAge(pp.ageMs)+'</div>'
-   +'<div class="tmeta2">'+rowSocials(pp)+txBar(pp)+'</div>'
+   +'<div class="bc-top">'
+    +(pp.img?'<img class="bc-ava" src="'+esc(pp.img)+'" alt="" loading="lazy" onerror="this.style.visibility=\'hidden\'">':'<span class="bc-ava ph">'+esc((pp.sym||'?').charAt(0).toUpperCase())+'</span>')
+    +'<div class="bc-id"><span class="bc-sym">'+starBtn(pp.addr,pp.chain,pp.sym)+'$'+esc(pp.sym)+'</span><span class="bc-chips"><span class="cchip">'+esc(pp.chain)+'</span>'+pf+wr+'</span></div>'
+    +'<span class="rank">'+medals[i]+'</span>'
+   +'</div>'
+   +'<div class="bc-stats">'
+    +'<div class="bc-stat"><b>'+fUsd(pp.mc)+'</b><span>mc</span></div>'
+    +'<div class="bc-stat '+chCls+'"><b>'+fPct(ch)+'</b><span>1h</span></div>'
+    +'<div class="bc-stat"><b>'+fAge(pp.ageMs)+'</b><span>age</span></div>'
+    +'<div class="bc-stat"><b>'+bcTxCount(pp)+'</b><span>tx</span></div>'
+   +'</div>'
    +sfBadges(pp)
-   +'<div class="battn"><span class="traj-mini '+a.traj+'">'+a.traj.toUpperCase()+'</span><span class="bar"><i style="width:'+Math.round(a.score/mx*100)+'%"></i></span><b>'+a.score+'</b></div>'
+   +'<div class="bc-foot"><span class="traj-pill '+a.traj+'">'+a.traj.toUpperCase()+'</span><span class="attn-num">'+a.score+'/100</span></div>'
    +'</button>';
  }).join('');
 }
