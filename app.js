@@ -577,8 +577,17 @@ function fetchSafety(addr,chain,urlAddr){
    var devH=creator?allH.filter(function(h){return String(h.address||h.owner||'')===String(creator);})[0]:null;
    var devPct=devH?devH.pct:(j.creatorBalancePct!=null?j.creatorBalancePct:null);
    // insider SUPPLY % = sum of pct across holders RugCheck flags as insider (the metric that matters, not a wallet count)
-   var insiderPct=allH.filter(function(h){return h.insider;}).reduce(function(s,h){return s+(+h.pct||0);},0);
-   insiderPct=insiderPct||null;
+   // BUG FOUND 2026-09-13: RugCheck's per-holder `insider` boolean comes back false on every
+   // holder for plenty of real coins (verified live on 88t4EdAjiuUDzHujJnK5nywitQzYQWEJq2ouUgRGpump —
+   // 0 flagged holders here, yet RugCheck's own graph-based insiderNetworks found 13 linked
+   // accounts holding ~22.9% of supply). Relying on the holder flag alone silently scored real
+   // insider concentration as 0%. insiderNetworks[].tokenAmount / token.supply is RugCheck's
+   // actual insider-cluster detector; use whichever signal reports the larger holding.
+   var insiderPctHolders=allH.filter(function(h){return h.insider;}).reduce(function(s,h){return s+(+h.pct||0);},0)||0;
+   var supplyRaw=+(j.token&&j.token.supply)||0;
+   var insiderNetAmt=(j.insiderNetworks||[]).reduce(function(s,n){return s+(+n.tokenAmount||0);},0);
+   var insiderPctNet=(supplyRaw&&insiderNetAmt)?Math.min(100,insiderNetAmt/supplyRaw*100):0;
+   var insiderPct=Math.max(insiderPctHolders,insiderPctNet)||null;
    var insiderCount=j.graphInsidersDetected||(j.insiderNetworks||[]).reduce(function(s,n){return s+(+n.activeAccounts||+n.size||0);},0)||0;
    // bundle pattern: 4+ non-LP wallets clustered at near-identical small stakes
    var cl=nonLp.slice(0,10).filter(function(h){return h.pct>=0.25&&h.pct<=5;}).map(function(h){return h.pct;});
