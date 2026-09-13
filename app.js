@@ -951,6 +951,13 @@ function longTermScore(pp,a,sf,hr,proj){
  // four factors is allowed to read that as anything but high risk (real case: a coin with $0.08
  // of liquidity scored 34-70 before this, purely from the non-liquidity factors landing fine)
  if(pp.liq!=null&&pp.liq<500)pct=Math.min(pct,20);
+ // same principle for a CONFIRMED hard safety fail (RugCheck's own ok===false: rugged, mint/freeze
+ // not renounced, top holder/dev/insider over threshold, or bundle pattern). Real case that shipped
+ // this: a coin with a genuine 23%-of-supply insider cluster still scored 60/100 "HAS SOME LEGS"
+ // because heavy live trading volume/holder-growth pulled the blended average back up — hot volume
+ // on a coin insiders can dump at will isn't safety, it's exit liquidity. A confirmed fail caps the
+ // score in rug-risk territory regardless of how active the trading looks right now.
+ if(sf&&sf.ok===false)pct=Math.min(pct,25);
  var label,cls;
  if(pct>=68){label='BUILT TO LAST';cls='pos';}
  else if(pct>=48){label='HAS SOME LEGS';cls='';}
