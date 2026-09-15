@@ -1,5 +1,6 @@
 import { tokenCard, pickAddr, resolveCoin, resolveTicker, topMovers, researchScore, scoreText } from './_token.js';
 import { kvReady, newId, alertsAll, alertPut, alertDel } from './_kv.js';
+import { dbReady, subscriberAdd, subscriberRemove } from './_db.js';
 
 export const config = { runtime: 'edge' };
 
@@ -22,6 +23,7 @@ const HELP = [
   '/setalert &lt;ca&gt; &lt;mc&gt; — ping me when it hits that market cap (e.g. <code>/setalert So111… 5M</code>) 🔔',
   '/alerts — your active alerts',
   '/score &lt;ca&gt; — the long-term research score breakdown (holder safety, liquidity, growth, volume, project surface) 📊',
+  '/watchdeployers on|off — push this chat when a wallet already flagged 2+ times deploys a new coin, before you ever search it (Solana only) 🕵️',
   '/idea — fresh coin concepts riding the hot narratives 💡',
   '/help — this menu 📖',
   '',
@@ -40,6 +42,7 @@ const START = [
   '• <code>/setalert &lt;ca&gt; &lt;mc&gt;</code> — ping you when it hits a market cap 🔔',
   '• <code>/flex &lt;ca&gt; &lt;entry mc&gt; [exit mc]</code> — chart card with your entry/exit + your pic, built for X 📸',
   '• <code>/score &lt;ca&gt;</code> — long-term research score breakdown 📊',
+  '• <code>/watchdeployers on</code> — push you when a repeat-offender wallet deploys, before you search it 🕵️',
   '• <code>/idea</code> — fresh coin concepts riding the hot narratives 💡',
   '• paste a CA — instant full x-ray 🔬',
   '• <code>/help</code> — the whole cheatsheet 📖',
@@ -120,6 +123,31 @@ async function cmdSetAlert(chatId, from, parts, reply) {
       `I'll ping you when MC ${dir === 'up' ? 'crosses <b>above</b>' : 'falls <b>below</b>'} <b>${fUsd(target)}</b>.\n` +
       `now: ${fUsd(base)}  ·  checked every ~5 min  ·  fires once`,
     reply_markup: { inline_keyboard: [[{ text: '❌ cancel this alert', callback_data: 'da:' + id }]] },
+    ...reply,
+  });
+}
+
+// opt-in push: a wallet already flagged 2+ times in the deployer-reputation ledger (built from
+// everyone's own screenings, see api/intel.js) deploys a new coin -> subscribed chats get pinged
+// the moment cron.js sees it on the boosted-tokens feed, no searching required. Solana only —
+// that's the only chain where a "deployer" is even identifiable from the data this tool has.
+async function cmdWatchDeployers(chatId, on, reply) {
+  if (!dbReady) {
+    await tg('sendMessage', { chat_id: chatId, text: "This isn't switched on yet — the admin needs to add the backend env vars.", ...reply });
+    return;
+  }
+  try {
+    if (on) await subscriberAdd(chatId);
+    else await subscriberRemove(chatId);
+  } catch (_) {
+    await tg('sendMessage', { chat_id: chatId, text: 'Something went wrong — try again in a moment.', ...reply });
+    return;
+  }
+  await tg('sendMessage', {
+    chat_id: chatId, parse_mode: 'HTML',
+    text: on
+      ? '🕵️ <b>Repeat-offender alerts on.</b> If a wallet already flagged 2+ times for failing a safety screen on this tool deploys a new coin that shows up trending, I\'ll ping this chat — Solana only, checked every few minutes. <code>/watchdeployers off</code> to stop.'
+      : '🕵️ Repeat-offender alerts off for this chat.',
     ...reply,
   });
 }
@@ -388,6 +416,11 @@ export default async function handler(req) {
   }
   if (/^\/(alerts|myalerts)\b/i.test(text)) {
     await cmdAlerts(chatId, msg.from || {}, reply);
+    return new Response('ok');
+  }
+  if (/^\/watchdeployers\b/i.test(text)) {
+    const arg = (text.split(/\s+/)[1] || '').trim().toLowerCase();
+    await cmdWatchDeployers(chatId, arg !== 'off', reply);
     return new Response('ok');
   }
   if (/^\/(delalert|delelert|rmalert)\b/i.test(text)) {

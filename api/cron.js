@@ -1,5 +1,5 @@
-import { alertsAll, alertDel, kvReady } from './_kv.js';
-import { dbReady, scoreCallsPending, scoreCallResolve } from './_db.js';
+import { alertsAll, alertDel, kvReady, alertedHas, alertedMark } from './_kv.js';
+import { dbReady, scoreCallsPending, scoreCallResolve, deployerLookup, subscribersAll } from './_db.js';
 
 export const config = { runtime: 'edge' };
 
@@ -110,5 +110,56 @@ export default async function handler(req) {
     } catch (_) {}
   }
 
-  return Response.json({ ok: true, checked: alerts.length, fired, scoreResolved });
+  let deployerPushed = 0;
+  if (dbReady && TOKEN) {
+    try {
+      deployerPushed = await checkRepeatOffenderDeploys();
+    } catch (_) {}
+  }
+
+  return Response.json({ ok: true, checked: alerts.length, fired, scoreResolved, deployerPushed });
+}
+
+// opt-in proactive push (see api/tg.js /watchdeployers): scans DexScreener's currently-boosted
+// tokens for new Solana launches, and if a boosted coin's on-chain deployer wallet already has
+// 2+ prior failed-safety-screen flags in this tool's own deployer_flags ledger, every subscribed
+// chat gets pinged immediately — before anyone has to search that coin themselves.
+async function checkRepeatOffenderDeploys() {
+  let boosts = [];
+  try {
+    boosts = await fetch(`${DEX}/token-boosts/top/v1`).then((r) => (r.ok ? r.json() : []));
+  } catch (_) { return 0; }
+  const solBoosts = (Array.isArray(boosts) ? boosts : [])
+    .filter((b) => b.chainId === 'solana' && b.tokenAddress)
+    .slice(0, 30);
+  if (!solBoosts.length) return 0;
+
+  let subscribers = [];
+  try { subscribers = await subscribersAll(); } catch (_) { return 0; }
+  if (!subscribers.length) return 0; // nobody opted in — skip the RugCheck calls entirely
+
+  let pushed = 0;
+  for (const b of solBoosts) {
+    const addr = String(b.tokenAddress).toLowerCase();
+    if (await alertedHas(addr)) continue;
+    let rc = null;
+    try { rc = await fetch(`https://api.rugcheck.xyz/v1/tokens/${b.tokenAddress}/report`).then((r) => (r.ok ? r.json() : null)); } catch (_) {}
+    const creator = rc && rc.creator;
+    if (!creator) { await alertedMark(addr); continue; } // no creator data — mark seen, don't retry every tick
+    let flag = null;
+    try { flag = await deployerLookup(String(creator).toLowerCase()); } catch (_) {}
+    await alertedMark(addr);
+    if (!flag || (flag.flag_count || 0) < 2) continue;
+
+    const text =
+      `🕵️ <b>Repeat-offender deployer just launched</b>\n` +
+      `A wallet flagged <b>${flag.flag_count}×</b> before on this tool just deployed <code>${addr.slice(0, 4)}…${addr.slice(-4)}</code>, now trending.\n` +
+      `Past reasons: ${(flag.reasons || []).slice(0, 3).join(', ') || 'failed safety screen'}\n\n` +
+      `<a href="${SITE}/?coin=${encodeURIComponent(addr)}&amp;chain=solana">open the x-ray</a>`;
+    for (const chat of subscribers) {
+      try { await tg('sendMessage', { chat_id: chat, parse_mode: 'HTML', disable_web_page_preview: true, text }); } catch (_) {}
+    }
+    pushed++;
+  }
+  return pushed;
 }

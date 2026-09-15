@@ -198,6 +198,23 @@ export async function scoreCallResolve(id, { mcAfter, pctChange, outcome }) {
   if (error) throw error;
 }
 
+// ---- repeat-offender deployer push (opt-in, Telegram) ----
+export async function subscriberAdd(chatId) {
+  const { error } = await db().from('tg_subscribers').upsert({ chat_id: chatId }, { onConflict: 'chat_id' });
+  if (error) throw error;
+}
+
+export async function subscriberRemove(chatId) {
+  const { error } = await db().from('tg_subscribers').delete().eq('chat_id', chatId);
+  if (error) throw error;
+}
+
+export async function subscribersAll() {
+  const { data, error } = await db().from('tg_subscribers').select('chat_id').limit(5000);
+  if (error) throw error;
+  return (data || []).map((r) => r.chat_id);
+}
+
 // aggregate stats for the public track-record page — grouped by verdict label, resolved calls only
 export async function scoreCallStats() {
   const { data, error } = await db().from('score_calls')

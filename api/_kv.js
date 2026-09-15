@@ -40,3 +40,16 @@ export async function alertDel(ids) {
   if (!ids || !ids.length) return;
   return pipe([['HDEL', HKEY, ...ids]]);
 }
+
+// ---- repeat-offender deployer push: dedupe so the same coin isn't re-alerted every cron tick ----
+const ALERTED_PREFIX = 'deployer_alerted:';
+const ALERTED_TTL_S = 7 * 86400; // 7 days is plenty — a coin's launch window is long over by then
+
+export async function alertedHas(addr) {
+  const [v] = await pipe([['GET', ALERTED_PREFIX + addr]]);
+  return !!v;
+}
+
+export async function alertedMark(addr) {
+  return pipe([['SET', ALERTED_PREFIX + addr, '1', 'EX', ALERTED_TTL_S]]);
+}
