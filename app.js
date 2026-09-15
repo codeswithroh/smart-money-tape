@@ -697,7 +697,18 @@ function attn(pp){
  if(pp.boosts)score+=6;
  return {b1:b1,s1:s1,skew1:skew1,skew24:skew24,accel:accel,slope:slope,traj:traj,score:Math.max(0,Math.min(100,Math.round(score)))};
 }
-function trajTag(a){return '<span class="traj '+a.traj+'">'+a.traj.toUpperCase()+'<small>attn '+a.score+'</small></span>';}
+// "RAMPING/FADING/STEADY" is momentum jargon nobody outside this codebase reads correctly —
+// the badge on every main listing card now shows the same plain verdict as the x-ray page
+// (BUILT TO LAST / HAS SOME LEGS / SPECULATIVE / HIGH RUG RISK), not a trading term.
+function simpleVerdict(pp,a,sf){
+ var hr=holderRate(pp.addr),proj=buildProject(pp,null);
+ var s=longTermScore(pp,a,sf,hr,proj);
+ return {label:s.label,cls:s.cls};
+}
+function trajTag(pp,a,sf){
+ var v=simpleVerdict(pp,a,sf);
+ return '<span class="traj '+v.cls+'">'+esc(v.label)+'<small>attn '+a.score+'</small></span>';
+}
 /* ---------- pick-quality gates (why a coin is worth your attention) ---------- */
 // user-adjustable via the Filter modal; null on a MAX_* means no ceiling, same for MIN_AGE_H/
 // MAX_AGE_H (age in hours — the filter people actually reach for: newer vs. older coins).
@@ -1378,7 +1389,7 @@ function tokenRow(pp){
   +'<span class="tmeta2">'+rowSocials(pp)+txBar(pp)+'</span>'
   +sfBadges(pp)
   +'<span class="tags">'+tg+'</span></span>'
-  +trajTag(a)+'</button>';
+  +trajTag(pp,a,sf)+'</button>';
 }
 
 /* ---------- RESEARCH ---------- */
@@ -2034,6 +2045,10 @@ function lwApply(){
 function setRes(addr,patch){var r=researchOf(addr);Object.keys(patch).forEach(function(k){r[k]=patch[k];});r.ts=Date.now();state.research[addr]=r;saveRes();}
 function rcardClick(ev){
  var pp=state.rcPair;if(!pp)return;var addr=pp.addr;
+ // explicit, not relying on the browser's native "auto-open a details containing the linked
+ // fragment" behavior — support for that varies by browser/webview, and this has to just work
+ var vbMore=ev.target.closest('.vb-more');
+ if(vbMore){ev.preventDefault();var dr=q1('deepResearch');if(dr){dr.open=true;dr.scrollIntoView({behavior:'smooth',block:'start'});}return;}
  var seg=ev.target.closest('.seg [data-v]');
  if(seg){var f=seg.parentNode.getAttribute('data-f');var patch={};patch[f]=seg.getAttribute('data-v');setRes(addr,patch);rerenderRcard();return;}
  var st=ev.target.closest('.stars [data-v]');
@@ -2079,6 +2094,7 @@ function renderBoard(){
  var medals=['🥇','🥈','🥉','4','5','6'];
  el.innerHTML=top.map(function(pp,i){
   var a=pp._a,ch=+pp.pc.h1||0,q=pp._q||pickQuality(pp),sf=state.safety.get(pp.addr);
+  var sv=simpleVerdict(pp,a,sf);
   var pf=q.pumpfun?'<span class="cchip pf">pump.fun</span>':'';
   var wr=(!q.mcOk||!q.liqOk||(sf||{}).bundle)?'<span class="cchip warn">&#9888;</span>':'';
   var chCls=ch>0?'pos':ch<0?'neg':'';
@@ -2091,7 +2107,7 @@ function renderBoard(){
    +'</div>'
    +'<div class="bc-meta2">'+fAge(pp.ageMs)+' old'+rowSocials(pp)+txBar(pp)+holdersBit+'</div>'
    +sfBadges(pp)
-   +'<div class="bc-foot"><span class="rank">'+medals[i]+'</span><span class="traj-pill '+a.traj+'">'+a.traj.toUpperCase()+'</span><span class="attn-num">'+a.score+'/100</span></div>'
+   +'<div class="bc-foot"><span class="rank">'+medals[i]+'</span><span class="traj-pill '+sv.cls+'">'+esc(sv.label)+'</span><span class="attn-num">'+a.score+'/100</span></div>'
    +'</button>';
  }).join('');
 }
