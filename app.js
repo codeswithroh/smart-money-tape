@@ -1959,9 +1959,11 @@ function mountChart(){
   timeScale:{borderColor:'rgba(205,210,223,.14)',timeVisible:true,secondsVisible:false},
   crosshair:{mode:LightweightCharts.CrosshairMode.Normal,vertLine:{color:'rgba(242,166,61,.5)',labelBackgroundColor:'#cf3a26'},horzLine:{color:'rgba(242,166,61,.5)',labelBackgroundColor:'#cf3a26'}},
   handleScroll:true,handleScale:true,
-  localization:{priceFormatter:function(p){return fPrice(p).replace('$','');}}
+  localization:{priceFormatter:function(p){return fUsd(p).replace('$','');}}
  });
- _lwCandle=_lw.addCandlestickSeries({upColor:'#46bd62',downColor:'#f2594f',borderUpColor:'#46bd62',borderDownColor:'#f2594f',wickUpColor:'#46bd62',wickDownColor:'#f2594f',priceFormat:{type:'custom',minMove:1e-12,formatter:function(p){return fPrice(p).replace('$','');}}});
+ // the axis plots market cap, not the raw per-token price — a meme coin's price alone (often
+ // 9+ decimal places) is meaningless to read on a chart; mc is what people actually watch.
+ _lwCandle=_lw.addCandlestickSeries({upColor:'#46bd62',downColor:'#f2594f',borderUpColor:'#46bd62',borderDownColor:'#f2594f',wickUpColor:'#46bd62',wickDownColor:'#f2594f',priceFormat:{type:'custom',minMove:1,formatter:function(p){return fUsd(p).replace('$','');}}});
  _lwVol=_lw.addHistogramSeries({priceScaleId:'vol',priceFormat:{type:'volume'},color:'rgba(120,130,150,.35)'});
  _lw.priceScale('vol').applyOptions({scaleMargins:{top:0.82,bottom:0},visible:false});
  if(window.ResizeObserver){_lwRO=new ResizeObserver(function(){if(_lw&&el.clientWidth)_lw.applyOptions({width:el.clientWidth,height:el.clientHeight});});_lwRO.observe(el);}
@@ -1973,9 +1975,15 @@ function lwApply(){
  var pp=state.rcPair;if(!pp||pp.addr!==_lwAddr)return;
  var oc=state.ohlcv.get(pp.addr),rows=(oc&&oc.rows)||[];
  if(!rows.length)return;
+ // price -> market cap: DexScreener gives current mc directly, but the OHLCV feed only has
+ // per-token price history, not a historical supply/mc series. Total supply is effectively
+ // fixed for a renounced-mint meme coin, so today's mc/price ratio is a real conversion factor,
+ // not a guess — apply it across the candle history to plot mc instead of raw token price.
+ var mult=(pp.mc&&pp.priceUsd)?pp.mc/pp.priceUsd:null;
  var bars=[],vol=[],seen={};
  rows.forEach(function(r){var t=Math.floor(+r[0]);if(!t||seen[t])return;seen[t]=1;
   var o=+r[1],hi=+r[2],lo=+r[3],cl=+r[4];
+  if(mult){o*=mult;hi*=mult;lo*=mult;cl*=mult;}
   bars.push({time:t,open:o,high:hi,low:lo,close:cl});
   vol.push({time:t,value:+r[5]||0,color:cl>=o?'rgba(70,185,98,.4)':'rgba(242,89,79,.4)'});
  });
@@ -1985,7 +1993,7 @@ function lwApply(){
  var fb=document.querySelector('.lwchart-fallback');if(fb)fb.hidden=true;
  var plan=planFrom(pp,researchOf(pp.addr));
  _lwLines.forEach(function(l){try{_lwCandle.removePriceLine(l);}catch(_){}});_lwLines=[];
- function line(price,color,title,solid){if(!price||!isFinite(price))return;_lwLines.push(_lwCandle.createPriceLine({price:price,color:color,lineWidth:1,lineStyle:solid?LightweightCharts.LineStyle.Solid:LightweightCharts.LineStyle.Dashed,axisLabelVisible:true,title:title}));}
+ function line(price,color,title,solid){if(!price||!isFinite(price))return;if(mult)price*=mult;_lwLines.push(_lwCandle.createPriceLine({price:price,color:color,lineWidth:1,lineStyle:solid?LightweightCharts.LineStyle.Solid:LightweightCharts.LineStyle.Dashed,axisLabelVisible:true,title:title}));}
  line(plan.stop,'#f2594f','STOP');
  line(plan.lo,'#46bd62','ENTRY');line(plan.hi,'#46bd62','');
  line(plan.t1,'#5bd07a','T1');line(plan.t2,'#5bd07a','T2');line(plan.t3,'#5bd07a','T3');
