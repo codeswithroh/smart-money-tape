@@ -997,9 +997,16 @@ function scoreTrendHtml(addr){
  return '<div class="score-trend"><div class="score-trend-bars">'+bars+'</div>'
   +'<p class="rscore-age"><span class="'+cls+'">'+arrow+' '+(t.delta>0?'+':'')+t.delta+'</span> vs '+span+' ago (was '+t.from+'/100) &mdash; tracked from your own visits to this coin.</p></div>';
 }
+// public accountability ledger — logs the verdict the moment it's shown, before any outcome is
+// known. Server dedupes (no second log for the same coin while one is still unresolved) and
+// cron.js revisits it 48h later against real market cap. Feeds the public /track-record page.
+function reportScoreCall(pp,s){
+ try{fetch('/api/intel?kind=scorecall',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({addr:pp.addr,chain:pp.chain||'',sym:pp.sym||'',label:s.label,score:s.pct,mc:pp.mc||null,liq:pp.liq||null})}).catch(function(){});}catch(_){}
+}
 function researchScorePanel(pp,a,sf,hr,proj){
  var s=longTermScore(pp,a,sf,hr,proj);
  recordScore(pp.addr,s.pct);
+ reportScoreCall(pp,s);
  var surv=survivalStage(pp);
  var ringCol=s.cls==='neg'?'var(--neg)':s.cls==='watch'?'var(--hot)':'var(--pos)';
  var deg=(s.pct*3.6).toFixed(0);

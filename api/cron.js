@@ -1,4 +1,5 @@
 import { alertsAll, alertDel, kvReady } from './_kv.js';
+import { dbReady, scoreCallsPending, scoreCallResolve } from './_db.js';
 
 export const config = { runtime: 'edge' };
 
@@ -71,5 +72,43 @@ export default async function handler(req) {
     done.push(al.id);
   }
   try { await alertDel(done); } catch (_) {}
-  return Response.json({ ok: true, checked: alerts.length, fired });
+
+  let scoreResolved = 0;
+  if (dbReady) {
+    try {
+      const pending = await scoreCallsPending(200);
+      if (pending.length) {
+        const uniq2 = [...new Set(pending.map((p) => p.addr))];
+        const mc2 = {};
+        for (let i = 0; i < uniq2.length; i += 30) {
+          const batch = uniq2.slice(i, i + 30);
+          let j = null;
+          try { j = await fetch(`${DEX}/latest/dex/tokens/${batch.join(',')}`).then((r) => (r.ok ? r.json() : null)); } catch (_) {}
+          for (const a of batch) mc2[a] = mcOf(j && j.pairs, a);
+        }
+        for (const p of pending) {
+          const mcAfter = mc2[p.addr];
+          // no live pair found 48h later on a coin that was still trending when scored — the
+          // closest this data source gets to "rugged/delisted", a fact worth keeping, not noise
+          if (mcAfter == null) {
+            await scoreCallResolve(p.id, { mcAfter: null, pctChange: null, outcome: 'delisted_or_no_data' });
+            scoreResolved++;
+            continue;
+          }
+          const base = p.mc_at_call;
+          const pct = base && base > 0 ? ((mcAfter - base) / base) * 100 : null;
+          let outcome = 'held';
+          if (pct != null) {
+            if (pct <= -80) outcome = 'dumped_80';
+            else if (pct <= -50) outcome = 'dumped_50';
+            else if (pct >= 50) outcome = 'pumped';
+          }
+          await scoreCallResolve(p.id, { mcAfter, pctChange: pct, outcome });
+          scoreResolved++;
+        }
+      }
+    } catch (_) {}
+  }
+
+  return Response.json({ ok: true, checked: alerts.length, fired, scoreResolved });
 }

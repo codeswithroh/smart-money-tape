@@ -160,3 +160,48 @@ export async function walletSightingsFor(wals, excludeAddr) {
   if (error) throw error;
   return data || [];
 }
+
+// ---- score-call track record (public accountability ledger) ----
+// Every research-score verdict this tool gives gets logged the moment it's given, with a fixed
+// revisit time set then, not adjusted later — so the outcome can't be cherry-picked after the fact.
+const RESOLVE_AFTER_MS = 48 * 3600 * 1000; // 48h — long enough to separate a real dump from noise
+
+export async function scoreCallLog({ addr, chain, sym, label, score, mc, liq }) {
+  // dedupe: don't log a second call for the same coin within the same open resolve window
+  const { data: existing, error: selErr } = await db().from('score_calls')
+    .select('id').eq('addr', addr).is('resolved_at', null)
+    .order('called_at', { ascending: false }).limit(1).maybeSingle();
+  if (selErr) throw selErr;
+  if (existing) return;
+  const now = new Date();
+  const { error } = await db().from('score_calls').insert({
+    addr, chain: chain || null, sym: sym || null, label, score,
+    mc_at_call: mc || null, liq_at_call: liq || null,
+    called_at: now.toISOString(),
+    resolve_after: new Date(now.getTime() + RESOLVE_AFTER_MS).toISOString(),
+  });
+  if (error) throw error;
+}
+
+export async function scoreCallsPending(limit) {
+  const { data, error } = await db().from('score_calls')
+    .select('id,addr,chain,mc_at_call').is('resolved_at', null)
+    .lte('resolve_after', new Date().toISOString()).limit(limit || 200);
+  if (error) throw error;
+  return data || [];
+}
+
+export async function scoreCallResolve(id, { mcAfter, pctChange, outcome }) {
+  const { error } = await db().from('score_calls').update({
+    resolved_at: new Date().toISOString(), mc_after: mcAfter, pct_change: pctChange, outcome,
+  }).eq('id', id);
+  if (error) throw error;
+}
+
+// aggregate stats for the public track-record page — grouped by verdict label, resolved calls only
+export async function scoreCallStats() {
+  const { data, error } = await db().from('score_calls')
+    .select('label,outcome,pct_change,called_at').not('resolved_at', 'is', null).limit(20000);
+  if (error) throw error;
+  return data || [];
+}

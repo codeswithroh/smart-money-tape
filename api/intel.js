@@ -7,6 +7,7 @@ import {
   deployerFlag, deployerLookup,
   pulseLog, pulseCurve,
   walletSightingsAdd, walletSightingsFor,
+  scoreCallLog,
 } from './_db.js';
 
 export const config = { runtime: 'edge' };
@@ -79,6 +80,17 @@ export default async function handler(req) {
         })).filter((r) => r.wal);
         await walletSightingsAdd(rows);
         return json({ ok: true, n: rows.length });
+      }
+      if (kind === 'scorecall') {
+        const addr = norm(b.addr, 90).toLowerCase();
+        const label = norm(b.label, 40);
+        const score = numOr(b.score);
+        if (!addr || !label || score == null) return json({ error: 'missing addr/label/score' }, 400);
+        await scoreCallLog({
+          addr, chain: norm(b.chain, 20).toLowerCase() || null, sym: norm(b.sym, 24) || null,
+          label, score, mc: numOr(b.mc), liq: numOr(b.liq),
+        });
+        return json({ ok: true });
       }
       return json({ error: 'unknown kind' }, 400);
     }
