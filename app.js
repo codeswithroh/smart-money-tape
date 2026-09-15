@@ -971,6 +971,26 @@ function longTermScore(pp,a,sf,hr,proj){
   {k:'Project surface',v:P.v,note:P.note},
  ]};
 }
+// ---------- primary-screen verdict: one decisive call + the single strongest reason for it,
+// shown before any of the deep panels. The whole point of this over a GMGN-style tile wall:
+// most people opening a coin just want "should I touch this," not fifteen stacked panels.
+function verdictBanner(pp,a,sf,hr,proj){
+ var s=longTermScore(pp,a,sf,hr,proj);
+ var reason;
+ if(sf&&sf.ok===false&&sf.reasons&&sf.reasons.length){
+  reason='RugCheck flagged this: <b>'+esc(sf.reasons.join(', '))+'</b>.';
+ }else{
+  var worst=s.factors.slice().sort(function(x,y){return x.v-y.v;})[0];
+  reason=esc(worst.k)+': '+worst.note+'.';
+ }
+ var icon=s.cls==='pos'?'&#9989;':s.cls==='neg'?'&#10060;':s.cls==='watch'?'&#9888;&#65039;':'&#128064;';
+ return '<div class="verdict-banner '+s.cls+'">'
+  +'<div class="vb-top"><span class="vb-icon">'+icon+'</span><div><div class="vb-label">'+esc(s.label)+'</div>'
+  +'<div class="vb-score">research score <b>'+s.pct+'</b>/100</div></div></div>'
+  +'<p class="vb-reason">'+reason+'</p>'
+  +'<a class="vb-more" href="#deepResearch">see the full research &darr;</a>'
+  +'</div>';
+}
 /* ---------- score history: is this coin's fundamentals improving or decaying, not just a snapshot ----------
    Same client-side pattern as holder-rate tracking: a capped, deduped local history per address.
    Min 10-minute spacing keeps it a trend across visits, not noise from re-rendering the same scan. */
@@ -1606,6 +1626,8 @@ function renderResearch(pp,sf,watchers,tinfo){
   +'</div>'
   +(gtOk(pp.chain)?'':'<div class="rc-banner" title="No fast indexer for this chain, so the chart and trade feed can read a little stale. Everything else is unaffected.">&#9888; '+esc(pp.chain)+' &mdash; slow chart/trade data</div>')
   +'<div class="body">'
+  +verdictBanner(pp,a,sf,hr,proj)
+  +'<details id="deepResearch" class="deep-research"><summary>Show full research &mdash; chart, holder breakdown, wallet history, live trades</summary>'
   +quickStatsGrid(pp,a,sf,hr,proj)
   +'<div style="font-size:12px;color:var(--ink-soft)">score <b>'+v.pct+'/100</b> &middot; attention '+Math.round(v.att*100)+' &middot; safety '+Math.round(v.safe*100)+' &middot; project '+proj.surface+'/4'+(v.meme?' &middot; your meme '+Math.round(v.meme*100):'')+'</div>'
   +chart
@@ -1624,6 +1646,7 @@ function renderResearch(pp,sf,watchers,tinfo){
   +firehosePanel()
   +tradesPanel()
   +form
+  +'</details>'
   +'</div></div>';
  mountChart();
  startFirehose();

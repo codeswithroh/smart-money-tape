@@ -452,6 +452,28 @@
   .collapsed-form>summary::before{content:"\25B8 ";}
   .collapsed-form[open]>summary::before{content:"\25BE ";}
 
+  /* one decisive verdict, shown before any of the deep panels */
+  .verdict-banner{border:3px solid var(--ink);border-radius:16px 9px 15px 8px / 9px 15px 8px 16px;background:var(--card);padding:16px 18px;margin:12px 0 6px;box-shadow:3px 4px 0 rgba(44,53,80,.16);}
+  .verdict-banner.pos{border-color:var(--pos);background:var(--pos-wash);}
+  .verdict-banner.neg{border-color:var(--neg);background:var(--neg-wash);}
+  .verdict-banner.watch{border-color:var(--hot);}
+  .vb-top{display:flex;align-items:center;gap:12px;}
+  .vb-icon{font-size:30px;flex:none;line-height:1;}
+  .vb-label{font-family:"Caveat",cursive;font-weight:700;font-size:29px;line-height:1;}
+  .verdict-banner.pos .vb-label{color:var(--pos);}
+  .verdict-banner.neg .vb-label{color:var(--neg);}
+  .verdict-banner.watch .vb-label{color:var(--hot);}
+  .vb-score{font-size:13px;color:var(--ink-soft);font-family:"Share Tech Mono",monospace;margin-top:2px;}
+  .vb-reason{margin:10px 0 2px;font-size:15px;color:var(--ink-soft);}
+  .vb-more{display:inline-block;margin-top:4px;font-size:13.5px;}
+
+  .deep-research{margin-top:4px;}
+  .deep-research>summary{cursor:pointer;font-size:14.5px;color:var(--ink-soft);padding:8px 0;list-style:none;border-top:2px dashed var(--ink);}
+  .deep-research>summary::-webkit-details-marker{display:none;}
+  .deep-research>summary::before{content:"\25B8 ";}
+  .deep-research[open]>summary::before{content:"\25BE ";}
+  .deep-research>summary:hover{color:var(--ink);}
+
   /* ---- ticker tape ---- */
   .botbar{display:flex;align-items:center;gap:12px;margin:12px 0 0;padding:10px 14px;border:2px solid var(--ink);border-radius:10px 6px 11px 6px / 6px 11px 6px 10px;background:linear-gradient(180deg,rgba(70,189,98,.16),rgba(70,189,98,.05));filter:url(#rough);}
   .botbar .bb-m{flex:none;width:30px;height:30px;border-radius:8px;background:#12170f;border:1.5px solid #46bd62;color:#7dff5b;display:grid;place-items:center;font-weight:800;font-family:'Patrick Hand',cursive;}
