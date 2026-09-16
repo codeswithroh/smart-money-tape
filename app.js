@@ -61,13 +61,13 @@ var state={
  // from their own servers) is the reliable default — 'entries' (our own bare candlestick canvas
  // with just the mechanical levels drawn on) depends on our own rate-limited OHLCV proxy and can
  // come up empty under load. Users who prefer the plain view can still switch to it.
- chartMode:'chart',rcAddr:null,rcPair:null,rcInfo:null,trades:[],_tradesPoll:0,fhSound:false,
+ chartMode:'chart',rcAddr:null,rcPair:null,rcInfo:null,trades:[],_tradesPoll:0,
  lastOk:0,lastErr:null,scanAt:0
 };
 
 /* ---------- storage ---------- */
 function loadAll(){
- try{var c=JSON.parse(localStorage.getItem(LS_CFG)||'{}');if(c.chains){state.chains=c.chains;if(state.chains.robinhood===undefined)state.chains.robinhood=true;}if(['scan','watch','research'].indexOf(c.tab)>=0)state.tab=c.tab;if(c.chartMode)state.chartMode=c.chartMode;if(c.fhSound)state.fhSound=true;if(c.minMc>0)MIN_MC=c.minMc;if(c.maxMc>0)MAX_MC=c.maxMc;if(c.minLiq>0)MIN_LIQ=c.minLiq;if(c.maxLiq>0)MAX_LIQ=c.maxLiq;if(c.minAgeH>0)MIN_AGE_H=c.minAgeH;if(c.maxAgeH>0)MAX_AGE_H=c.maxAgeH;if(c.launchpads)state.filters.launchpads=c.launchpads;}catch(_){}
+ try{var c=JSON.parse(localStorage.getItem(LS_CFG)||'{}');if(c.chains){state.chains=c.chains;if(state.chains.robinhood===undefined)state.chains.robinhood=true;}if(['scan','watch','research'].indexOf(c.tab)>=0)state.tab=c.tab;if(c.chartMode)state.chartMode=c.chartMode;if(c.minMc>0)MIN_MC=c.minMc;if(c.maxMc>0)MAX_MC=c.maxMc;if(c.minLiq>0)MIN_LIQ=c.minLiq;if(c.maxLiq>0)MAX_LIQ=c.maxLiq;if(c.minAgeH>0)MIN_AGE_H=c.minAgeH;if(c.maxAgeH>0)MAX_AGE_H=c.maxAgeH;if(c.launchpads)state.filters.launchpads=c.launchpads;}catch(_){}
  try{state.research=JSON.parse(localStorage.getItem(LS_RES)||'{}')||{};}catch(_){state.research={};}
  try{state.holders=JSON.parse(localStorage.getItem(LS_HOLD)||'{}')||{};}catch(_){state.holders={};}
  try{var w=JSON.parse(localStorage.getItem(LS_WATCH)||'[]');state.watch=new Set(w);}catch(_){}
@@ -75,7 +75,7 @@ function loadAll(){
  try{state.thesis=JSON.parse(localStorage.getItem(LS_THESIS)||'{}')||{};}catch(_){state.thesis={};}
  try{state.journal=JSON.parse(localStorage.getItem(LS_JOURNAL)||'[]')||[];}catch(_){state.journal=[];}
 }
-function saveCfg(){try{localStorage.setItem(LS_CFG,JSON.stringify({apiKey:state.apiKey,chains:state.chains,tab:state.tab,chartMode:state.chartMode,fhSound:state.fhSound,minMc:MIN_MC,maxMc:MAX_MC,minLiq:MIN_LIQ,maxLiq:MAX_LIQ,minAgeH:MIN_AGE_H,maxAgeH:MAX_AGE_H,launchpads:state.filters.launchpads}));}catch(_){}}
+function saveCfg(){try{localStorage.setItem(LS_CFG,JSON.stringify({apiKey:state.apiKey,chains:state.chains,tab:state.tab,chartMode:state.chartMode,minMc:MIN_MC,maxMc:MAX_MC,minLiq:MIN_LIQ,maxLiq:MAX_LIQ,minAgeH:MIN_AGE_H,maxAgeH:MAX_AGE_H,launchpads:state.filters.launchpads}));}catch(_){}}
 function saveRes(){try{localStorage.setItem(LS_RES,JSON.stringify(state.research));}catch(_){}}
 function saveHold(){try{localStorage.setItem(LS_HOLD,JSON.stringify(state.holders));}catch(_){}}
 function saveScores(){try{localStorage.setItem(LS_SCORE,JSON.stringify(state.scores));}catch(_){}}
@@ -1304,7 +1304,7 @@ function renderScan(){
   return pp._tags.indexOf(cur)>=0;
  });
  q1('attnList').innerHTML=shown.length?shown.slice(0,40).map(function(pp){return tokenRow(pp);}).join(''):'<div class="empty">nothing here right now &mdash; try another filter or widen chains</div>';
- renderTicker();renderBoard();
+ renderBoard();
 }
 // shadcn's Skeleton primitive (a muted block, animate-pulse) composed into this app's own
 // row/card shapes — same idea as <Skeleton className="h-4 w-1/2" />, just vanilla markup since
@@ -1543,27 +1543,6 @@ function bundlePanel(pp,sf){
  return '<div class="panel"><h3>Bundle &amp; insider check</h3><div class="bchks">'+rows.join('')+'</div>'
   +'<p style="font-size:12.5px;color:var(--ink-soft);margin-top:8px">'+verdict+'</p></div>';
 }
-function checklistPanel(pp,proj){
- var xq=encodeURIComponent('$'+pp.sym);
- var holdersUrl=pp.url?(pp.url.split('?')[0]):'https://dexscreener.com/'+pp.chain+'/'+pp.addr;
- var items=[
-  ['Holder balances', 'Open the holders tab. Top 5 non-LP wallets should hold <b>varied</b> SOL amounts (5, 3, 1, 4.7&hellip;). Four wallets at 0.1 / 0.1 / 0.1 / 0.1 = bundle &rarr; skip.'],
-  ['Holder funding times', 'Same 5 wallets: funding ages should be <b>mixed</b> (6d, 22d, 3y, 2d). All &ldquo;25 min ago&rdquo; = bundle &rarr; skip.'],
-  ['Community, not tweet/profile', 'Tweet coin (a tweet tied to a coin) and profile coin (blue-avatar &ldquo;launching a project&rdquo;) are 99% LARP. You want a real community with people actually talking.'],
-  ['Community page', 'CA in the bio/description, a <b>pinned</b> post with CA + narrative from the admin, and real humans in &ldquo;Latest&rdquo; &mdash; not link spam / drainers. Missing any of the three &rarr; red flag.'],
-  ['Entry discipline', 'Best entries are a <b>40&ndash;50% dip from ATH</b> on a clean coin. A 10% dip (40k&rarr;36k) usually is not enough to pull in dip buyers.'],
-  ['Never marry the bag', 'Below your average and not bouncing &rarr; you&rsquo;re out. No &ldquo;maybe it comes back&rdquo;.'],
-  ['Port size', 'Under 0.1 SOL, fees eat you &mdash; go earn more first. Sizing: 0.1 port &rarr; ~0.05 new / 0.07 stretch; 0.5 &rarr; 0.1 / 0.2; 1 &rarr; 0.25 / 0.4; 5 &rarr; 1 / 1.5.'],
-  ['Default to distrust', 'Assume every coin is a scam until it passes <i>every</i> check. Narrative reading is a daily-reps skill, not a filter.']
- ];
- return '<details class="panel" style="padding:0"><summary style="padding:12px 14px;cursor:pointer;font-weight:700">Before you ape &mdash; manual checklist <span style="font-weight:400;color:var(--ink-faint)">(the stuff no API can check for you)</span></summary>'
-  +'<div style="padding:0 14px 14px">'
-  +'<div class="proj-links" style="margin:4px 0 10px"><a class="btn sm" href="'+esc(holdersUrl)+'" target="_blank" rel="noopener">holders on DexScreener</a>'
-  +'<a class="btn sm" href="https://x.com/search?q='+xq+'&f=live" target="_blank" rel="noopener">$'+esc(pp.sym)+' on X (Latest)</a>'
-  +(proj.x?'<a class="btn sm" href="'+esc(proj.xUrl)+'" target="_blank" rel="noopener">@'+esc(proj.x)+'</a>':'')+'</div>'
-  +'<ol class="chklist">'+items.map(function(it){return '<li><b>'+it[0]+'.</b> '+it[1]+'</li>';}).join('')+'</ol>'
-  +'</div></details>';
-}
 function planFrom(pp,r){
  var px=pp.priceUsd||0;var mc=pp.mc||pp.fdv||0;
  var tMult=(r.target&&mc&&r.target>mc)?r.target/mc:null;
@@ -1639,28 +1618,26 @@ function renderResearch(pp,sf,watchers,tinfo){
   +'<div class="body">'
   +verdictBanner(pp,a,sf,hr,proj)
   +'<details id="deepResearch" class="deep-research"><summary>Show full research &mdash; chart, holder breakdown, wallet history, live trades</summary>'
+  +'<div class="deep-research-body">'
   +quickStatsGrid(pp,a,sf,hr,proj)
   +'<div style="font-size:12px;color:var(--ink-soft)">score <b>'+v.pct+'/100</b> &middot; attention '+Math.round(v.att*100)+' &middot; safety '+Math.round(v.safe*100)+' &middot; project '+proj.surface+'/4'+(v.meme?' &middot; your meme '+Math.round(v.meme*100):'')+'</div>'
   +chart
   +'<div class="rc-2col">'+radarTile(rax)+'<div class="panel"><h3>What the radar sees</h3>'+autoKv+safeLine+watchLine+'</div></div>'
-  +bundlePanel(pp,sf)
+  +'<div class="rc-2col">'+bundlePanel(pp,sf)+exitLiquidityPanel(pp)+'</div>'
   +deployerPanel(sf)
   +'<div id="deployerRepPanel"></div>'
   +researchScorePanel(pp,a,sf,hr,proj)
-  +exitLiquidityPanel(pp)
   +graduationPanel(pp)
   +'<div id="cohortPanel"></div>'
   +'<div id="pulsePanel"></div>'
   +compPanel(pp,sf,tags)
   +projPanel
-  +checklistPanel(pp,proj)
-  +firehosePanel()
   +tradesPanel()
   +form
+  +'</div>'
   +'</details>'
   +'</div></div>';
  mountChart();
- startFirehose();
  renderTrades();
  var rc=document.querySelector('canvas.radar-cv');if(rc)drawRadar(rc,state._radarAxes||rax);
  // async, never blocks the rest of the card — and each guarded against a stale write if the
@@ -1769,92 +1746,6 @@ function radarTile(axes){
   +'<div class="rc-grid">'+chips+'</div>'
   +'<p class="rl-s">'+s+'</p></div></div>';
 }
-/* ---------- FIREHOSE ----------
-   Was a GitHub-style contribution grid of colored squares — looked busy, told users nothing at
-   a glance (real feedback: "clients can't understand anything from this"). Replaced with a
-   buy/sell volume timeline: one bar per minute, green rising above the line for buy $, red
-   falling below it for sell $, taller = bigger. That's the actual question a trader has looking
-   at live flow — "when did buying happen, when did selling happen, how big" — answered as a
-   shape you read in one glance instead of a grid you have to hover cell-by-cell to decode. */
-var FH_WINDOW_MIN=20;
-var fh={buys:[],streak:0,streakSide:0,biggest:null,flow:[],ac:null};
-function firehosePanel(){
- return '<div class="firehose">'
-  +'<div class="fh-stats">'
-   +'<div class="s"><div class="k">buy pressure</div><div class="v g" id="fhBP">--</div></div>'
-   +'<div class="s"><div class="k">streak</div><div class="v h" id="fhST">--</div></div>'
-   +'<div class="s"><div class="k">biggest buy</div><div class="v" id="fhBIG">--</div></div>'
-   +'<div class="s"><div class="k">trades / 5m</div><div class="v" id="fhFLOW">--</div></div>'
-  +'</div>'
-  +'<div class="tl-wrap">'
-   +'<div class="tl-head"><span id="fhHint">buy/sell volume, last '+FH_WINDOW_MIN+' minutes &mdash; green up = bought, red down = sold, taller = bigger</span>'
-   +'<button class="fh-sound" id="fhSound" aria-pressed="'+(state.fhSound?'true':'false')+'">'+(state.fhSound?'&#128266;':'&#128263;')+'</button></div>'
-   +'<div class="tl-grid" id="fhTimeline"></div>'
-  +'</div>'
-  +'<div class="fh-duel"><i class="g" id="fhG" style="width:50%"></i><i class="r" id="fhR" style="width:50%"></i><span class="seam" id="fhSeam" style="left:50%"></span><span class="pc l" id="fhPL">50</span><span class="pc rr" id="fhPR">50</span></div>'
-  +'</div>';
-}
-function fhReset(){fh.buys=[];fh.streak=0;fh.streakSide=0;fh.biggest=null;fh.flow=[];}
-function startFirehose(){if(!state.trades.length)fhReset();renderTimeline();feedFirehose();}
-function stopFirehose(){}
-function renderTimeline(){
- var el=q1('fhTimeline');if(!el)return;
- var n=FH_WINDOW_MIN,bucketMs=60000,now=Date.now();
- var buckets=[];for(var i=n-1;i>=0;i--)buckets.push({buy:0,sell:0});
- state.trades.forEach(function(t){
-  var age=now-t.ts;if(age<0||age>=n*bucketMs)return;
-  var idx=n-1-Math.floor(age/bucketMs);if(idx<0||idx>=n)return;
-  if(t.buy)buckets[idx].buy+=t.usd;else buckets[idx].sell+=t.usd;
- });
- var mx=Math.max.apply(null,buckets.map(function(b){return Math.max(b.buy,b.sell);}))||1;
- el.innerHTML=buckets.map(function(b,i){
-  var bh=b.buy?Math.max(2,Math.round(b.buy/mx*44)):0,sh=b.sell?Math.max(2,Math.round(b.sell/mx*44)):0;
-  var mAgo=n-1-i;
-  var tip=(mAgo===0?'this minute':mAgo+'m ago')+': '+fUsd(b.buy)+' bought, '+fUsd(b.sell)+' sold';
-  return '<div class="tlcol" title="'+esc(tip)+'"><i class="tlbuy" style="height:'+bh+'px"></i><i class="tlsell" style="height:'+sh+'px"></i></div>';
- }).join('');
-}
-function fhCtx(){if(!fh.ac){try{fh.ac=new (window.AudioContext||window.webkitAudioContext)();}catch(_){fh.ac=null;}}return fh.ac;}
-function fhBlip(usd,buy){
- if(!state.fhSound)return;var ac=fhCtx();if(!ac)return;
- var o=ac.createOscillator(),g=ac.createGain();
- var big=usd>=1000;
- o.type=big?'triangle':'sine';
- var base=buy?(big?520:340):(big?200:150);
- o.frequency.setValueAtTime(base,ac.currentTime);
- if(big)o.frequency.exponentialRampToValueAtTime(base*1.9,ac.currentTime+0.12);
- g.gain.setValueAtTime(0.0001,ac.currentTime);
- g.gain.exponentialRampToValueAtTime(big?0.16:0.05,ac.currentTime+0.01);
- g.gain.exponentialRampToValueAtTime(0.0001,ac.currentTime+(big?0.35:0.14));
- o.connect(g);g.connect(ac.destination);o.start();o.stop(ac.currentTime+0.4);
-}
-function feedFirehose(fresh){
- var seed=!fresh||!fresh.length;
- (fresh||[]).forEach(function(t){
-  fh.buys.push(t.buy?1:0);if(fh.buys.length>40)fh.buys.shift();
-  if(t.buy){if(fh.streakSide===1)fh.streak++;else{fh.streakSide=1;fh.streak=1;}}
-  else{if(fh.streakSide===-1)fh.streak++;else{fh.streakSide=-1;fh.streak=1;}}
-  if(t.buy&&(!fh.biggest||t.usd>fh.biggest.usd))fh.biggest=t;
-  fh.flow.push(t.ts);
-  fhBlip(t.usd,t.buy);
- });
- if(seed){
-  fh.buys=state.trades.slice(0,40).map(function(t){return t.buy?1:0;});
-  var bb=state.trades.filter(function(t){return t.buy;}).sort(function(a,b){return b.usd-a.usd;})[0];fh.biggest=bb||null;
-  fh.flow=state.trades.map(function(t){return t.ts;});
- }
- fh.flow=fh.flow.filter(function(ts){return Date.now()-ts<300000;});
- renderTimeline();
- var bp=fh.buys.length?Math.round(fh.buys.reduce(function(a,b){return a+b;},0)/fh.buys.length*100):50;
- var bpEl=q1('fhBP'),stEl=q1('fhST'),bgEl=q1('fhBIG'),flEl=q1('fhFLOW'),hintEl=q1('fhHint');
- var g=q1('fhG'),rr=q1('fhR'),seam=q1('fhSeam'),pl=q1('fhPL'),pr=q1('fhPR');
- if(bpEl){bpEl.textContent=bp+'%';bpEl.className='v '+(bp>=55?'g':bp<=45?'r':'');}
- if(g){g.style.width=bp+'%';rr.style.width=(100-bp)+'%';seam.style.left=bp+'%';pl.textContent=bp;pr.textContent=100-bp;}
- if(stEl){stEl.textContent=fh.streak+(fh.streakSide===1?'G':'R')+(fh.streak>=5?'*':'');stEl.className='v '+(fh.streakSide===1?'g':'r');}
- if(bgEl)bgEl.textContent=fh.biggest?fUsd(fh.biggest.usd).replace('$',''):'--';
- if(flEl)flEl.textContent=fh.flow.length;
- if(hintEl&&fresh&&fresh.length){var last=fresh[fresh.length-1];hintEl.textContent=(last.buy?'BUY ':'SELL ')+fUsd(last.usd)+(last.usd>=1000?' WHALE':'')+' just landed';}
-}
 function tradesPanel(){
  return '<div class="trades"><h3><span class="pulse"></span>The tape &middot; <span id="tradeRate" style="color:#8a8a76">&hellip;</span></h3>'
   +'<div class="tfeed" id="tradesFeed"><div style="padding:14px;color:#6b7180;font-size:12px">waiting for prints&hellip;</div></div></div>'
@@ -1941,11 +1832,8 @@ function pumpTrades(){
   var freshIds=freshTrades.map(function(t){return t.id;});
   var merged=list.concat(state.trades.filter(function(t){return list.every(function(n){return n.id!==t.id;});}));
   merged.sort(function(a,b){return b.ts-a.ts;});
-  var firstFill=!state.trades.length;
   state.trades=merged.slice(0,120);
   renderTrades(reduceMotion?[]:freshIds.slice(0,8));
-  if(firstFill)feedFirehose();
-  else feedFirehose(freshTrades.sort(function(a,b){return a.ts-b.ts;}));
   // once a real sample of the tape has loaded, log its wallets to the shared sightings table
   // and check whether any have shown up early elsewhere — once per coin, not every poll tick.
   if(!state._sightingsSent&&state.trades.length>=8){
@@ -2048,7 +1936,11 @@ function rcardClick(ev){
  // explicit, not relying on the browser's native "auto-open a details containing the linked
  // fragment" behavior — support for that varies by browser/webview, and this has to just work
  var vbMore=ev.target.closest('.vb-more');
- if(vbMore){ev.preventDefault();var dr=q1('deepResearch');if(dr){dr.open=true;dr.scrollIntoView({behavior:'smooth',block:'start'});}return;}
+ // scrollIntoView in the same tick as setting .open=true can collide with the browser's own
+ // open transition on a <details> (newer Chrome specifically) and snap it back closed —
+ // first click looked like it opened-then-closed, second click "worked" because by then the
+ // open transition had already finished. Deferring the scroll a frame avoids the collision.
+ if(vbMore){ev.preventDefault();var dr=q1('deepResearch');if(dr){dr.open=true;requestAnimationFrame(function(){dr.scrollIntoView({behavior:'smooth',block:'start'});});}return;}
  var seg=ev.target.closest('.seg [data-v]');
  if(seg){var f=seg.parentNode.getAttribute('data-f');var patch={};patch[f]=seg.getAttribute('data-v');setRes(addr,patch);rerenderRcard();return;}
  var st=ev.target.closest('.stars [data-v]');
@@ -2228,18 +2120,7 @@ function syncTabs(){
  ['scan','watch','research'].forEach(function(t){var el=q1('tab-'+t);if(el)el.hidden=state.tab!==t;});
  document.querySelectorAll('.tabs button').forEach(function(b){b.setAttribute('aria-selected',b.getAttribute('data-tab')===state.tab?'true':'false');});
  if(state.tab==='watch')renderWatch();
- if(state.tab!=='research'){stopChart();stopTrades();stopFirehose();}
-}
-function renderTicker(){
- var tr=q1('tickerTrack');if(!tr)return;
- var pool=state._pool||[];
- if(!pool.length){tr.innerHTML='<span class="tk-item">loading attention feed&hellip;</span>';return;}
- var items=pool.slice(0,26).map(function(pp){
-  var ch=+pp.pc.h1||0,cls=ch>0?'up':ch<0?'dn':'';
-  var rmp=pp._a&&pp._a.traj==='ramping'?'<span class="rmp"> ~ramping</span>':'';
-  return '<span class="tk-item" data-addr="'+esc(pp.addr)+'" data-chain="'+esc(pp.chain)+'"><b>$'+esc(pp.sym)+'</b> <span class="'+cls+'">'+fPct(ch)+'</span> '+fUsd(pp.mc)+rmp+'</span>';
- }).join('');
- tr.innerHTML=items+items;
+ if(state.tab!=='research'){stopChart();stopTrades();}
 }
 function setStatus(){
  var d=q1('dot'),s=q1('statusText');var age=state.lastOk?Date.now()-state.lastOk:Infinity;
@@ -2265,7 +2146,6 @@ window.addEventListener('popstate',function(){
  else{state.tab='scan';saveCfg();syncTabs();}
 });
 document.querySelectorAll('.chip-toggle[data-chain]').forEach(function(b){b.addEventListener('click',function(){var c=b.getAttribute('data-chain');state.chains[c]=!state.chains[c];b.setAttribute('aria-pressed',state.chains[c]?'true':'false');saveCfg();state.searchCache.clear();scan();});});
-q1('tickerTrack').addEventListener('click',function(ev){var t=ev.target.closest('[data-addr]');if(!t)return;openResearch(t.getAttribute('data-addr'),t.getAttribute('data-chain'));});
 q1('avatarBtn').addEventListener('click',function(ev){ev.stopPropagation();toggleMenu();});
 q1('umProfile').addEventListener('click',openProfile);
 q1('pfClose').addEventListener('click',closeProfile);
@@ -2277,7 +2157,6 @@ q1('attnList').addEventListener('click',function(ev){if(watchClick(ev))return;va
 q1('rcardHost').addEventListener('click',rcardClick);
 q1('rcardHost').addEventListener('input',rcardInput);
 q1('rcardHost').addEventListener('change',rcardInput);
-q1('rcardHost').addEventListener('click',function(ev){var s=ev.target.closest('#fhSound');if(!s)return;state.fhSound=!state.fhSound;saveCfg();fhCtx();s.setAttribute('aria-pressed',state.fhSound?'true':'false');s.innerHTML=state.fhSound?'&#128266;':'&#128263;';});
 q1('board').addEventListener('click',function(ev){if(watchClick(ev))return;var b=ev.target.closest('[data-addr]');if(!b)return;openResearch(b.getAttribute('data-addr'),b.getAttribute('data-chain'));});
 q1('watchList').addEventListener('click',function(ev){if(watchClick(ev))return;var b=ev.target.closest('[data-addr]');if(!b)return;openResearch(b.getAttribute('data-addr'),b.getAttribute('data-chain'));});
 if(q1('cmpGo'))q1('cmpGo').addEventListener('click',runCompare);
@@ -2380,7 +2259,6 @@ loadAll();
 updateFilterDot();
 document.querySelectorAll('.chip-toggle[data-chain]').forEach(function(b){var c=b.getAttribute('data-chain');b.setAttribute('aria-pressed',state.chains[c]?'true':'false');});
 syncTabs();
-renderTicker();
 renderAccount();
 // instant first paint: hydrate the last live scan from disk and render it immediately (same
 // hard-exclusion safety filter runs on it as on live data), then kick off the real scan() right
@@ -2402,7 +2280,7 @@ syncWatchFromServer().then(function(){refreshStars();if(state.tab==='watch')rend
  if(c&&/^(0x[0-9a-f]{40}|[1-9A-HJ-NP-Za-km-z]{32,44})$/i.test(c))openResearch(c,q.get('chain')||'',true);
 })();
 // keep the ticker refreshed from the latest pool even between scans, and re-scan on any tab
-setInterval(function(){if(state._pool){renderTicker();renderBoard();}},30000);
+setInterval(function(){if(state._pool)renderBoard();},30000);
 setInterval(function(){scan().then(setStatus);},90000);
 setInterval(setStatus,15000);
 })();
