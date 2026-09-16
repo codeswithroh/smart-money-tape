@@ -7,6 +7,12 @@ var RUG='https://api.rugcheck.xyz/v1/tokens',HP='https://api.honeypot.is/v2/IsHo
 var LS_CFG='ar-cfg-v1',LS_RES='ar-research-v1',LS_HOLD='ar-holders-v1',LS_WATCH='ar-watch-v1',LS_SCORE='ar-scores-v1',LS_THESIS='ar-thesis-v1',LS_POOL='ar-poolcache-v2',LS_JOURNAL='ar-journal-v1';
 var POOL_CACHE_MAX_AGE=20*60*1000; // stale cache older than this is skipped for instant-paint, straight to skeleton
 var EVM_CHAIN_ID={bsc:56,base:8453,ethereum:1};
+// Arc's real EVM chain ID is 5042 (0x13b2) — verified directly against its own RPC
+// (eth_chainId on https://rpc.arc-scan.org), not a guess. Deliberately left out of this
+// map: honeypot.is itself returns {"code":400,"error":"Invalid chain"} for 5042 as of
+// today (arc mainnet launched today, 2026-09-16) — verified live, not assumed. Add
+// arc:5042 here the day honeypot.is actually supports it; until then this keeps the
+// safety check honestly saying "no source" instead of silently failing every lookup.
 var reduceMotion=!!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 // GeckoTerminal free tier ~25 req/min and 429s without CORS headers -> throttle every GT call
 var _gtQ=[],_gtLast=0,_gtBusy=false,GT_GAP=650;
@@ -27,7 +33,7 @@ function drainGt(){
  },wait);
 }
 function gtNet(c){return ({solana:'solana',bsc:'bsc',base:'base',ethereum:'eth'})[c]||c;}
-function gtOk(c){return ['solana','bsc','base','ethereum'].indexOf(normChain(c))>=0;} // has a GeckoTerminal network (chart/trades)
+function gtOk(c){return ['solana','bsc','base','ethereum','arc'].indexOf(normChain(c))>=0;} // has a GeckoTerminal network (chart/trades)
 function chainSlug(c){return ({solana:'solana',base:'base',bsc:'bsc',ethereum:'ethereum'})[c]||'';}
 function normChain(c){c=String(c||'').toLowerCase();if(c==='eth')return'ethereum';if(c==='bnb')return'bsc';return c;}
 
