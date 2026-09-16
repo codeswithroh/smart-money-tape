@@ -46,9 +46,9 @@ var THEMES=[
 
 var state={
  tab:'scan',apiKey:'',
- chains:{solana:true,base:true,bsc:true,robinhood:true,ethereum:false},
+ chains:{solana:true,base:true,bsc:true,robinhood:true,ethereum:false,arc:true},
  // discovery-board filters — launchpad concept only applies to Solana rows; anything else
- // (base/bsc/ethereum/robinhood, or a Solana coin from a launchpad we can't identify) falls
+ // (base/bsc/ethereum/robinhood/arc, or a Solana coin from a launchpad we can't identify) falls
  // into 'other' rather than being silently dropped or silently assumed to be one specific pad.
  filters:{launchpads:{pump:true,bonk:true,boop:true,moonshot:true,fourmeme:true,other:true}},
  searchCache:new Map(), // q -> {ts,pairs}
@@ -67,7 +67,7 @@ var state={
 
 /* ---------- storage ---------- */
 function loadAll(){
- try{var c=JSON.parse(localStorage.getItem(LS_CFG)||'{}');if(c.chains){state.chains=c.chains;if(state.chains.robinhood===undefined)state.chains.robinhood=true;}if(['scan','watch','research'].indexOf(c.tab)>=0)state.tab=c.tab;if(c.chartMode)state.chartMode=c.chartMode;if(c.minMc>0)MIN_MC=c.minMc;if(c.maxMc>0)MAX_MC=c.maxMc;if(c.minLiq>0)MIN_LIQ=c.minLiq;if(c.maxLiq>0)MAX_LIQ=c.maxLiq;if(c.minAgeH>0)MIN_AGE_H=c.minAgeH;if(c.maxAgeH>0)MAX_AGE_H=c.maxAgeH;if(c.launchpads)state.filters.launchpads=c.launchpads;}catch(_){}
+ try{var c=JSON.parse(localStorage.getItem(LS_CFG)||'{}');if(c.chains){state.chains=c.chains;if(state.chains.robinhood===undefined)state.chains.robinhood=true;if(state.chains.arc===undefined)state.chains.arc=true;}if(['scan','watch','research'].indexOf(c.tab)>=0)state.tab=c.tab;if(c.chartMode)state.chartMode=c.chartMode;if(c.minMc>0)MIN_MC=c.minMc;if(c.maxMc>0)MAX_MC=c.maxMc;if(c.minLiq>0)MIN_LIQ=c.minLiq;if(c.maxLiq>0)MAX_LIQ=c.maxLiq;if(c.minAgeH>0)MIN_AGE_H=c.minAgeH;if(c.maxAgeH>0)MAX_AGE_H=c.maxAgeH;if(c.launchpads)state.filters.launchpads=c.launchpads;}catch(_){}
  try{state.research=JSON.parse(localStorage.getItem(LS_RES)||'{}')||{};}catch(_){state.research={};}
  try{state.holders=JSON.parse(localStorage.getItem(LS_HOLD)||'{}')||{};}catch(_){state.holders={};}
  try{var w=JSON.parse(localStorage.getItem(LS_WATCH)||'[]');state.watch=new Set(w);}catch(_){}
@@ -551,8 +551,8 @@ function gtPools(net,path){
  }).catch(function(){return [];});
 }
 function fetchTrending(){
- var nets=[];if(state.chains.solana)nets.push('solana');if(state.chains.base)nets.push('base');if(state.chains.bsc)nets.push('bsc');
- nets=nets.slice(0,3);if(!nets.length){state.trending=[];return Promise.resolve();}
+ var nets=[];if(state.chains.solana)nets.push('solana');if(state.chains.base)nets.push('base');if(state.chains.bsc)nets.push('bsc');if(state.chains.arc)nets.push('arc');
+ nets=nets.slice(0,4);if(!nets.length){state.trending=[];return Promise.resolve();}
  var reqs=[];nets.forEach(function(n){reqs.push(gtPools(n,'trending_pools'));});
  reqs.push(gtPools(nets[0],'new_pools')); // one fresh-pool pull, primary chain only
  return Promise.all(reqs).then(function(res){
@@ -1144,7 +1144,7 @@ function fairLaunchLikely(sf){
 }
 function chainFamily(chain){
  if(chain==='solana')return 'solana';
- if(chain==='ethereum'||chain==='base'||chain==='bsc'||chain==='arbitrum'||chain==='polygon')return 'evm';
+ if(chain==='ethereum'||chain==='base'||chain==='bsc'||chain==='arbitrum'||chain==='polygon'||chain==='arc')return 'evm';
  return 'other';
 }
 function bestComp(tags,pp,sf){
