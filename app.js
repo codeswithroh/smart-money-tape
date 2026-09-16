@@ -1375,7 +1375,7 @@ function txBar(pp){
 function tokenRow(pp){
  var a=pp._a||attn(pp),tags=pp._tags||tagThemes(pp),sf=state.safety.get(pp.addr);
  var tg=tags.length?tags.map(function(k){var t=THEMES.filter(function(x){return x.k===k;})[0];return '<span class="tag">'+esc(t?t.name:k)+'</span>';}).join('')
-   :'<span class="tag n">'+esc(typeGuess(pp))+' &mdash; you tag it</span>';
+   :'';
  var src=(pp._src&&pp._src!=='boost')?'<span class="cchip">'+esc(pp._src)+'</span>':'';
  var q=pp._q||pickQuality(pp);
  var pf=q.pumpfun?'<span class="cchip pf">pump.fun</span>':'';
