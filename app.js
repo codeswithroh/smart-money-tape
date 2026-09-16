@@ -1692,7 +1692,11 @@ function chartBlock(pp,plan){
    +'<div class="lwchart-note">DexScreener chart ('+esc(pp.chain)+') &middot; mechanical levels: entry '+fPrice(plan.lo)+'&ndash;'+fPrice(plan.hi)+', stop '+fPrice(plan.stop)+' (-'+plan.stopPct+'%), targets '+fPrice(plan.t1)+' / '+fPrice(plan.t2)+' / '+fPrice(plan.t3)+'. Not advice.</div></div>';
  }
  var toggle='<div class="ctoggle">'+(canEmbed?'<button data-cm="chart" aria-pressed="'+(mode==='chart')+'">Full chart (indicators &amp; drawing tools)</button>':'')+'<button data-cm="entries" aria-pressed="'+(mode==='entries')+'">Simple + my levels</button></div>';
- var embSrc=canEmbed?'https://www.geckoterminal.com/'+net+'/pools/'+esc(pp.pairAddr)+'?embed=1&info=0&swaps=0&grayscale=0&light_chart=0&resolution=15m':'';
+ // chart_type=mcap: verified live against GeckoTerminal's own embed — on a pool with no prior
+ // visit (no localStorage override), this query param is what actually sets the widget's
+ // default axis to market cap instead of raw per-token price. Not documented publicly; found
+ // by testing, not guessed.
+ var embSrc=canEmbed?'https://www.geckoterminal.com/'+net+'/pools/'+esc(pp.pairAddr)+'?embed=1&info=0&swaps=0&grayscale=0&light_chart=0&resolution=15m&chart_type=mcap':'';
  var embed=canEmbed?'<div class="chart-embed"'+(mode==='entries'?' hidden':'')+'><iframe loading="lazy" title="chart" src="'+(mode==='chart'?embSrc:'')+'" data-embsrc="'+embSrc+'"></iframe></div>':'';
  var cand='<div class="lwchart" data-caddr="'+esc(pp.addr)+'"'+(mode==='chart'?' hidden':'')+'></div>'
   +'<div class="lwchart-fallback" hidden><p>Chart data is slow to load right now.</p><button class="btn sm" data-cm="chart">Switch to the full chart</button></div>';
