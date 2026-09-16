@@ -1611,8 +1611,7 @@ function renderResearch(pp,sf,watchers,tinfo){
   +'<span class="nm">$'+esc(pp.sym)+'</span><span class="chain">'+esc(pp.chain)+'</span>'
   +(proj.x?'<a class="xh" href="'+esc(proj.xUrl)+'" target="_blank" rel="noopener">@'+esc(proj.x)+'</a>':'')
   +'<div class="cap-right"><span class="lnks">'+lnk.join('')+'</span>'
-   +'<div class="cap-actions"><button class="btn sm" data-act="savefav">'+(state.watch.has(pp.addr)?'&#9733; watchlist':'&#9734; watchlist')+'</button>'
-   +'<button class="btn sm pri" data-act="flex">&#128248; flex $'+esc(pp.sym)+'</button></div></div>'
+   +'<div class="cap-actions"><button class="btn sm" data-act="savefav">'+(state.watch.has(pp.addr)?'&#9733; watchlist':'&#9734; watchlist')+'</button></div></div>'
   +'</div>'
   +(gtOk(pp.chain)?'':'<div class="rc-banner" title="No fast indexer for this chain, so the chart and trade feed can read a little stale. Everything else is unaffected.">&#9888; '+esc(pp.chain)+' &mdash; slow chart/trade data</div>')
   +'<div class="body">'
@@ -1963,7 +1962,6 @@ function rcardClick(ev){
  else if(a==='delcat'){var r2=researchOf(addr);r2.catalysts.splice(+act.getAttribute('data-i'),1);setRes(addr,{catalysts:r2.catalysts});rerenderRcard();}
  else if(a==='moredesc'){var d=act.previousElementSibling;if(d)d.classList.remove('clamp');act.remove();return;}
  else if(a==='savefav'){watchToggle(addr,pp.chain,pp.sym);rerenderRcard();}
- else if(a==='flex'){flexCoin(pp);}
 }
 function rcardInput(ev){
  var pp=state.rcPair;if(!pp)return;var addr=pp.addr;var t=ev.target;
@@ -2019,62 +2017,6 @@ function drawFlex(cv,draw){
  draw(x,W,H);
  x.fillStyle='#8a8a76';x.font='26px Caveat, cursive';x.textAlign='right';
  x.fillText('made on memexray.fun · not financial advice',W-60,H-54);
-}
-function flexCoin(pp){
- var v,a,sc;try{a=attn(pp);var sf=state.safety.get(pp.addr);var proj=buildProject(pp,state.rcInfo);v=verdict(pp,a,sf,proj.surface);}catch(_){a={traj:'steady',score:0};v={pct:0,label:'',cls:'pass'};}
- var oc=state.ohlcv.get(pp.addr),oh=(oc&&oc.rows)||[];
- var cv=document.createElement('canvas');
- drawFlex(cv,function(x,W,H){
-  x.textAlign='left';
-  x.fillStyle='#cf3a26';x.font='700 130px Caveat, cursive';
-  x.fillText('$'+pp.sym,110,220);
-  x.fillStyle='#565d70';x.font='40px "Patrick Hand", cursive';
-  x.fillText(pp.chain+'  ·  '+fUsd(pp.mc)+' mc  ·  '+fAge(pp.ageMs)+' old',112,280);
-  // verdict
-  var vc={go:'#2f7c4d',watch:'#d9822b',pass:'#8a8a76',fomo:'#a5301c'}[v.cls]||'#2c3550';
-  x.fillStyle=vc;x.font='700 84px Caveat, cursive';
-  x.fillText(String(v.label).replace(/&[a-z]+;/g,'').replace(/&#\d+;/g,''),110,400);
-  // hex attention radar (top-right)
-  try{
-   var sf2=state.safety.get(pp.addr),proj2=buildProject(pp,state.rcInfo),hr2=holderRate(pp.addr);
-   var rax2=radarAxes(pp,a,sf2,proj2,hr2);
-   var rcx=W-250,rcy=345,rR=140,rn=rax2.length;
-   var rpt=function(i,rr){var ang=-Math.PI/2+i/rn*Math.PI*2;return [rcx+Math.cos(ang)*rr,rcy+Math.sin(ang)*rr,ang];};
-   for(var rr1=1;rr1<=4;rr1++){x.beginPath();for(var ri=0;ri<=rn;ri++){var q=rpt(ri%rn,rR*rr1/4);ri?x.lineTo(q[0],q[1]):x.moveTo(q[0],q[1]);}x.strokeStyle='rgba(44,53,80,.18)';x.lineWidth=1.5;x.stroke();}
-   x.font='20px "Patrick Hand", cursive';x.fillStyle='#8a8a76';
-   rax2.forEach(function(a3,i){var l=rpt(i,rR+18);x.textAlign=Math.abs(Math.cos(l[2]))<0.35?'center':(Math.cos(l[2])>0?'left':'right');x.fillText(a3.label,l[0],l[1]+6);});
-   x.beginPath();rax2.forEach(function(a3,i){var q=rpt(i,rR*Math.max(0.05,Math.min(1,a3.v)));i?x.lineTo(q[0],q[1]):x.moveTo(q[0],q[1]);});x.closePath();
-   x.fillStyle='rgba(207,58,38,.22)';x.fill();x.strokeStyle='#cf3a26';x.lineWidth=4;x.stroke();
-   rax2.forEach(function(a3,i){var q=rpt(i,rR*Math.max(0.05,Math.min(1,a3.v)));x.beginPath();x.arc(q[0],q[1],6,0,7);x.fillStyle='#d9822b';x.fill();});
-   x.textAlign='left';
-  }catch(_){}
-  // sparkline
-  var sx=110,sy=560,sw=W-190,sh=290;
-  x.fillStyle='#12131c';x.fillRect(sx,sy,sw,sh);
-  if(oh.length>2){
-   var lo=Infinity,hi=-Infinity;oh.forEach(function(r){hi=Math.max(hi,+r[2]);lo=Math.min(lo,+r[3]);});
-   var pad=(hi-lo)*0.1||hi*0.05||1;hi+=pad;lo-=pad;
-   var n=oh.length,cw=sw/n;
-   oh.forEach(function(r,i){var o=+r[1],cl=+r[4];var up=cl>=o;x.fillStyle=up?'#46bd62':'#f2594f';
-    var yO=sy+sh-((o-lo)/(hi-lo))*sh,yC=sy+sh-((cl-lo)/(hi-lo))*sh;
-    var top=Math.min(yO,yC),bh=Math.max(2,Math.abs(yO-yC));
-    x.fillRect(sx+i*cw+cw*0.2,top,Math.max(1.5,cw*0.6),bh);
-   });
-  } else { x.fillStyle='#6b7180';x.font='30px "Patrick Hand",cursive';x.fillText('chart indexing…',sx+24,sy+sh/2); }
-  // stat chips
-  var rows=[
-   ['attention',a.score+' / 100 · '+a.traj.toUpperCase()],
-   ['buy pressure 1h',Math.round(a.skew1*100)+'%'],
-   ['1h / 6h',fPct(+pp.pc.h1||0)+'  /  '+fPct(+pp.pc.h6||0)],
-   ['radar score',v.pct+' / 100']
-  ];
-  x.font='40px "Patrick Hand", cursive';
-  rows.forEach(function(rw,i){var yy=930+i*74;
-   x.fillStyle='#8a8a76';x.fillText(rw[0],112,yy);
-   x.fillStyle='#2c3550';x.textAlign='right';x.fillText(rw[1],W-160,yy);x.textAlign='left';
-  });
- });
- exportCanvas(cv,'radar-'+pp.sym+'.png');
 }
 function flexBoard(){
  var pool=(state._pool||[]).filter(function(pp){return pp._a;}).slice(0,6);
